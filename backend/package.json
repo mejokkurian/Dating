@@ -1,0 +1,26 @@
+{
+  "name": "sugar-dating-backend",
+  "version": "1.0.0",
+  "description": "Node.js backend for Sugar Dating App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "multer": "^2.0.2",
+    "socket.io": "^4.8.1",
+    "twilio": "^5.10.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
