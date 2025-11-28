@@ -7,6 +7,7 @@ class SocketService {
   constructor() {
     this.socket = null;
     this.connected = false;
+    this.listenerQueue = [];
   }
 
   async connect() {
@@ -27,6 +28,12 @@ class SocketService {
       this.socket.on('connect', () => {
         console.log('Socket connected');
         this.connected = true;
+        
+        // Process queued listeners
+        while (this.listenerQueue.length > 0) {
+          const { event, callback } = this.listenerQueue.shift();
+          this.socket.on(event, callback);
+        }
       });
 
       this.socket.on('disconnect', () => {
@@ -50,10 +57,18 @@ class SocketService {
     }
   }
 
-  // Send a message
-  sendMessage(receiverId, content, tempId) {
+  // Send a message (updated with replyTo)
+  sendMessage(receiverId, content, tempId, messageType = 'text', audioUrl = null, audioDuration = null, replyTo = null) {
     if (!this.socket) return;
-    this.socket.emit('send_message', { receiverId, content, tempId });
+    this.socket.emit('send_message', { 
+      receiverId, 
+      content, 
+      tempId, 
+      messageType,
+      audioUrl,
+      audioDuration,
+      replyTo
+    });
   }
 
   // Send typing indicator
@@ -62,41 +77,181 @@ class SocketService {
     this.socket.emit('typing', { receiverId, isTyping });
   }
 
+  // Send recording indicator
+  sendRecording(receiverId, isRecording) {
+    if (!this.socket) return;
+    this.socket.emit('recording', { receiverId, isRecording });
+  }
+
   // Mark messages as read
   markAsRead(conversationId) {
     if (!this.socket) return;
     this.socket.emit('mark_read', { conversationId });
   }
 
+  // Pin/Unpin message
+  pinMessage(messageId, conversationId, pin) {
+    if (!this.socket) return;
+    this.socket.emit('message_pin', { messageId, conversationId, pin });
+  }
+
+  // Delete message
+  deleteMessage(messageId, deleteForEveryone) {
+    if (!this.socket) return;
+    this.socket.emit('message_delete', { messageId, deleteForEveryone });
+  }
+
+  // Star/Unstar message
+  starMessage(messageId, star) {
+    if (!this.socket) return;
+    this.socket.emit('message_star', { messageId, star });
+  }
+
+  // Generic listener handler
+  addListener(event, callback) {
+    if (this.socket) {
+      this.socket.on(event, callback);
+    } else {
+      this.listenerQueue.push({ event, callback });
+    }
+  }
+
   // Listen for new messages
   onNewMessage(callback) {
-    if (!this.socket) return;
-    this.socket.on('new_message', callback);
+    this.addListener('new_message', callback);
   }
 
   // Listen for message sent confirmation
   onMessageSent(callback) {
-    if (!this.socket) return;
-    this.socket.on('message_sent', callback);
+    this.addListener('message_sent', callback);
   }
 
   // Listen for typing indicator
   onUserTyping(callback) {
+    this.addListener('user_typing', callback);
+  }
+
+  // Listen for recording indicator
+  onUserRecording(callback) {
+    this.addListener('user_recording', callback);
+  }
+
+  // Listen for message pinned
+  onMessagePinned(callback) {
+    this.addListener('message_pinned', callback);
+  }
+
+  // Listen for message starred
+  onMessageStarred(callback) {
+    this.addListener('message_starred', callback);
+  }
+
+  // Listen for message deleted
+  onMessageDeleted(callback) {
+    this.addListener('message_deleted', callback);
+  }
+
+  // Acknowledge message delivery
+  ackDelivered(messageId, senderId) {
     if (!this.socket) return;
-    this.socket.on('user_typing', callback);
+    this.socket.emit('ack_delivered', { messageId, senderId });
+  }
+
+  // Listen for delivery receipts
+  onMessageDelivered(callback) {
+    this.addListener('message_delivered', callback);
   }
 
   // Listen for read receipts
   onMessagesRead(callback) {
+    this.addListener('messages_read', callback);
+  }
+
+  // Join chat room (presence)
+  joinChat(receiverId) {
     if (!this.socket) return;
-    this.socket.on('messages_read', callback);
+    this.socket.emit('join_chat', { receiverId });
+  }
+
+  // Leave chat room (presence)
+  leaveChat(receiverId) {
+    if (!this.socket) return;
+    this.socket.emit('leave_chat', { receiverId });
+  }
+
+  // Listen for user joined chat
+  onUserJoinedChat(callback) {
+    this.addListener('user_joined_chat', callback);
+  }
+
+  // Listen for user left chat
+  onUserLeftChat(callback) {
+    this.addListener('user_left_chat', callback);
+  }
+
+  // Acknowledge presence
+  ackPresence(receiverId) {
+    if (!this.socket) return;
+    this.socket.emit('chat_presence_ack', { receiverId });
+  }
+
+  // Listen for presence acknowledgment
+  onPresenceAck(callback) {
+    this.addListener('chat_presence_ack', callback);
   }
 
   // Remove listeners
-  off(event) {
+  removeListener(eventName) {
+    if (this.socket) {
+      this.socket.off(eventName);
+    }
+    // Also remove from queue if present
+    this.listenerQueue = this.listenerQueue.filter(item => item.event !== eventName);
+  }
+
+  // ============ WebRTC Methods ============
+  
+  // Emit WebRTC offer
+  emit(event, data) {
     if (!this.socket) return;
-    this.socket.off(event);
+    this.socket.emit(event, data);
+  }
+
+  // Listen for incoming call
+  onIncomingCall(callback) {
+    this.addListener('incoming_call', callback);
+  }
+
+  // Listen for WebRTC offer
+  onWebRTCOffer(callback) {
+    this.addListener('webrtc_offer', callback);
+  }
+
+  // Listen for WebRTC answer
+  onWebRTCAnswer(callback) {
+    this.addListener('webrtc_answer', callback);
+  }
+
+  // Listen for ICE candidate
+  onICECandidate(callback) {
+    this.addListener('ice_candidate', callback);
+  }
+
+  // Listen for call accepted
+  onCallAccepted(callback) {
+    this.addListener('call_accepted', callback);
+  }
+
+  // Listen for call rejected
+  onCallRejected(callback) {
+    this.addListener('call_rejected', callback);
+  }
+
+  // Listen for call ended
+  onCallEnded(callback) {
+    this.addListener('call_ended', callback);
   }
 }
 
-export default new SocketService();
+const socketService = new SocketService();
+export default socketService;

@@ -12,7 +12,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getPotentialMatches } from '../services/api/user';
+import { getPotentialMatches, getUserById } from '../services/api/user';
+import { recordInteraction } from '../services/api/match';
 import SwipeCard from '../components/SwipeCard';
 import ProfileBottomSheet from '../components/ProfileBottomSheet';
 import MatchCommentModal from '../components/MatchCommentModal';
@@ -21,7 +22,7 @@ import theme from '../theme/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const MainScreen = ({ navigation }) => {
+const MainScreen = ({ navigation, route }) => {
   const { user, userData } = useAuth();
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -31,10 +32,66 @@ const MainScreen = ({ navigation }) => {
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchProfile, setMatchProfile] = useState(null);
+  const [isPendingMode, setIsPendingMode] = useState(false);
 
   React.useEffect(() => {
-    loadInitialData();
-  }, []);
+    const loadPendingProfile = async () => {
+      if (route.params?.pendingProfile) {
+        // Pending Match Mode
+        console.log('Loading pending profile:', route.params.pendingProfile.displayName);
+        
+        // Set initial data from params (optimistic)
+        setProfiles([route.params.pendingProfile]);
+        setCurrentIndex(0);
+        setIsPendingMode(true);
+        setLoading(false);
+
+        try {
+          // Fetch full details to ensure we have all fields (occupation, location, etc.)
+          const fullProfile = await getUserById(route.params.pendingProfile._id);
+          if (fullProfile) {
+            console.log('Fetched full profile details');
+            setProfiles([fullProfile]);
+          }
+        } catch (error) {
+          console.error('Error fetching full pending profile:', error);
+          // Fallback is already set, so just log error
+        }
+      } else {
+        // Normal Discovery Mode
+        setIsPendingMode(false);
+        loadInitialData();
+      }
+    };
+
+    loadPendingProfile();
+  }, [route.params?.pendingProfile]);
+
+  // Handle Tab Press for Refresh
+  React.useEffect(() => {
+    const unsubscribe = navigation.getParent()?.addListener('tabPress', (e) => {
+      if (navigation.isFocused()) {
+        // If already focused, reload data
+        console.log('Tab pressed while focused, refreshing...');
+        if (isPendingMode) {
+           // If in pending mode, maybe go back to normal mode? 
+           // Or just reload pending profile? 
+           // User said "reload the user details", so let's reload whatever mode we are in.
+           // But usually double tap on home means "reset to top/fresh".
+           // Let's just reload current state for now.
+           // Actually, if in pending mode, tapping home tab usually takes you to "Home" (Discovery).
+           // Let's switch to normal discovery mode if tab is pressed in pending mode.
+           setIsPendingMode(false);
+           navigation.setParams({ pendingProfile: null }); // Clear params
+           loadInitialData();
+        } else {
+           loadInitialData();
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isPendingMode]);
 
   const loadInitialData = async () => {
     try {
@@ -94,34 +151,109 @@ const MainScreen = ({ navigation }) => {
     setCurrentIndex((prev) => prev + 1);
   };
 
-  const handleSwipeLeft = (profile) => {
+  const handleSwipeLeft = async (profile) => {
     console.log('Passed:', profile.name);
-    setCurrentIndex((prev) => prev + 1);
-  };
-
-  const handleSwipeRight = (profile) => {
-    console.log('Liked:', profile.name);
-    // Simulate match
-    if (Math.random() > 0.5) {
-      Alert.alert(
-        '🎉 It\'s a Match!',
-        `You and ${profile.name} liked each other!`,
-        [
-          { text: 'Send Message', onPress: () => console.log('Navigate to chat') },
-          { text: 'Keep Swiping', style: 'cancel' },
-        ]
-      );
+    try {
+      await recordInteraction(profile._id, 'PASS');
+    } catch (error) {
+      console.error('Error recording pass:', error);
     }
-    setCurrentIndex((prev) => prev + 1);
+    
+    if (isPendingMode) {
+      // Exit pending mode and load discovery feed
+      setIsPendingMode(false);
+      navigation.setParams({ pendingProfile: null });
+      setCurrentIndex(0);
+      loadProfiles();
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
   };
 
-  const handleSuperLike = (profile) => {
+  const handleSwipeRight = async (profile) => {
+    console.log('Liked:', profile.name);
+    try {
+      const result = await recordInteraction(profile._id, 'LIKE');
+      
+      // Check if it's a mutual match
+      if (result.match && result.match.isMutual) {
+        Alert.alert(
+          '🎉 It\'s a Match!',
+          `You and ${profile.name || profile.displayName} liked each other!`,
+          [
+            { 
+              text: 'Send Message', 
+              onPress: () => navigation.navigate('Chat', {
+                user: profile,
+                matchStatus: 'active',
+                isInitiator: false
+              })
+            },
+            { 
+              text: 'Keep Swiping', 
+              style: 'cancel', 
+              onPress: () => {
+                if (isPendingMode) {
+                  // Exit pending mode and load discovery feed
+                  setIsPendingMode(false);
+                  navigation.setParams({ pendingProfile: null });
+                  setCurrentIndex(0);
+                  loadProfiles();
+                }
+              }
+            },
+          ]
+        );
+      } else if (isPendingMode) {
+        // Exit pending mode and load discovery feed
+        setIsPendingMode(false);
+        navigation.setParams({ pendingProfile: null });
+        setCurrentIndex(0);
+        loadProfiles();
+      }
+    } catch (error) {
+      console.error('Error recording like:', error);
+    }
+    
+    if (!isPendingMode) {
+      setCurrentIndex((prev) => prev + 1);
+    }
+  };
+
+  const handleSuperLike = async (profile) => {
     console.log('Super Liked:', profile.name);
-    Alert.alert(
-      '⭐ Super Like Sent!',
-      `${profile.name} will see that you super liked them!`,
-      [{ text: 'OK' }]
-    );
+    try {
+      const result = await recordInteraction(profile._id, 'SUPERLIKE');
+      
+      Alert.alert(
+        '⭐ Super Like Sent!',
+        `${profile.name || profile.displayName} will see that you super liked them!`,
+        [{ text: 'OK' }]
+      );
+
+      // Check if it's a mutual match
+      if (result.match && result.match.isMutual) {
+        setTimeout(() => {
+          Alert.alert(
+            '🎉 It\'s a Match!',
+            `You and ${profile.name || profile.displayName} liked each other!`,
+            [
+              { 
+                text: 'Send Message', 
+                onPress: () => navigation.navigate('Chat', {
+                  user: profile,
+                  matchStatus: 'active',
+                  isInitiator: false
+                })
+              },
+              { text: 'Keep Swiping', style: 'cancel' },
+            ]
+          );
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error recording super like:', error);
+    }
     setCurrentIndex((prev) => prev + 1);
     setShowBottomSheet(false);
   };
@@ -180,7 +312,22 @@ const MainScreen = ({ navigation }) => {
           colors={['rgba(255,255,255,0.2)', 'transparent']}
           style={styles.header}
         >
-          <Text style={styles.headerTitle}>Discover</Text>
+          {isPendingMode ? (
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => {
+                setIsPendingMode(false);
+                navigation.setParams({ pendingProfile: null });
+                setCurrentIndex(0);
+                loadProfiles();
+              }}
+            >
+              <Ionicons name="arrow-back" size={28} color={theme.colors.text.primary} />
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.headerTitle}>Discover</Text>
+          )}
+          
           <TouchableOpacity 
             style={styles.filterButton}
             onPress={() => {/* TODO: Open filter modal */}}
@@ -299,6 +446,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
   },
   filterButton: {
+    padding: 8,
+  },
+  backButton: {
     padding: 8,
   },
   filterBar: {

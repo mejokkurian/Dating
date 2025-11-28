@@ -170,10 +170,16 @@ const SwipeCard = ({ data, onSwipeLeft, onSwipeRight, onCardPress, onDoubleTap }
           </Text>
         )}
                 <View style={styles.detailsRow}>
-          {data.distance && (
+          {data.location && (
             <View style={styles.detailItem}>
               <Ionicons name="location" size={16} color="#fff" />
-              <Text style={styles.detailText}>{data.distance} km away</Text>
+              <Text style={styles.detailText}>{data.location}</Text>
+            </View>
+          )}
+          {data.distance && (
+            <View style={styles.detailItem}>
+              <Ionicons name="navigate" size={16} color="#fff" />
+              <Text style={styles.detailText}>{data.distance} km</Text>
             </View>
           )}
           {data.occupation && (

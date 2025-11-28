@@ -18,11 +18,63 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true,
+    required: function() {
+      return this.messageType === 'text';
+    },
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'audio', 'image'],
+    default: 'text',
+  },
+  audioUrl: {
+    type: String,
+  },
+  audioDuration: {
+    type: Number, // in seconds
+  },
+  // Reply functionality
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+  },
+  // Pin functionality
+  isPinned: {
+    type: Boolean,
+    default: false,
+  },
+  pinnedAt: {
+    type: Date,
+  },
+  pinnedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  // Star functionality
+  starredBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  // Delete functionality
+  deletedFor: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  deletedForEveryone: {
+    type: Boolean,
+    default: false,
+  },
+  deletedAt: {
+    type: Date,
   },
   read: {
     type: Boolean,
     default: false,
+  },
+  status: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent',
   },
   readAt: {
     type: Date,

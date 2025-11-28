@@ -45,3 +45,32 @@ exports.deleteImage = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete image', error: error.message });
   }
 };
+
+// @desc    Upload audio to Cloudinary
+// @route   POST /api/upload/audio
+// @access  Private
+exports.uploadAudio = async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ message: 'No audio file provided' });
+    }
+
+    const file = req.files.file;
+
+    // Upload audio to Cloudinary
+    const result = await cloudinary.uploader.upload(file.tempFilePath, {
+      folder: 'sugar-dating-app/audio',
+      resource_type: 'video', // Cloudinary uses 'video' for audio files
+      format: 'm4a',
+    });
+
+    res.json({
+      url: result.secure_url,
+      publicId: result.public_id,
+      duration: result.duration
+    });
+  } catch (error) {
+    console.error('Audio upload error:', error);
+    res.status(500).json({ message: 'Failed to upload audio', error: error.message });
+  }
+};

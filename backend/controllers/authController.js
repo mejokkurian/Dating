@@ -138,3 +138,182 @@ exports.verifyPhoneOTP = async (req, res) => {
 exports.socialLogin = async (req, res) => {
   res.status(501).json({ message: 'Not implemented yet' });
 };
+
+// @desc    Google Sign-In
+// @route   POST /api/auth/google
+// @access  Public
+exports.googleSignIn = async (req, res) => {
+  try {
+    const { idToken, email, displayName, photoURL } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required from Google sign-in' });
+    }
+
+    // Check if user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create new user
+      user = await User.create({
+        email,
+        displayName: displayName || 'Google User',
+        googleId: idToken, // Store token hash or user ID
+        photos: photoURL ? [photoURL] : [],
+        isVerified: true, // Google accounts are verified
+      });
+    } else {
+      // Update existing user
+      if (!user.googleId) {
+        user.googleId = idToken;
+      }
+      if (photoURL && (!user.photos || user.photos.length === 0)) {
+        user.photos = [photoURL];
+      }
+      await user.save();
+    }
+
+    res.json({
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      photos: user.photos,
+      onboardingCompleted: user.onboardingCompleted,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Apple Sign-In
+// @route   POST /api/auth/apple
+// @access  Public
+exports.appleSignIn = async (req, res) => {
+  try {
+    const { identityToken, email, fullName } = req.body;
+
+    if (!email && !identityToken) {
+      return res.status(400).json({ message: 'Email or identity token is required' });
+    }
+
+    // For Apple Sign-In, email might not be provided on subsequent logins
+    // We need to find user by appleId or email
+    let user;
+    
+    if (email) {
+      user = await User.findOne({ $or: [{ email }, { appleId: identityToken }] });
+    } else {
+      user = await User.findOne({ appleId: identityToken });
+    }
+
+    if (!user) {
+      // Create new user
+      const displayName = fullName 
+        ? `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim()
+        : 'Apple User';
+
+      user = await User.create({
+        email: email || `${identityToken.substring(0, 10)}@appleid.user`,
+        displayName,
+        appleId: identityToken,
+        isVerified: true, // Apple accounts are verified
+      });
+    } else {
+      // Update existing user
+      if (!user.appleId) {
+        user.appleId = identityToken;
+      }
+      await user.save();
+    }
+
+    res.json({
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      photos: user.photos,
+      onboardingCompleted: user.onboardingCompleted,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Request password reset
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // Don't reveal if user exists or not
+      return res.json({ message: 'If an account exists, a password reset link has been sent' });
+    }
+
+    // Generate reset token (valid for 1 hour)
+    const resetToken = jwt.sign(
+      { id: user._id, purpose: 'password-reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // In production, send email with reset link
+    // For now, return the token (in production, this should be sent via email)
+    console.log('Password reset token:', resetToken);
+
+    res.json({ 
+      message: 'If an account exists, a password reset link has been sent',
+      // Remove this in production - only for development
+      resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Reset password with token
+// @route   POST /api/auth/reset-password/confirm
+// @access  Public
+exports.confirmPasswordReset = async (req, res) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ message: 'Reset token and new password are required' });
+    }
+
+    // Verify reset token
+    const decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+
+    if (decoded.purpose !== 'password-reset') {
+      return res.status(400).json({ message: 'Invalid reset token' });
+    }
+
+    // Find user
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};

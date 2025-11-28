@@ -90,7 +90,15 @@ exports.getMessages = async (req, res) => {
     const messages = await Message.find(query)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .populate('senderId', 'displayName photos');
+      .populate('senderId', 'displayName photos')
+      .populate({
+        path: 'replyTo',
+        select: 'content messageType audioUrl audioDuration senderId createdAt',
+        populate: {
+          path: 'senderId',
+          select: 'displayName photos'
+        }
+      });
 
     res.json(messages.reverse());
   } catch (error) {

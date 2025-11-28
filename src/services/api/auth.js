@@ -37,14 +37,30 @@ export const signOut = async () => {
 };
 
 // Mocking other auth methods for now or implementing if backend supports them
-export const signInWithGoogle = async () => {
-  // Implement social login logic here calling /auth/social
-  console.warn('Google Sign In not fully implemented in frontend yet');
+export const signInWithGoogle = async (googleData) => {
+  try {
+    const response = await api.post('/auth/google', googleData);
+    if (response.data.token) {
+      await AsyncStorage.setItem('userToken', response.data.token);
+      await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+    }
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
 };
 
-export const signInWithApple = async () => {
-  // Implement social login logic here calling /auth/social
-  console.warn('Apple Sign In not fully implemented in frontend yet');
+export const signInWithApple = async (appleData) => {
+  try {
+    const response = await api.post('/auth/apple', appleData);
+    if (response.data.token) {
+      await AsyncStorage.setItem('userToken', response.data.token);
+      await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+    }
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
 };
 
 export const signInWithPhoneNumber = async (phoneNumber) => {
@@ -63,6 +79,27 @@ export const verifyPhoneOTP = async (phoneNumber, code) => {
       await AsyncStorage.setItem('userToken', response.data.token);
       await AsyncStorage.setItem('userData', JSON.stringify(response.data));
     }
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const requestPasswordReset = async (email) => {
+  try {
+    const response = await api.post('/auth/reset-password', { email });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error;
+  }
+};
+
+export const confirmPasswordReset = async (resetToken, newPassword) => {
+  try {
+    const response = await api.post('/auth/reset-password/confirm', {
+      resetToken,
+      newPassword,
+    });
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : error;

@@ -50,10 +50,20 @@ export const isOnboardingComplete = async (userId) => {
 
 export const getPotentialMatches = async () => {
   try {
-    const response = await api.get('/matches');
+    const response = await api.get('/users/matches');
     return response.data;
   } catch (error) {
     console.error('Error fetching matches:', error);
     return [];
+  }
+};
+
+export const getUserById = async (userId) => {
+  try {
+    const response = await api.get(`/users/profile/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user by ID:', error);
+    throw error;
   }
 };

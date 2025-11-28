@@ -22,6 +22,31 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
     return null;
   }
 
+  const handleLikeBack = async () => {
+    try {
+      // Import dynamically to avoid circular dependencies if any
+      const { recordInteraction } = require('../../services/api/match');
+      
+      const result = await recordInteraction(profileData._id, 'LIKE');
+      
+      if (result.match && result.match.isMutual) {
+        // Navigate to chat immediately
+        navigation.replace('Chat', {
+          user: profileData,
+          matchStatus: 'active',
+          isInitiator: false
+        });
+      }
+    } catch (error) {
+      console.error('Error liking back:', error);
+      alert('Failed to match. Please try again.');
+    }
+  };
+
+  const handlePass = () => {
+    navigation.goBack();
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -180,9 +205,21 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: 100 }} />
         </View>
       </ScrollView>
+
+      {/* Action Bar for Pending Matches */}
+      {route.params?.isPendingMatch && (
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.actionButtonPass} onPress={handlePass}>
+            <Ionicons name="close" size={30} color="#FF4B4B" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButtonLike} onPress={handleLikeBack}>
+            <Ionicons name="heart" size={30} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -364,6 +401,42 @@ const styles = StyleSheet.create({
   lifestyleText: {
     fontSize: 14,
     color: theme.colors.text.primary,
+  },
+  actionBar: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+    paddingHorizontal: 20,
+  },
+  actionButtonPass: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  actionButtonLike: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FF4B4B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF4B4B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });
 

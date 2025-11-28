@@ -23,7 +23,7 @@ const PhoneOTPScreen = ({ route, navigation }) => {
   const { phoneNumber } = route.params;
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
-  const inputRefs = useRef([]);
+  const inputRefs = useRef(null);
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { login } = useAuth();
 
@@ -46,50 +46,16 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       }),
     ]).start();
 
-    // Focus first input
-    if (inputRefs.current[0]) {
-      setTimeout(() => inputRefs.current[0].focus(), 500);
-    }
+    // Auto-focus input shortly after mounting
+    const timer = setTimeout(() => {
+      inputRefs.current?.focus();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleCodeChange = (text, index) => {
-    // Handle autofill/paste of full code
-    if (text.length > 1) {
-      const digits = text.slice(0, 6).split('');
-      const newCode = [...code];
-      digits.forEach((digit, i) => {
-        if (i < 6) newCode[i] = digit;
-      });
-      setCode(newCode);
-      
-      // Focus last input or trigger verify if complete
-      if (digits.length === 6) {
-        inputRefs.current[5]?.blur();
-      } else {
-        inputRefs.current[Math.min(digits.length, 5)]?.focus();
-      }
-      return;
-    }
-
-    // Handle single digit input
-    const newCode = [...code];
-    newCode[index] = text;
-    setCode(newCode);
-
-    // Auto-focus next input
-    if (text && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerify = async () => {
-    const otpCode = code.join('');
+  const handleVerify = async (otpCodeInput) => {
+    const otpCode = otpCodeInput || code.join('');
     if (otpCode.length !== 6) {
       showAlert('Error', 'Please enter the complete 6-digit code', 'error');
       return;
@@ -99,7 +65,7 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       setLoading(true);
       const response = await verifyPhoneOTP(phoneNumber, otpCode);
       await login(response);
-      // Navigation will be handled by AuthContext
+      // Navigation is handled by AuthContext
     } catch (error) {
       showAlert('Error', error.message || 'Invalid verification code', 'error');
     } finally {
@@ -112,6 +78,8 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       setLoading(true);
       await signInWithPhoneNumber(phoneNumber);
       showAlert('Success', 'OTP has been resent', 'success');
+      // Refocus input after resend
+      setTimeout(() => inputRefs.current?.focus(), 100);
     } catch (error) {
       showAlert('Error', error.message || 'Failed to resend OTP', 'error');
     } finally {
@@ -155,31 +123,57 @@ const PhoneOTPScreen = ({ route, navigation }) => {
             <Text style={styles.phoneNumber}>{phoneNumber}</Text>
           </View>
 
-          {/* OTP Input */}
+          {/* OTP Input Section */}
           <View style={styles.codeContainer}>
+            {/* HIDDEN MASTER INPUT - Handles typing, pasting, and OS autofill */}
+            <TextInput
+              ref={inputRefs}
+              style={styles.hiddenInputOverlay}
+              value={code.join('')}
+              onChangeText={(text) => {
+                // Filter non-numeric input and limit length
+                const cleanText = text.replace(/[^0-9]/g, '').slice(0, 6);
+                
+                // Update array representation for visual boxes
+                const newCode = cleanText.split('');
+                while (newCode.length < 6) {
+                  newCode.push('');
+                }
+                
+                setCode(newCode);
+
+                // If full code entered/pasted, trigger verify
+                if (cleanText.length === 6) {
+                  handleVerify(cleanText); 
+                }
+              }}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode" // iOS Autofill
+              autoComplete="sms-otp" // Android Autofill
+              importantForAutofill="yes" // Android accessibility
+              maxLength={6}
+              caretHidden={true}
+              autoFocus={true}
+            />
+
+            {/* Visual Digit Boxes */}
             {code.map((digit, index) => (
-              <GlassCard key={index} style={styles.codeInputCard} opacity={0.9}>
-                <TextInput
-                  ref={(ref) => (inputRefs.current[index] = ref)}
-                  style={styles.codeInput}
-                  value={digit}
-                  onChangeText={(text) => handleCodeChange(text, index)}
-                  onKeyPress={(e) => handleKeyPress(e, index)}
-                  keyboardType="number-pad"
-                  maxLength={1}
-                  selectTextOnFocus
-                  placeholderTextColor="rgba(0,0,0,0.3)"
-                  textContentType={index === 0 ? "oneTimeCode" : "none"}
-                  autoComplete={index === 0 ? "sms-otp" : "off"}
-                />
-              </GlassCard>
+              <View
+                key={index}
+                style={styles.codeBoxWrapper}
+                pointerEvents="none" // Pass touches through to the TextInput
+              >
+                <GlassCard style={styles.codeInputCard} opacity={0.9}>
+                  <Text style={styles.codeDigit}>{digit}</Text>
+                </GlassCard>
+              </View>
             ))}
           </View>
 
           {/* Verify Button */}
           <TouchableOpacity
             style={[styles.verifyButton, loading && styles.buttonDisabled]}
-            onPress={handleVerify}
+            onPress={() => handleVerify()}
             disabled={loading}
           >
             {loading ? (
@@ -283,16 +277,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: theme.spacing['2xl'],
     gap: 8,
+    position: 'relative',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.01,
+    zIndex: 10, // Ensure it sits on top to capture touches
+  },
+  codeBoxContainer: {
+    flex: 1,
+    height: 64,
   },
   codeInputCard: {
     flex: 1,
     padding: 0,
-    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 16,
   },
-  codeInput: {
-    flex: 1,
-    textAlign: 'center',
+  codeDigit: {
     fontSize: 28,
     fontWeight: theme.typography.fontWeight.bold,
     color: '#000000',

@@ -11,8 +11,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
 import { useAuth } from '../../context/AuthContext';
-import { uploadVerificationDocument } from '../../services/firebase/storage';
-import { createVerificationDocument, getVerificationDocument } from '../../services/firebase/firestore';
+import { uploadImage } from '../../services/api/upload';
+import { createVerification, getVerificationStatus } from '../../services/api/verification';
 import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 
@@ -30,14 +30,14 @@ const KYCUploadScreen = ({ navigation }) => {
 
   const loadVerificationStatus = async () => {
     try {
-      const verification = await getVerificationDocument(user.uid);
+      const verification = await getVerificationStatus(user._id);
       if (verification) {
         setVerificationStatus(verification.status);
-        if (verification.frontImageURL) {
-          setFrontImage({ uri: verification.frontImageURL });
+        if (verification.frontImageUrl) {
+          setFrontImage({ uri: verification.frontImageUrl });
         }
-        if (verification.backImageURL) {
-          setBackImage({ uri: verification.backImageURL });
+        if (verification.backImageUrl) {
+          setBackImage({ uri: verification.backImageUrl });
         }
       }
     } catch (error) {
@@ -121,24 +121,16 @@ const KYCUploadScreen = ({ navigation }) => {
       setLoading(true);
 
       // Upload front image
-      const frontImageURL = await uploadVerificationDocument(
-        user.uid,
-        'front',
-        frontImage.uri
-      );
+      const frontImageUrl = await uploadImage(frontImage.uri);
 
       // Upload back image
-      const backImageURL = await uploadVerificationDocument(
-        user.uid,
-        'back',
-        backImage.uri
-      );
+      const backImageUrl = await uploadImage(backImage.uri);
 
       // Create verification document
-      await createVerificationDocument(user.uid, {
-        frontImageURL,
-        backImageURL,
-        status: 'pending',
+      await createVerification({
+        frontImageUrl,
+        backImageUrl,
+        documentType: 'id_card', // Defaulting to ID card for now
       });
 
       showAlert(

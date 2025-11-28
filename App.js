@@ -1,13 +1,17 @@
 import React from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from './src/context/AuthContext';
+import { CallProvider } from './src/context/CallContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
-import { firebaseApp } from './src/firebase/config';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthNavigator />
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <CallProvider>
+          <AuthNavigator />
+        </CallProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
-

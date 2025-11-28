@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Match = require('../models/Match');
+const Interaction = require('../models/Interaction');
 
 // @desc    Get user profile
 // @route   GET /api/users/profile
@@ -61,6 +63,88 @@ exports.saveOnboarding = async (req, res) => {
     } else {
       res.status(404).json({ message: 'User not found' });
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get user by ID
+// @route   GET /api/users/:id
+// @access  Private
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get potential matches
+// @route   GET /api/users/matches
+// @access  Private
+exports.getPotentialMatches = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+
+    // Find all matches (active or pending) involving the current user
+    const existingMatches = await Match.find({
+      $or: [{ user1Id: currentUserId }, { user2Id: currentUserId }],
+    });
+
+    // Get IDs of users to exclude
+    const excludedUserIds = existingMatches.map(match => 
+      match.user1Id.toString() === currentUserId.toString() 
+        ? match.user2Id 
+        : match.user1Id
+    );
+
+    // Also exclude users we have already interacted with (swiped)
+    const interactions = await Interaction.find({ userId: currentUserId });
+    const interactedUserIds = interactions.map(i => i.targetId);
+
+    // Combine all exclusions
+    const allExcludedIds = [...new Set([
+      currentUserId, 
+      ...excludedUserIds, 
+      ...interactedUserIds
+    ])];
+    
+    // Get all users except excluded ones who have completed onboarding
+    const users = await User.find({
+      _id: { $nin: allExcludedIds },
+      onboardingCompleted: true,
+      displayName: { $exists: true },
+      age: { $exists: true }
+    })
+    .select('-password')
+    .limit(50);
+
+    // Format response
+    const matches = users.map(user => ({
+      id: user._id,
+      _id: user._id,
+      displayName: user.displayName,
+      age: user.age,
+      gender: user.gender,
+      location: user.location || 'Unknown Location',
+      bio: user.bio || 'No bio available',
+      occupation: user.occupation || 'Undisclosed',
+      height: user.height,
+      photos: user.photos || [],
+      interests: user.interests || [],
+      relationshipExpectations: user.relationshipExpectations || 'Open to possibilities',
+      isVerified: user.isVerified || false,
+      isPremium: user.isPremium || false,
+      distance: Math.floor(Math.random() * 20) + 1 // Mock distance for now
+    }));
+
+    res.json(matches);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

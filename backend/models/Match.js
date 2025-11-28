@@ -13,8 +13,20 @@ const matchSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'unmatched'],
-    default: 'active',
+    enum: ['pending', 'active', 'unmatched'],
+    default: 'pending',
+  },
+  initiatorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  user1Liked: {
+    type: Boolean,
+    default: false,
+  },
+  user2Liked: {
+    type: Boolean,
+    default: false,
   },
   lastMessageAt: {
     type: Date,
@@ -45,6 +57,9 @@ matchSchema.statics.findOrCreateMatch = async function(userId1, userId2) {
     match = await this.create({
       user1Id: ids[0],
       user2Id: ids[1],
+      status: 'active',
+      user1Liked: true,
+      user2Liked: true,
     });
   }
 
