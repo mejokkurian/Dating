@@ -67,3 +67,18 @@ export const getUserById = async (userId) => {
     throw error;
   }
 };
+
+/**
+ * Register push notification token with backend
+ * @param {string} token - Expo push token
+ * @returns {Promise<Object>}
+ */
+export const registerPushToken = async (token) => {
+  try {
+    const response = await api.post('/users/push-token', { token });
+    return response.data;
+  } catch (error) {
+    console.error('Error registering push token:', error);
+    throw error;
+  }
+};

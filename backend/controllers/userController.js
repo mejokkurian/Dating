@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Match = require('../models/Match');
 const Interaction = require('../models/Interaction');
+const pushNotificationService = require('../services/pushNotificationService');
 
 // @desc    Get user profile
 // @route   GET /api/users/profile
@@ -146,6 +147,40 @@ exports.getPotentialMatches = async (req, res) => {
 
     res.json(matches);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Register/Update push notification token
+// @route   POST /api/users/push-token
+// @access  Private
+exports.registerPushToken = async (req, res) => {
+  try {
+    const { token, deviceId } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ message: 'Push token is required' });
+    }
+
+    // Validate token format
+    if (!pushNotificationService.validateToken(token)) {
+      return res.status(400).json({ message: 'Invalid push token format' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Add or update push token
+    await user.addPushToken(token, deviceId);
+
+    res.json({ 
+      message: 'Push token registered successfully',
+      tokenCount: user.pushTokens.length
+    });
+  } catch (error) {
+    console.error('Error registering push token:', error);
     res.status(500).json({ message: error.message });
   }
 };

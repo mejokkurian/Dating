@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const Match = require('../models/Match');
+const pushNotificationService = require('../services/pushNotificationService');
+const NotificationFactory = require('../services/notifications/notificationFactory');
 
 // Helper function to generate conversation ID from two user IDs (same as chatHandler)
 const getConversationId = (userId1, userId2) => {
@@ -256,6 +258,10 @@ exports.sendQuickHello = async (req, res) => {
       ]
     });
 
+    const sender = await User.findById(senderId).select('displayName name photos');
+    const matchWasCreated = !match;
+    const matchWasActivated = match && match.status === 'pending';
+
     // If no match exists, create a pending match
     // Sort IDs to match the Match model's expected format (sorted for consistency)
     if (!match) {
@@ -302,6 +308,21 @@ exports.sendQuickHello = async (req, res) => {
         createdAt: newMessage.createdAt,
         status: 'sent'
       });
+    }
+
+    // Send push notification for match creation or activation
+    if (matchWasCreated || matchWasActivated) {
+      try {
+        const notification = NotificationFactory.createMatchNotification(
+          sender,
+          match._id.toString(),
+          message
+        );
+        await pushNotificationService.sendNotification(userId.toString(), notification);
+      } catch (notificationError) {
+        console.error('Error sending match push notification:', notificationError);
+        // Don't fail the request if notification fails
+      }
     }
 
     res.json({ 

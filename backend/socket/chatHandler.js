@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const Message = require('../models/Message');
 const Match = require('../models/Match');
 const User = require('../models/User');
+const pushNotificationService = require('../services/pushNotificationService');
+const NotificationFactory = require('../services/notifications/notificationFactory');
 
 // Custom bad words list for dating app
 const customBadWords = [
@@ -183,6 +185,41 @@ module.exports = (io) => {
           ...message.toObject(),
           tempId: data.tempId,
         });
+
+        // Check if receiver is actively in the chat room
+        const receiverSocketRoom = `chat_${conversationId}`;
+        const receiverSockets = await io.in(receiverSocketRoom).fetchSockets();
+        const isReceiverInChat = receiverSockets.some(s => s.userId?.toString() === receiverId.toString());
+
+        // Send push notification if receiver is not actively in the chat
+        if (!isReceiverInChat) {
+          try {
+            // Get message preview text
+            let messagePreview = 'New message';
+            if (data.messageType === 'text' && content) {
+              messagePreview = content.length > 50 ? content.substring(0, 50) + '...' : content;
+            } else if (data.messageType === 'image') {
+              messagePreview = '📷 Photo';
+            } else if (data.messageType === 'audio') {
+              messagePreview = '🎤 Voice message';
+            } else if (data.messageType === 'file') {
+              messagePreview = '📎 File';
+            }
+
+            // Create notification payload
+            const notification = NotificationFactory.createMessageNotification(
+              message.senderId,
+              messagePreview,
+              conversationId
+            );
+
+            // Send notification
+            await pushNotificationService.sendNotification(receiverId.toString(), notification);
+          } catch (notificationError) {
+            // Log but don't fail the message send
+            console.error('Error sending push notification:', notificationError);
+          }
+        }
 
       } catch (error) {
         console.error('Send message error:', error);

@@ -73,6 +73,20 @@ const userSchema = new mongoose.Schema({
     shareLocation: { type: Boolean, default: true }
   },
   
+  // Push Notifications
+  pushTokens: [{ 
+    token: { type: String, required: true },
+    deviceId: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    lastUsed: { type: Date, default: Date.now }
+  }],
+  pushNotificationsEnabled: { type: Boolean, default: true },
+  notificationPreferences: {
+    messages: { type: Boolean, default: true },
+    nearbyUsers: { type: Boolean, default: true },
+    matches: { type: Boolean, default: true }
+  },
+  
   // Visibility Settings
   visibility: {
     basicInfo: { type: Boolean, default: true },
@@ -109,5 +123,50 @@ userSchema.pre('save', function(next) {
 // Create sparse geospatial index on lastLocation for efficient proximity queries
 // Sparse index only indexes documents where the field exists and is valid
 userSchema.index({ 'lastLocation': '2dsphere' }, { sparse: true });
+
+// Index push tokens for efficient queries
+userSchema.index({ 'pushTokens.token': 1 }, { sparse: true });
+
+// Helper methods for push token management
+userSchema.methods.addPushToken = function(token, deviceId = null) {
+  // Check if token already exists
+  const existingIndex = this.pushTokens.findIndex(t => t.token === token);
+  
+  if (existingIndex >= 0) {
+    // Update existing token
+    this.pushTokens[existingIndex].lastUsed = new Date();
+    if (deviceId) {
+      this.pushTokens[existingIndex].deviceId = deviceId;
+    }
+  } else {
+    // Add new token
+    this.pushTokens.push({
+      token,
+      deviceId,
+      createdAt: new Date(),
+      lastUsed: new Date()
+    });
+  }
+  
+  return this.save();
+};
+
+userSchema.methods.removePushToken = function(token) {
+  this.pushTokens = this.pushTokens.filter(t => t.token !== token);
+  return this.save();
+};
+
+userSchema.methods.hasValidPushToken = function() {
+  return this.pushNotificationsEnabled && 
+         this.pushTokens && 
+         this.pushTokens.length > 0;
+};
+
+userSchema.methods.getPushTokens = function() {
+  if (!this.pushNotificationsEnabled || !this.pushTokens || this.pushTokens.length === 0) {
+    return [];
+  }
+  return this.pushTokens.map(t => t.token);
+};
 
 module.exports = mongoose.model('User', userSchema);

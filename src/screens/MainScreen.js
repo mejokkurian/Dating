@@ -312,28 +312,41 @@ const MainScreen = ({ navigation, route }) => {
           colors={['rgba(255,255,255,0.2)', 'transparent']}
           style={styles.header}
         >
-          {isPendingMode ? (
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => {
-                setIsPendingMode(false);
-                navigation.setParams({ pendingProfile: null });
-                setCurrentIndex(0);
-                loadProfiles();
-              }}
-            >
-              <Ionicons name="arrow-back" size={28} color={theme.colors.text.primary} />
-            </TouchableOpacity>
-          ) : (
+          <View style={styles.headerLeft}>
+            {isPendingMode ? (
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => {
+                  setIsPendingMode(false);
+                  navigation.setParams({ pendingProfile: null });
+                  setCurrentIndex(0);
+                  loadProfiles();
+                }}
+              >
+                <Ionicons name="arrow-back" size={28} color={theme.colors.text.primary} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={styles.profileButton}
+                onPress={() => navigation.navigate('Profile')}
+              >
+                <Ionicons name="person-circle-outline" size={32} color={theme.colors.text.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {!isPendingMode && (
             <Text style={styles.headerTitle}>Discover</Text>
           )}
           
-          <TouchableOpacity 
-            style={styles.filterButton}
-            onPress={() => {/* TODO: Open filter modal */}}
-          >
-            <Ionicons name="options-outline" size={24} color={theme.colors.text.primary} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={() => {/* TODO: Open filter modal */}}
+            >
+              <Ionicons name="options-outline" size={24} color={theme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
 
         {/* Filter Bar */}
@@ -437,6 +450,14 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: theme.spacing.xs,
   },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
   headerIcon: {
     fontSize: 28,
   },
@@ -444,12 +465,16 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize['2xl'],
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.text.primary,
+    textAlign: 'center',
   },
   filterButton: {
     padding: 8,
   },
   backButton: {
     padding: 8,
+  },
+  profileButton: {
+    padding: 4,
   },
   filterBar: {
     paddingHorizontal: theme.spacing.lg,

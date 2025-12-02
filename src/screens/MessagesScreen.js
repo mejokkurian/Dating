@@ -4,17 +4,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { getMyMatches } from '../services/api/match';
 import { useAuth } from '../context/AuthContext';
+import { useBadge } from '../context/BadgeContext';
 
 const MessagesScreen = ({ navigation }) => {
   const { user } = useAuth();
+  const { updateBadgeCounts } = useBadge();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('messages'); // 'messages' or 'waiting'
 
   useFocusEffect(
     useCallback(() => {
       loadMatches();
-    }, [])
+      updateBadgeCounts(); // Update badge counts when screen comes into focus
+    }, [updateBadgeCounts])
   );
 
   const loadMatches = async () => {
@@ -33,6 +37,7 @@ const MessagesScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMatches();
+    updateBadgeCounts(); // Update badge counts on refresh
     setRefreshing(false);
   };
 
@@ -77,6 +82,62 @@ const MessagesScreen = ({ navigation }) => {
     return messageDate.toLocaleDateString();
   };
 
+  // Split matches into active and waiting
+  const activeMatches = matches.filter(match => match.status === 'active');
+  const waitingMatches = matches.filter(match => match.status === 'pending' && match.isInitiator);
+
+  // Get matches for current tab
+  const currentMatches = activeTab === 'messages' ? activeMatches : waitingMatches;
+
+  const renderMatchItem = (match) => (
+    <TouchableOpacity 
+      key={match.matchId} 
+      style={styles.chatItem} 
+      onPress={() => handleChatPress(match)}
+    >
+      <Image 
+        source={{ uri: match.user.image || match.user.photos?.[0] || 'https://via.placeholder.com/60' }} 
+        style={styles.chatAvatar} 
+      />
+      <View style={styles.chatContent}>
+        <View style={styles.chatHeader}>
+          <Text style={styles.chatName}>{match.user.name || match.user.displayName}</Text>
+          <Text style={styles.chatTime}>
+            {formatTime(match.lastMessage?.createdAt || match.lastMessageAt)}
+          </Text>
+        </View>
+        {match.status === 'pending' ? (
+          <View style={styles.pendingContainer}>
+            <Ionicons 
+              name={match.isInitiator ? "time-outline" : "heart"} 
+              size={14} 
+              color={match.isInitiator ? "#FF9800" : "#E91E63"} 
+            />
+            <Text style={[styles.pendingText, !match.isInitiator && styles.likesYouText]}>
+              {match.isInitiator 
+                ? 'Waiting for response...' 
+                : 'Liked you! Swipe right to match'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.chatMessage} numberOfLines={1}>
+            {match.lastMessage?.content || 'Start a conversation...'}
+          </Text>
+        )}
+      </View>
+      {match.status === 'active' && match.unreadCount > 0 && (
+        <View style={styles.unreadBadge}>
+          <Text style={styles.unreadText}>{match.unreadCount}</Text>
+        </View>
+      )}
+      {match.status === 'pending' && (
+        <View style={styles.pendingBadge}>
+          <Ionicons name="hourglass-outline" size={16} color="#FF9800" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -94,67 +155,63 @@ const MessagesScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Tab Bar */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'messages' && styles.tabActive]}
+          onPress={() => setActiveTab('messages')}
+        >
+          <Text style={[styles.tabText, activeTab === 'messages' && styles.tabTextActive]}>
+            Messages
+          </Text>
+          {activeTab === 'messages' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'waiting' && styles.tabActive]}
+          onPress={() => setActiveTab('waiting')}
+        >
+          <View style={styles.tabContent}>
+            <Text style={[styles.tabText, activeTab === 'waiting' && styles.tabTextActive]}>
+              Waiting
+            </Text>
+            {waitingMatches.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>
+                  {waitingMatches.length > 99 ? '99+' : waitingMatches.length}
+                </Text>
+              </View>
+            )}
+          </View>
+          {activeTab === 'waiting' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab Content */}
       <ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {matches.length === 0 ? (
+        {currentMatches.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={80} color="#CCC" />
-            <Text style={styles.emptyTitle}>No Matches Yet</Text>
+            <Ionicons 
+              name={activeTab === 'messages' ? 'chatbubbles-outline' : 'time-outline'} 
+              size={80} 
+              color="#CCC" 
+            />
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'messages' ? 'No Conversations Yet' : 'No Pending Matches'}
+            </Text>
             <Text style={styles.emptyText}>
-              Start swiping to find your perfect match!
+              {activeTab === 'messages' 
+                ? 'Start swiping to find your perfect match!'
+                : 'All caught up! No pending matches at the moment.'}
             </Text>
           </View>
         ) : (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Conversations</Text>
-            {matches.map((match) => (
-              <TouchableOpacity 
-                key={match.matchId} 
-                style={styles.chatItem} 
-                onPress={() => handleChatPress(match)}
-              >
-                <Image 
-                  source={{ uri: match.user.image || 'https://via.placeholder.com/60' }} 
-                  style={styles.chatAvatar} 
-                />
-                <View style={styles.chatContent}>
-                  <View style={styles.chatHeader}>
-                    <Text style={styles.chatName}>{match.user.name}</Text>
-                    <Text style={styles.chatTime}>
-                      {formatTime(match.lastMessage?.createdAt || match.lastMessageAt)}
-                    </Text>
-                  </View>
-                  {match.status === 'pending' ? (
-                    <View style={styles.pendingContainer}>
-                      <Ionicons name="time-outline" size={14} color="#FF9800" />
-                      <Text style={styles.pendingText}>
-                        {match.isInitiator 
-                          ? 'Waiting for response...' 
-                          : 'Liked you! Swipe right to match'}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.chatMessage} numberOfLines={1}>
-                      {match.lastMessage?.content || 'Start a conversation...'}
-                    </Text>
-                  )}
-                </View>
-                {match.status === 'active' && match.unreadCount > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>{match.unreadCount}</Text>
-                  </View>
-                )}
-                {match.status === 'pending' && (
-                  <View style={styles.pendingBadge}>
-                    <Ionicons name="hourglass-outline" size={16} color="#FF9800" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+            {currentMatches.map(renderMatchItem)}
           </View>
         )}
       </ScrollView>
@@ -281,6 +338,9 @@ const styles = StyleSheet.create({
     color: '#FF9800',
     fontStyle: 'italic',
   },
+  likesYouText: {
+    color: '#E91E63',
+  },
   pendingBadge: {
     width: 32,
     height: 32,
@@ -303,6 +363,60 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9F9F9',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabActive: {
+    // Active tab styling handled by indicator
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#999999',
+  },
+  tabTextActive: {
+    color: '#000000',
+    fontWeight: '700',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000000',
+  },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tabBadge: {
+    backgroundColor: '#000000',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 

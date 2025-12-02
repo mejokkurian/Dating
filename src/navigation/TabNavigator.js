@@ -2,13 +2,16 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, Platform, Text } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import theme from '../theme/theme';
+import { useBadge } from '../context/BadgeContext';
 
 // Screens
 import MainScreen from '../screens/MainScreen';
 import TopPicksScreen from '../screens/TopPicksScreen';
 import ConnectNowScreen from '../screens/ConnectNowScreen';
 import MessagesScreen from '../screens/MessagesScreen';
+import LikesYouScreen from '../screens/LikesYouScreen';
 import PremiumScreen from '../screens/subscription/PremiumScreen';
 import UserProfileScreen from '../screens/profile/UserProfileScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
@@ -17,6 +20,13 @@ import ProfilePreviewScreen from '../screens/profile/ProfilePreviewScreen';
 const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
+  const { likesYouCount, unreadMessagesCount, updateBadgeCounts } = useBadge();
+
+  // Update badge counts when navigator comes into focus
+  React.useEffect(() => {
+    updateBadgeCounts();
+  }, []);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -28,6 +38,7 @@ const TabNavigator = () => {
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
+          let badgeCount = null;
 
           if (route.name === 'Discover') {
             iconName = focused ? 'heart' : 'heart-outline';
@@ -37,20 +48,31 @@ const TabNavigator = () => {
             iconName = focused ? 'location' : 'location-outline';
           } else if (route.name === 'Messages') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            badgeCount = unreadMessagesCount > 0 ? unreadMessagesCount : null;
+          } else if (route.name === 'LikesYou') {
+            iconName = focused ? 'heart' : 'heart-outline';
+            badgeCount = likesYouCount > 0 ? likesYouCount : null;
           } else if (route.name === 'Premium') {
             iconName = focused ? 'diamond' : 'diamond-outline';
-          } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person-outline';
           }
 
           return (
-            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-              <Ionicons 
-                name={iconName} 
-                size={focused ? 26 : 24} 
-                color={color}
-                style={focused && styles.iconActive}
-              />
+            <View style={styles.iconWrapper}>
+              <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+                <Ionicons 
+                  name={iconName} 
+                  size={focused ? 26 : 24} 
+                  color={color}
+                  style={focused && styles.iconActive}
+                />
+              </View>
+              {badgeCount !== null && badgeCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </Text>
+                </View>
+              )}
             </View>
           );
         },
@@ -59,10 +81,16 @@ const TabNavigator = () => {
       <Tab.Screen name="Discover" component={MainScreen} />
       <Tab.Screen name="TopPicks" component={TopPicksScreen} />
       <Tab.Screen name="ConnectNow" component={ConnectNowScreen} />
+    
+      <Tab.Screen name="LikesYou" component={LikesYouScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       {/* <Tab.Screen name="Premium" component={PremiumScreen} initialParams={{ isTab: true }} /> */}
-      <Tab.Screen name="Profile" component={UserProfileScreen} />
       {/* Hidden screens for navigation (no tab bar button) */}
+      <Tab.Screen
+        name="Profile"
+        component={UserProfileScreen}
+        options={{ tabBarButton: () => null, headerShown: false }}
+      />
       <Tab.Screen
         name="EditProfile"
         component={EditProfileScreen}
@@ -105,6 +133,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     letterSpacing: 0.3,
   },
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -118,6 +151,26 @@ const styles = StyleSheet.create({
   },
   iconActive: {
     transform: [{ scale: 1.1 }],
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#000000',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 

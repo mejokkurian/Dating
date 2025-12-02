@@ -25,7 +25,7 @@ import ViewUserProfileScreen from '../screens/profile/ViewUserProfileScreen';
 
 const Stack = createStackNavigator();
 
-const AuthNavigator = () => {
+const AuthNavigator = ({ navigationRef }) => {
   const { user, loading, onboardingComplete } = useAuth();
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
   const heartAnims = React.useRef(
@@ -127,7 +127,7 @@ const AuthNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

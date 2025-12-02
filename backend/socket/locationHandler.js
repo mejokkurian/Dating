@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const pushNotificationService = require('../services/pushNotificationService');
+const NotificationFactory = require('../services/notifications/notificationFactory');
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -55,7 +57,14 @@ const checkProximityMatches = async (userId, latitude, longitude, io) => {
 
       // Check if user is within 1km
       if (distance <= 1000) {
-        // Notify current user about nearby user
+        // Check if current user is actively viewing Connect Now screen
+        const currentUserSockets = await io.in(userId.toString()).fetchSockets();
+        const isUserInConnectNow = currentUserSockets.some(s => {
+          // Check if socket is in a Connect Now related room (you can create a specific room)
+          return true; // For now, we'll send notification if user is not actively in chat
+        });
+
+        // Notify current user about nearby user via socket
         io.to(userId.toString()).emit('nearby_user_entered', {
           user: {
             _id: nearbyUser._id,
@@ -65,6 +74,19 @@ const checkProximityMatches = async (userId, latitude, longitude, io) => {
             showExactDistance: nearbyUser.locationPrivacy?.showExactDistance !== false
           }
         });
+
+        // Send push notification if user is not actively viewing Connect Now
+        if (!isUserInConnectNow) {
+          try {
+            const notification = NotificationFactory.createNearbyUserNotification(
+              nearbyUser,
+              distance
+            );
+            await pushNotificationService.sendNotification(userId.toString(), notification);
+          } catch (notificationError) {
+            console.error('Error sending nearby user push notification:', notificationError);
+          }
+        }
 
         // Also notify the nearby user about current user (if they're also within range)
         const reverseDistance = calculateDistance(
