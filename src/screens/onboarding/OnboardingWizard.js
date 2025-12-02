@@ -131,7 +131,7 @@ const OnboardingWizard = ({ route, navigation }) => {
           newErrors.gender = '';
         }
         break;
-      case 3: // Preferences
+      case 4: // Preferences
         if (!formData.preferences) {
           newErrors.preferences = 'Please select who you are looking for';
           isValid = false;
@@ -164,8 +164,8 @@ const OnboardingWizard = ({ route, navigation }) => {
   };
 
   const handleSkip = async () => {
-    // Steps 1, 2, and 3 are mandatory and cannot be skipped
-    if (currentStep <= 3) {
+    // Steps 1, 2, and 4 are mandatory and cannot be skipped
+    if (currentStep === 1 || currentStep === 2 || currentStep === 4) {
       // Trigger validation to show inline errors
       validateStep();
       return;
@@ -208,9 +208,9 @@ const OnboardingWizard = ({ route, navigation }) => {
   };
 
   const handleComplete = async () => {
-    // Validate ONLY strictly required fields (Steps 1-3)
+    // Validate ONLY strictly required fields (Steps 1-2, and 4 for preferences)
     if (!formData.displayName || !formData.location || !formData.gender || !formData.preferences) {
-      showAlert('Error', 'Please complete the basic information steps (1-3)');
+      showAlert('Error', 'Please complete the basic information steps (1-2, and 4)');
       return;
     }
 
@@ -332,6 +332,15 @@ const OnboardingWizard = ({ route, navigation }) => {
         );
       case 3:
         return (
+          <OnboardingStepBudget
+            budget={formData.budget}
+            isVisible={formData.visibility.budget}
+            onUpdate={(budget) => updateFormData('budget', budget)}
+            onToggleVisibility={() => updateFormData('visibility', { ...formData.visibility, budget: !formData.visibility.budget })}
+          />
+        );
+      case 4:
+        return (
           <OnboardingStep3
             preferences={formData.preferences}
             isVisible={formData.visibility.preferences}
@@ -341,16 +350,6 @@ const OnboardingWizard = ({ route, navigation }) => {
               setErrors(prev => ({ ...prev, preferences: '' }));
             }}
             onToggleVisibility={() => updateFormData('visibility', { ...formData.visibility, preferences: !formData.visibility.preferences })}
-          />
-        );
-      case 4:
-        return (
-          <OnboardingStepBudget
-            role={formData.preferences}
-            budget={formData.budget}
-            isVisible={formData.visibility.budget}
-            onUpdate={(budget) => updateFormData('budget', budget)}
-            onToggleVisibility={() => updateFormData('visibility', { ...formData.visibility, budget: !formData.visibility.budget })}
           />
         );
       case 5:
@@ -820,21 +819,19 @@ const OnboardingStep2 = ({ gender, isVisible, errors, onUpdate, onToggleVisibili
   );
 };
 
-// Step 3: Preferences
+// Step 3: Dating Preferences
 const OnboardingStep3 = ({ preferences, isVisible, errors, onUpdate, onToggleVisibility }) => {
   const preferenceOptions = [
-    'Sugar Daddy',
-    'Sugar Mummy',
-    'Sugar Baby (Male)',
-    'Sugar Baby (Female)',
-    'Open to all',
+    'Men',
+    'Women',
+    'Everyone',
   ];
 
   return (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Who are you looking for?</Text>
+      <Text style={styles.stepTitle}>Who would you like to date?</Text>
       <Text style={styles.stepDescription}>
-        Select your preferences for matching
+        This helps us show you the right people
       </Text>
       <View style={styles.optionsContainer}>
         {preferenceOptions.map((option) => (
@@ -874,38 +871,25 @@ const OnboardingStep3 = ({ preferences, isVisible, errors, onUpdate, onToggleVis
   );
 };
 
-// Step 4: Lifestyle & Budget
-const OnboardingStepBudget = ({ role, budget, isVisible, onUpdate, onToggleVisibility }) => {
-  const isProvider = role?.includes('Daddy') || role?.includes('Mummy');
-  
-  const providerOptions = [
-    '$1k - $3k / month',
-    '$3k - $5k / month',
-    '$5k - $10k / month',
-    '$10k - $20k / month',
-    '$20k+ / month',
-    'Flexible / Negotiable',
+// Step 4: Relationship Goals
+const OnboardingStepBudget = ({ budget, isVisible, onUpdate, onToggleVisibility }) => {
+  const relationshipGoals = [
+    'Long-term relationship',
+    'Short-term fun',
+    'Casual dating',
+    'Friendship',
+    'Marriage',
+    'Still figuring it out',
   ];
-
-  const seekerOptions = [
-    'Tuition / Education Support',
-    'Luxury Lifestyle & Travel',
-    'Monthly Allowance',
-    'Shopping & Gifts',
-    'Mentorship & Networking',
-    'Open to discussion',
-  ];
-
-  const options = isProvider ? providerOptions : seekerOptions;
-  const title = isProvider ? 'What is your budget range?' : 'What are your lifestyle expectations?';
-  const subtitle = isProvider ? 'This helps match you with compatible partners' : 'Select what matters most to you';
 
   return (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>{title}</Text>
-      <Text style={styles.stepDescription}>{subtitle}</Text>
+      <Text style={styles.stepTitle}>What are you looking for?</Text>
+      <Text style={styles.stepDescription}>
+        Select your relationship goals
+      </Text>
       <View style={styles.optionsContainer}>
-        {options.map((option) => (
+        {relationshipGoals.map((option) => (
           <TouchableOpacity
             key={option}
             style={[

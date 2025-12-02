@@ -74,3 +74,35 @@ exports.uploadAudio = async (req, res) => {
     res.status(500).json({ message: 'Failed to upload audio', error: error.message });
   }
 };
+
+// @desc    Upload chat image to Cloudinary
+// @route   POST /api/upload/image
+// @access  Private
+exports.uploadChatImage = async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+
+    const file = req.files.file;
+
+    // Upload image to Cloudinary
+    const result = await cloudinary.uploader.upload(file.tempFilePath, {
+      folder: 'sugar-dating-app/chat-images',
+      resource_type: 'image',
+      transformation: [
+        { width: 1200, height: 1600, crop: 'limit' },
+        { quality: 'auto:good' },
+        { fetch_format: 'auto' }
+      ]
+    });
+
+    res.json({
+      url: result.secure_url,
+      publicId: result.public_id
+    });
+  } catch (error) {
+    console.error('Chat image upload error:', error);
+    res.status(500).json({ message: 'Failed to upload image', error: error.message });
+  }
+};

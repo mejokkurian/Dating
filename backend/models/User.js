@@ -45,6 +45,34 @@ const userSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false },
   lastActive: { type: Date, default: Date.now },
   
+  // Location & Connect Now
+  connectNowEnabled: { type: Boolean, default: false },
+  lastLocation: {
+    type: {
+      type: String,
+      enum: ['Point']
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude] for GeoJSON
+      validate: {
+        validator: function(v) {
+          // If coordinates exist, must be array of 2 numbers [lon, lat]
+          if (!v) return true; // Allow undefined
+          return Array.isArray(v) && v.length === 2 && 
+                 typeof v[0] === 'number' && typeof v[1] === 'number' &&
+                 v[0] >= -180 && v[0] <= 180 && // longitude range
+                 v[1] >= -90 && v[1] <= 90; // latitude range
+        },
+        message: 'Coordinates must be [longitude, latitude] with valid ranges'
+      }
+    },
+    timestamp: { type: Date }
+  },
+  locationPrivacy: {
+    showExactDistance: { type: Boolean, default: true },
+    shareLocation: { type: Boolean, default: true }
+  },
+  
   // Visibility Settings
   visibility: {
     basicInfo: { type: Boolean, default: true },
@@ -61,5 +89,25 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Pre-save hook to ensure lastLocation is valid or null
+userSchema.pre('save', function(next) {
+  // If lastLocation exists but doesn't have coordinates, set it to null
+  // This prevents MongoDB from trying to index invalid GeoJSON Point structures
+  if (this.lastLocation && (!this.lastLocation.coordinates || 
+      !Array.isArray(this.lastLocation.coordinates) || 
+      this.lastLocation.coordinates.length !== 2)) {
+    this.lastLocation = undefined;
+  }
+  // If lastLocation has coordinates but no type, add type
+  if (this.lastLocation && this.lastLocation.coordinates && !this.lastLocation.type) {
+    this.lastLocation.type = 'Point';
+  }
+  next();
+});
+
+// Create sparse geospatial index on lastLocation for efficient proximity queries
+// Sparse index only indexes documents where the field exists and is valid
+userSchema.index({ 'lastLocation': '2dsphere' }, { sparse: true });
 
 module.exports = mongoose.model('User', userSchema);

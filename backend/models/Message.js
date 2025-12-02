@@ -24,7 +24,7 @@ const messageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'audio', 'image'],
+    enum: ['text', 'audio', 'image', 'sticker', 'file'],
     default: 'text',
   },
   audioUrl: {
@@ -32,6 +32,33 @@ const messageSchema = new mongoose.Schema({
   },
   audioDuration: {
     type: Number, // in seconds
+  },
+  imageUrl: {
+    type: String,
+  },
+  isViewOnce: {
+    type: Boolean,
+    default: false,
+  },
+  viewedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  stickerEmoji: {
+    type: String,
+  },
+  stickerId: {
+    type: String,
+  },
+  // File functionality
+  fileName: {
+    type: String,
+  },
+  fileSize: {
+    type: Number,
+  },
+  fileUrl: {
+    type: String,
   },
   // Reply functionality
   replyTo: {

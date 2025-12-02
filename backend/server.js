@@ -14,7 +14,9 @@ const matchRoutes = require('./routes/matchRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const verificationRoutes = require('./routes/verificationRoutes');
+const locationRoutes = require('./routes/locationRoutes');
 const chatHandler = require('./socket/chatHandler');
+const locationHandler = require('./socket/locationHandler');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,8 +44,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sugar_dat
 .then(() => console.log('MongoDB Connected'))
 .catch(err => console.error('MongoDB Connection Error:', err));
 
-// Initialize Socket.IO chat handler
+// Make io accessible to routes/controllers
+app.set('io', io);
+
+// Initialize Socket.IO handlers
 chatHandler(io);
+locationHandler(io);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -52,6 +58,7 @@ app.use('/api/matches', matchRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api/location', locationRoutes);
 
 // Health Check
 app.get('/', (req, res) => {

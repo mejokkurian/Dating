@@ -21,6 +21,7 @@ import PremiumScreen from '../screens/subscription/PremiumScreen';
 // Main App (placeholder - to be implemented)
 import TabNavigator from './TabNavigator';
 import ChatScreen from '../screens/chat/ChatScreen';
+import ViewUserProfileScreen from '../screens/profile/ViewUserProfileScreen';
 
 const Stack = createStackNavigator();
 
@@ -151,6 +152,13 @@ const AuthNavigator = () => {
           <>
             <Stack.Screen name="MainTab" component={TabNavigator} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen 
+              name="ViewUserProfile" 
+              component={ViewUserProfileScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
             <Stack.Screen 
               name="KYCUpload" 
               component={KYCUploadScreen}

@@ -3,6 +3,40 @@ const Message = require('../models/Message');
 const Match = require('../models/Match');
 const User = require('../models/User');
 
+// Custom bad words list for dating app
+const customBadWords = [
+  // Add dating app specific inappropriate terms
+  'unsolicited', 'nude', 'nudes', 'dickpic', 'dick pic',
+  'send nudes', 'send pics', 'send photos', 'send pictures',
+  'personal info', 'phone number', 'address', 'location',
+  // Add more as needed
+];
+
+// Initialize profanity filter (bad-words v4 is ES module, so we use dynamic import)
+let Filter;
+// Initialize with fallback filter immediately to avoid race conditions
+let filter = {
+  isProfane: (text) => {
+    const lowerText = text.toLowerCase();
+    return customBadWords.some(word => lowerText.includes(word.toLowerCase()));
+  }
+};
+
+// Try to load the full bad-words package asynchronously
+(async () => {
+  try {
+    const badWordsModule = await import('bad-words');
+    Filter = badWordsModule.Filter || badWordsModule.default;
+    if (Filter && typeof Filter === 'function') {
+      filter = new Filter({ list: customBadWords });
+      console.log('✅ Profanity filter initialized with bad-words package');
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to load bad-words package, using fallback filter:', error.message);
+    // Fallback filter is already set above
+  }
+})();
+
 // Helper to generate conversation ID from two user IDs
 const getConversationId = (userId1, userId2) => {
   const ids = [userId1.toString(), userId2.toString()].sort();
@@ -39,6 +73,19 @@ module.exports = (io) => {
         const { receiverId, content } = data;
         const senderId = socket.userId;
 
+        // Server-side profanity check for text messages (unless bypassed)
+        if (data.messageType === 'text' && content && filter && !data.bypassProfanityCheck) {
+          if (filter.isProfane(content)) {
+            // Log violation and emit error to sender
+            console.warn(`⚠️ Profanity detected from user ${senderId}: ${content}`);
+            socket.emit('message_error', {
+              message: 'Your message contains inappropriate content and cannot be sent.',
+              tempId: data.tempId
+            });
+            return; // Exit, don't save or broadcast the message
+          }
+        }
+
         // Create conversation ID
         const conversationId = getConversationId(senderId, receiverId);
 
@@ -72,6 +119,22 @@ module.exports = (io) => {
           messageData.audioUrl = data.audioUrl;
           messageData.audioDuration = data.audioDuration;
           messageData.content = ''; // Empty content for audio
+        } else if (data.messageType === 'image') {
+          messageData.messageType = 'image';
+          messageData.imageUrl = data.imageUrl;
+          messageData.isViewOnce = data.isViewOnce || false;
+          messageData.content = data.content || ''; // Optional caption
+        } else if (data.messageType === 'sticker') {
+          messageData.messageType = 'sticker';
+          messageData.stickerEmoji = data.stickerEmoji;
+          messageData.stickerId = data.stickerId;
+          messageData.content = 'Sticker'; // Set content to satisfy required field
+        } else if (data.messageType === 'file') {
+          messageData.messageType = 'file';
+          messageData.fileName = data.fileName;
+          messageData.fileSize = data.fileSize;
+          messageData.fileUrl = data.fileUrl || fileUrl;
+          messageData.content = data.fileName || 'File'; // Set content to satisfy required field
         } else {
           messageData.messageType = 'text';
           messageData.content = content;
@@ -101,7 +164,7 @@ module.exports = (io) => {
         if (message.replyTo) {
           await message.populate({
             path: 'replyTo',
-            select: 'content messageType audioUrl audioDuration senderId createdAt',
+            select: 'content messageType audioUrl audioDuration imageUrl isViewOnce stickerEmoji stickerId fileName fileSize fileUrl senderId createdAt',
             populate: {
               path: 'senderId',
               select: 'displayName photos'
@@ -162,6 +225,37 @@ module.exports = (io) => {
         userId: socket.userId,
         isRecording,
       });
+    });
+
+    // Handle View Once image viewed
+    socket.on('view_once_opened', async (data) => {
+      try {
+        const { messageId } = data;
+        const viewerId = socket.userId;
+
+        const message = await Message.findById(messageId);
+        
+        if (!message || !message.isViewOnce) {
+          return;
+        }
+
+        // Add viewer to viewedBy array if not already there
+        if (!message.viewedBy.includes(viewerId)) {
+          await Message.findByIdAndUpdate(
+            messageId,
+            { $addToSet: { viewedBy: viewerId } }
+          );
+
+          // Notify the sender
+          const senderId = message.senderId.toString();
+          io.to(senderId).emit('view_once_opened', {
+            messageId,
+            viewedBy: viewerId,
+          });
+        }
+      } catch (error) {
+        console.error('View once opened error:', error);
+      }
     });
 
     // Handle mark as read

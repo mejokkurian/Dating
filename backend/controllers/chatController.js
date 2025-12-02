@@ -45,6 +45,40 @@ exports.getConversations = async (req, res) => {
           read: false,
         });
 
+        // Helper to safely serialize message content to string
+        const serializeContent = (content) => {
+          if (content === null || content === undefined) {
+            return '';
+          }
+          if (typeof content === 'string') {
+            return content;
+          }
+          if (typeof content === 'object') {
+            // If it's a Mongoose document, try toObject
+            if (typeof content.toObject === 'function') {
+              try {
+                const obj = content.toObject();
+                if (obj?.content && typeof obj.content === 'string') return obj.content;
+                if (obj?.text && typeof obj.text === 'string') return obj.text;
+              } catch (e) {
+                // Continue
+              }
+            }
+            // Try common properties
+            if (content.content && typeof content.content === 'string') return content.content;
+            if (content.text && typeof content.text === 'string') return content.text;
+            if (content.message && typeof content.message === 'string') return content.message;
+            // Last resort: JSON stringify (but limit length to prevent huge strings)
+            try {
+              const str = JSON.stringify(content);
+              return str.length > 200 ? str.substring(0, 200) + '...' : str;
+            } catch (e) {
+              return '';
+            }
+          }
+          return String(content);
+        };
+
         return {
           conversationId,
           otherUser: {
@@ -54,7 +88,7 @@ exports.getConversations = async (req, res) => {
           },
           lastMessage: lastMessage
             ? {
-                content: lastMessage.content,
+                content: serializeContent(lastMessage.content),
                 createdAt: lastMessage.createdAt,
                 senderId: lastMessage.senderId,
               }
@@ -93,7 +127,7 @@ exports.getMessages = async (req, res) => {
       .populate('senderId', 'displayName photos')
       .populate({
         path: 'replyTo',
-        select: 'content messageType audioUrl audioDuration senderId createdAt',
+        select: 'content messageType audioUrl audioDuration imageUrl isViewOnce stickerEmoji stickerId senderId createdAt',
         populate: {
           path: 'senderId',
           select: 'displayName photos'

@@ -51,23 +51,39 @@ class SocketService {
 
   disconnect() {
     if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-      this.connected = false;
+      try {
+        // Remove all listeners before disconnecting
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch (error) {
+        console.warn('Error disconnecting socket:', error);
+      } finally {
+        this.socket = null;
+        this.connected = false;
+        this.listenerQueue = [];
+      }
     }
   }
 
-  // Send a message (updated with replyTo)
-  sendMessage(receiverId, content, tempId, messageType = 'text', audioUrl = null, audioDuration = null, replyTo = null) {
+  // Send a message (updated with replyTo and metadata)
+  sendMessage(receiverId, content, tempId, messageType = 'text', fileUrl = null, duration = null, replyTo = null, metadata = {}) {
     if (!this.socket) return;
     this.socket.emit('send_message', { 
       receiverId, 
       content, 
       tempId, 
       messageType,
-      audioUrl,
-      audioDuration,
-      replyTo
+      audioUrl: messageType === 'audio' ? fileUrl : null,
+      audioDuration: duration,
+      imageUrl: messageType === 'image' ? fileUrl : null,
+      isViewOnce: metadata.isViewOnce || false,
+      stickerEmoji: metadata.stickerEmoji || null,
+      stickerId: metadata.stickerId || null,
+      fileName: messageType === 'file' ? metadata.fileName : null,
+      fileSize: messageType === 'file' ? metadata.fileSize : null,
+      fileUrl: messageType === 'file' ? fileUrl : null,
+      replyTo,
+      bypassProfanityCheck: metadata.bypassProfanityCheck || false
     });
   }
 
@@ -124,6 +140,11 @@ class SocketService {
   // Listen for message sent confirmation
   onMessageSent(callback) {
     this.addListener('message_sent', callback);
+  }
+
+  // Listen for message errors (e.g., profanity detected)
+  onMessageError(callback) {
+    this.addListener('message_error', callback);
   }
 
   // Listen for typing indicator
@@ -203,10 +224,26 @@ class SocketService {
   // Remove listeners
   removeListener(eventName) {
     if (this.socket) {
-      this.socket.off(eventName);
+      try {
+        this.socket.off(eventName);
+      } catch (error) {
+        console.warn('Error removing listener:', error);
+      }
     }
     // Also remove from queue if present
     this.listenerQueue = this.listenerQueue.filter(item => item.event !== eventName);
+  }
+
+  // Remove all listeners (useful for cleanup)
+  removeAllListeners() {
+    if (this.socket) {
+      try {
+        this.socket.removeAllListeners();
+      } catch (error) {
+        console.warn('Error removing all listeners:', error);
+      }
+    }
+    this.listenerQueue = [];
   }
 
   // ============ WebRTC Methods ============
@@ -250,6 +287,60 @@ class SocketService {
   // Listen for call ended
   onCallEnded(callback) {
     this.addListener('call_ended', callback);
+  }
+
+  // View Once methods
+  notifyViewOnceOpened(messageId) {
+    if (!this.socket) return;
+    this.socket.emit('view_once_opened', { messageId });
+  }
+
+  onViewOnceOpened(callback) {
+    this.addListener('view_once_opened', callback);
+  }
+
+  // ============ Location & Connect Now Methods ============
+
+  // Update user location
+  updateLocation(latitude, longitude) {
+    if (!this.socket) return;
+    this.socket.emit('update_location', { latitude, longitude });
+  }
+
+  // Toggle Connect Now feature
+  toggleConnectNow(enabled) {
+    if (!this.socket) return;
+    this.socket.emit('toggle_connect_now', { enabled });
+  }
+
+  // Listen for location update confirmation
+  onLocationUpdated(callback) {
+    this.addListener('location_updated', callback);
+  }
+
+  // Listen for location errors
+  onLocationError(callback) {
+    this.addListener('location_error', callback);
+  }
+
+  // Listen for Connect Now toggle confirmation
+  onConnectNowToggled(callback) {
+    this.addListener('connect_now_toggled', callback);
+  }
+
+  // Listen for Connect Now errors
+  onConnectNowError(callback) {
+    this.addListener('connect_now_error', callback);
+  }
+
+  // Listen for nearby user entered proximity
+  onNearbyUserEntered(callback) {
+    this.addListener('nearby_user_entered', callback);
+  }
+
+  // Listen for nearby user left proximity
+  onNearbyUserLeft(callback) {
+    this.addListener('nearby_user_left', callback);
   }
 }
 

@@ -17,14 +17,24 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sugardating.app",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to help you discover compatible people nearby when you enable Connect Now.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby.",
+        "NSLocationAlwaysUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.sugardating.app"
+      "package": "com.sugardating.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,6 +50,14 @@
         "expo-camera",
         {
           "cameraPermission": "The app accesses your camera to take ID verification photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "This app uses your location to help you discover compatible people nearby when you enable Connect Now.",
+          "locationAlwaysPermission": "This app uses your location in the background to notify you when compatible people are nearby.",
+          "locationWhenInUsePermission": "This app uses your location to help you discover compatible people nearby when you enable Connect Now."
         }
       ]
     ]

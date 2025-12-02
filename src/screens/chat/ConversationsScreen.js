@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getConversations } from '../../services/api/chat';
 import socketService from '../../services/socket';
+import { normalizeContent } from '../../utils/messageContent';
 
 const ConversationsScreen = ({ navigation }) => {
   const [conversations, setConversations] = useState([]);
@@ -19,16 +20,59 @@ const ConversationsScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadConversations();
-    socketService.connect();
+    let isMounted = true;
+    let messageHandler = null;
 
-    // Listen for new messages to update conversation list
-    socketService.onNewMessage((message) => {
-      loadConversations();
-    });
+    const loadConversations = async () => {
+      try {
+        const data = await getConversations();
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setConversations(data);
+        }
+      } catch (error) {
+        console.error('Load conversations error:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    };
+
+    const initializeSocket = async () => {
+      try {
+        await socketService.connect();
+        
+        if (isMounted) {
+          // Listen for new messages to update conversation list
+          messageHandler = (message) => {
+            if (isMounted) {
+              loadConversations();
+            }
+          };
+          socketService.onNewMessage(messageHandler);
+        }
+      } catch (error) {
+        console.error('Socket initialization error:', error);
+      }
+    };
+
+    loadConversations();
+    initializeSocket();
 
     return () => {
-      socketService.off('new_message');
+      isMounted = false;
+      // Properly remove the listener
+      try {
+        if (messageHandler) {
+          socketService.removeListener('new_message');
+        }
+        // Also disconnect to prevent memory leaks
+        socketService.disconnect();
+      } catch (error) {
+        console.warn('Error during ConversationsScreen cleanup:', error);
+      }
     };
   }, []);
 
@@ -84,7 +128,7 @@ const ConversationsScreen = ({ navigation }) => {
         </View>
         <View style={styles.bottomRow}>
           <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage?.content || 'Start a conversation'}
+            {item.lastMessage ? normalizeContent(item.lastMessage.content) || 'Start a conversation' : 'Start a conversation'}
           </Text>
           {item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>

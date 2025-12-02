@@ -49,6 +49,18 @@ exports.register = async (req, res) => {
   }
 };
 
+// Helper function to fix malformed lastLocation in a user document
+const fixMalformedLastLocation = async (userId) => {
+  try {
+    await User.updateOne(
+      { _id: userId },
+      { $unset: { lastLocation: "" } }
+    );
+  } catch (error) {
+    console.error(`Error fixing malformed lastLocation for user ${userId}:`, error);
+  }
+};
+
 // @desc    Authenticate user & get token
 // @route   POST /api/auth/login
 // @access  Public
@@ -56,23 +68,69 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check for user email
-    const user = await User.findOne({ email });
-
-    if (user && (await bcrypt.compare(password, user.password))) {
-      res.json({
-        _id: user._id,
-        email: user.email,
-        displayName: user.displayName,
-        photos: user.photos,
-        onboardingCompleted: user.onboardingCompleted,
-        token: generateToken(user._id),
-      });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
     }
+
+    // Try to find user - handle geospatial index errors gracefully
+    let user;
+    try {
+      user = await User.findOne({ email }).lean();
+    } catch (findError) {
+      // If error is related to geospatial index, try alternative query
+      if (findError.message && findError.message.includes("Can't extract geo keys")) {
+        console.error('Geospatial index error during user lookup:', findError);
+        // Use aggregation pipeline to bypass index issues
+        const users = await User.aggregate([
+          { $match: { email: email } },
+          { $limit: 1 }
+        ]);
+        user = users.length > 0 ? users[0] : null;
+        
+        // If we found the user, try to fix all malformed lastLocation in the collection
+        if (user) {
+          // Fix this user's lastLocation if malformed
+          if (user.lastLocation && (!user.lastLocation.coordinates || 
+              !Array.isArray(user.lastLocation.coordinates) || 
+              user.lastLocation.coordinates.length !== 2)) {
+            await fixMalformedLastLocation(user._id);
+            user.lastLocation = undefined;
+          }
+        }
+      } else {
+        throw findError;
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Fix malformed lastLocation if it exists (double-check after password verification)
+    if (user.lastLocation && (!user.lastLocation.coordinates || 
+        !Array.isArray(user.lastLocation.coordinates) || 
+        user.lastLocation.coordinates.length !== 2)) {
+      await fixMalformedLastLocation(user._id);
+      user.lastLocation = undefined;
+    }
+
+    res.json({
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      photos: user.photos || [],
+      onboardingCompleted: user.onboardingCompleted || false,
+      token: generateToken(user._id),
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Login error:', error);
+    res.status(500).json({ message: error.message || 'An error occurred during login' });
   }
 };
 

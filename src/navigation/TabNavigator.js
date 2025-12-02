@@ -1,14 +1,13 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Platform, Animated } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, Platform, Text } from 'react-native';
 import theme from '../theme/theme';
 
 // Screens
 import MainScreen from '../screens/MainScreen';
 import TopPicksScreen from '../screens/TopPicksScreen';
+import ConnectNowScreen from '../screens/ConnectNowScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import PremiumScreen from '../screens/subscription/PremiumScreen';
 import UserProfileScreen from '../screens/profile/UserProfileScreen';
@@ -17,70 +16,6 @@ import ProfilePreviewScreen from '../screens/profile/ProfilePreviewScreen';
 
 const Tab = createBottomTabNavigator();
 
-const CustomTabBarIcon = ({ focused, iconName, color, isPremium }) => {
-  const scaleValue = React.useRef(new Animated.Value(focused ? 1 : 0.9)).current;
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-
-  React.useEffect(() => {
-    Animated.spring(scaleValue, {
-      toValue: focused ? 1.1 : 1,
-      friction: 3,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  }, [focused]);
-
-  // Pulsing animation for Premium tab
-  React.useEffect(() => {
-    if (isPremium) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.15,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, [isPremium]);
-
-  return (
-    <Animated.View style={[
-      styles.iconContainer,
-      focused && styles.activeIconContainer,
-      { transform: [{ scale: scaleValue }] }
-    ]}>
-      {/* Premium Aura Effect */}
-      {isPremium && (
-        <>
-          <Animated.View 
-            style={[
-              styles.premiumAura,
-              { transform: [{ scale: pulseAnim }] }
-            ]} 
-          />
-          <View style={styles.premiumGlow} />
-        </>
-      )}
-      
-      {focused && !isPremium && (
-        <LinearGradient
-          colors={[theme.colors.primary + '20', theme.colors.primary + '10']}
-          style={styles.activeIconBackground}
-        />
-      )}
-      <Ionicons name={iconName} size={focused ? 26 : 24} color={color} />
-      {focused && <View style={styles.activeDot} />}
-    </Animated.View>
-  );
-};
-
 const TabNavigator = () => {
   return (
     <Tab.Navigator
@@ -88,16 +23,18 @@ const TabNavigator = () => {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#D4AF37', // Elegant gold for active icons
-        tabBarInactiveTintColor: '#888888', // Gray inactive icons
-        tabBarBackground: () => null, // Remove background component
-        tabBarIcon: ({ focused, color }) => {
+        tabBarActiveTintColor: theme.colors.primary || '#000000',
+        tabBarInactiveTintColor: '#999999',
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
           if (route.name === 'Discover') {
             iconName = focused ? 'heart' : 'heart-outline';
           } else if (route.name === 'TopPicks') {
             iconName = focused ? 'flash' : 'flash-outline';
+          } else if (route.name === 'ConnectNow') {
+            iconName = focused ? 'location' : 'location-outline';
           } else if (route.name === 'Messages') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           } else if (route.name === 'Premium') {
@@ -106,19 +43,24 @@ const TabNavigator = () => {
             iconName = focused ? 'person' : 'person-outline';
           }
 
-          return <CustomTabBarIcon 
-            focused={focused} 
-            iconName={iconName} 
-            color={color} 
-            isPremium={route.name === 'Premium'}
-          />;
+          return (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <Ionicons 
+                name={iconName} 
+                size={focused ? 26 : 24} 
+                color={color}
+                style={focused && styles.iconActive}
+              />
+            </View>
+          );
         },
       })}
     >
       <Tab.Screen name="Discover" component={MainScreen} />
       <Tab.Screen name="TopPicks" component={TopPicksScreen} />
+      <Tab.Screen name="ConnectNow" component={ConnectNowScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
-      <Tab.Screen name="Premium" component={PremiumScreen} initialParams={{ isTab: true }} />
+      {/* <Tab.Screen name="Premium" component={PremiumScreen} initialParams={{ isTab: true }} /> */}
       <Tab.Screen name="Profile" component={UserProfileScreen} />
       {/* Hidden screens for navigation (no tab bar button) */}
       <Tab.Screen
@@ -135,73 +77,49 @@ const TabNavigator = () => {
   );
 };
 
+
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 30 : 20,
-    left: 20,
-    right: 20,
+    bottom: Platform.OS === 'ios' ? 20 : 10,
+    left: 16,
+    right: 16,
     elevation: 0,
-    backgroundColor: '#1A1A1A', // Almost black, softer than pure black
-    borderRadius: 35,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
     height: 70,
     borderTopWidth: 0,
-    paddingBottom: 0,
-    paddingTop: 0,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    paddingTop: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
     shadowRadius: 16,
-    elevation: 10,
+    elevation: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(0, 0, 0, 0.05)',
   },
-  tabBarBackground: {
-    display: 'none',
-  },
-  tabBarOverlay: {
-    display: 'none',
+  tabBarLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+    letterSpacing: 0.3,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginBottom: 2,
   },
-  activeIconContainer: {
-    backgroundColor: 'rgba(212, 175, 55, 0.15)', // Subtle gold tint for active state
+  iconContainerActive: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
-  activeIconBackground: {
-    display: 'none',
-  },
-  activeDot: {
-    display: 'none',
-  },
-  premiumAura: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(212, 175, 55, 0.12)',
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  premiumGlow: {
-    position: 'absolute',
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(212, 175, 55, 0.08)',
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
+  iconActive: {
+    transform: [{ scale: 1.1 }],
   },
 });
 
 export default TabNavigator;
+
