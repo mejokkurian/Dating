@@ -206,19 +206,42 @@ module.exports = (io) => {
               messagePreview = '📎 File';
             }
 
-            // Create notification payload
+            // Ensure sender object has required fields
+            const sender = message.senderId;
+            if (!sender || !sender._id) {
+              console.error('Sender object is invalid:', sender);
+              return;
+            }
+
+            // Create notification payload - ensure sender object is properly structured
+            const senderObj = {
+              _id: sender._id || sender,
+              displayName: (sender.displayName || sender.name || 'Someone'),
+            };
+            
             const notification = NotificationFactory.createMessageNotification(
-              message.senderId,
+              senderObj,
               messagePreview,
               conversationId
             );
 
+            console.log(`Sending push notification to user ${receiverId} from ${sender._id} (${sender.displayName})`);
+            
             // Send notification
-            await pushNotificationService.sendNotification(receiverId.toString(), notification);
+            const result = await pushNotificationService.sendNotification(receiverId.toString(), notification);
+            
+            if (!result.success) {
+              console.warn(`Failed to send notification to user ${receiverId}:`, result.reason || result.error);
+            } else {
+              console.log(`Push notification sent successfully to user ${receiverId}`);
+            }
           } catch (notificationError) {
             // Log but don't fail the message send
             console.error('Error sending push notification:', notificationError);
+            console.error('Notification error stack:', notificationError.stack);
           }
+        } else {
+          console.log(`User ${receiverId} is in chat room, skipping push notification`);
         }
 
       } catch (error) {

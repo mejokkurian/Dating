@@ -43,6 +43,8 @@ const userSchema = new mongoose.Schema({
   onboardingCompleted: { type: Boolean, default: false },
   isPremium: { type: Boolean, default: false },
   isVerified: { type: Boolean, default: false },
+  verificationMethod: { type: String, enum: ['kyc', 'image', null], default: null },
+  verificationDate: { type: Date },
   lastActive: { type: Date, default: Date.now },
   
   // Location & Connect Now

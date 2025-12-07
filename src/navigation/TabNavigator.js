@@ -16,6 +16,7 @@ import PremiumScreen from '../screens/subscription/PremiumScreen';
 import UserProfileScreen from '../screens/profile/UserProfileScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import ProfilePreviewScreen from '../screens/profile/ProfilePreviewScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -99,6 +100,11 @@ const TabNavigator = () => {
       <Tab.Screen
         name="ProfilePreview"
         component={ProfilePreviewScreen}
+        options={{ tabBarButton: () => null, headerShown: false }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
         options={{ tabBarButton: () => null, headerShown: false }}
       />
     </Tab.Navigator>

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Sugar Dating",
-    "slug": "sugar-dating-mobile",
+    "slug": "stafftraveller_mob",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,14 +14,21 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "extra": {
+      "eas": {
+        "projectId": "ef36a5a2-8725-4cb2-9b8d-c81e39c99770"
+      }
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sugardating.app",
+      "bundleIdentifier": "com.vofox.standbytraveller-mob",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses your location to help you discover compatible people nearby when you enable Connect Now.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby.",
-        "NSLocationAlwaysUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby."
+        "NSLocationAlwaysUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby.",
+        "NSCameraUsageDescription": "We need access to your camera to take a selfie for account verification.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select a selfie for account verification."
       }
     },
     "android": {

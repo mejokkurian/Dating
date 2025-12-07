@@ -1,4 +1,4 @@
-import api from './config';
+import api from "./config";
 
 /**
  * Create verification request
@@ -6,10 +6,12 @@ import api from './config';
  */
 export const createVerification = async (verificationData) => {
   try {
-    const response = await api.post('/verification', verificationData);
+    const response = await api.post("/verification", verificationData);
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || 'Verification request failed');
+    throw new Error(
+      error.response?.data?.message || "Verification request failed"
+    );
   }
 };
 
@@ -22,7 +24,9 @@ export const getVerificationStatus = async (userId) => {
     const response = await api.get(`/verification/${userId}`);
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || 'Failed to get verification status');
+    throw new Error(
+      error.response?.data?.message || "Failed to get verification status"
+    );
   }
 };
 
@@ -40,6 +44,41 @@ export const updateVerificationStatus = async (userId, status, adminNotes) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || 'Failed to update verification status');
+    throw new Error(
+      error.response?.data?.message || "Failed to update verification status"
+    );
+  }
+};
+
+/**
+ * Verify account with selfie image (face verification)
+ * @param {string} imageBase64 - Base64 encoded image (can include data URL prefix)
+ * @returns {Promise<Object>} - Verification result
+ */
+export const verifyAccountWithSelfie = async (imageBase64) => {
+  try {
+    const response = await api.post("/verification/image-verify", {
+      image: imageBase64,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || "Failed to verify account with selfie"
+    );
+  }
+};
+
+/**
+ * Get current image verification status
+ * @returns {Promise<Object>} - Image verification status
+ */
+export const getImageVerificationStatus = async () => {
+  try {
+    const response = await api.get("/verification/status");
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || "Failed to get verification status"
+    );
   }
 };

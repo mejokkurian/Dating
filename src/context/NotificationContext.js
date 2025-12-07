@@ -3,6 +3,7 @@
  * Manages global notification state and push token registration
  */
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
+import { Alert, Platform, Linking, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from './AuthContext';
 import {
@@ -11,6 +12,7 @@ import {
   registerForPushNotifications,
   validateToken,
   clearBadge,
+  openSettings,
 } from '../services/notifications/pushNotificationService';
 import { handleNotificationTap } from '../services/notifications/notificationHandler';
 import { registerPushToken } from '../services/api/user';
@@ -38,16 +40,86 @@ export const NotificationProvider = ({ children, navigationRef }) => {
    */
   const syncTokenWithBackend = useCallback(async (token) => {
     if (!token || !user) {
+      console.log('Cannot sync token - missing token or user:', { hasToken: !!token, hasUser: !!user });
       return;
     }
 
     try {
-      await registerPushToken(token);
-      console.log('Push token synced with backend');
+      console.log('Syncing push token with backend for user:', user._id);
+      await registerPushToken(token); // Register token
+      console.log('✅ Push token successfully synced with backend');
     } catch (error) {
-      console.error('Error syncing push token with backend:', error);
+      console.error('❌ Error syncing push token with backend:', error);
+      console.error('Error details:', error.response?.data || error.message);
     }
   }, [user]);
+
+  /**
+   * Request notification permissions with user-friendly prompt
+   */
+  const requestNotificationPermission = useCallback(async () => {
+    console.log('🔔 Checking notification permission status...');
+    const statusResponse = await getPermissionStatus();
+    setPermissionStatus(statusResponse.status);
+
+    if (statusResponse.status === 'granted') {
+      console.log('✅ Notification permissions already granted');
+      return true;
+    }
+
+    // Show explanation alert before requesting - this is IMPORTANT
+    console.log('📢 Showing notification permission alert to user...');
+    return new Promise((resolve) => {
+      Alert.alert(
+        'Enable Notifications',
+        'Stay connected! Get notified when you receive:\n\n• New messages\n• New matches\n• Nearby users\n\nTap "Enable" to allow notifications.',
+        [
+          {
+            text: 'Not Now',
+            style: 'cancel',
+            onPress: () => {
+              console.log('❌ User declined notification permission');
+              setPermissionStatus('denied');
+              resolve(false);
+            },
+          },
+          {
+            text: 'Enable',
+            onPress: async () => {
+              console.log('✅ User tapped Enable - requesting system permission...');
+              try {
+                const permissionResult = await requestPermissions();
+                setPermissionStatus(permissionResult.status);
+                
+                if (permissionResult.granted) {
+                  console.log('✅ System granted notification permission');
+                  resolve(true);
+                } else {
+                  console.warn('❌ System denied notification permission after user accepted');
+                  Alert.alert(
+                    'Permission Required',
+                    'Please enable notifications in your device Settings to receive updates.',
+                    [
+                      { text: 'OK' },
+                      {
+                        text: 'Open Settings',
+                        onPress: () => openSettings(),
+                      },
+                    ]
+                  );
+                  resolve(false);
+                }
+              } catch (error) {
+                console.error('Error requesting permissions:', error);
+                resolve(false);
+              }
+            },
+          },
+        ],
+        { cancelable: false } // Make sure user must respond
+      );
+    });
+  }, []);
 
   /**
    * Initialize push notifications
@@ -61,35 +133,38 @@ export const NotificationProvider = ({ children, navigationRef }) => {
       setLoading(true);
 
       // Check permission status
-      const status = await getPermissionStatus();
-      setPermissionStatus(status);
+      const statusResponse = await getPermissionStatus();
+      setPermissionStatus(statusResponse.status);
 
-      if (status !== 'granted') {
-        // Request permissions
-        const permissionResult = await requestPermissions();
-        setPermissionStatus(permissionResult.status);
-
-        if (!permissionResult.granted) {
+      if (statusResponse.status !== 'granted') {
+        // Request permissions with user prompt
+        const hasPermission = await requestNotificationPermission();
+        
+        if (!hasPermission) {
           console.warn('Notification permissions not granted');
           setLoading(false);
           return;
         }
       }
 
-      // Register for push notifications
-      const token = await registerForPushNotifications();
+      // Register for push notifications (skip permission check since we already have permission)
+      console.log('Registering for push notifications...');
+      const token = await registerForPushNotifications(true); // Skip permission check - already granted
+      console.log('Received push token:', token ? token.substring(0, 30) + '...' : 'null');
+      
       if (token && validateToken(token)) {
+        console.log('✅ Valid push token received, setting and syncing...');
         setExpoPushToken(token);
         await syncTokenWithBackend(token);
       } else {
-        console.warn('Failed to get valid push token');
+        console.warn('❌ Failed to get valid push token:', { token: token?.substring(0, 30), isValid: token ? validateToken(token) : false });
       }
     } catch (error) {
       console.error('Error initializing notifications:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, syncTokenWithBackend]);
+  }, [user, syncTokenWithBackend, requestNotificationPermission]);
 
   /**
    * Refresh push token
@@ -109,8 +184,10 @@ export const NotificationProvider = ({ children, navigationRef }) => {
   // Initialize notifications when user logs in
   useEffect(() => {
     if (user) {
+      console.log('👤 User logged in, initializing push notifications for user:', user._id);
       initializeNotifications();
     } else {
+      console.log('👤 No user logged in, clearing push token');
       setExpoPushToken(null);
       setPermissionStatus('undetermined');
     }
@@ -151,23 +228,122 @@ export const NotificationProvider = ({ children, navigationRef }) => {
     };
   }, [navigationRef]);
 
-  // Clear badge when app comes to foreground (optional)
+  // Check notification status when app comes to foreground (after user might have enabled in settings)
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(() => {
-      // Badge will be updated by the system
-    });
-
-    return () => {
-      Notifications.removeNotificationSubscription(subscription);
+    const handleAppStateChange = async (nextAppState) => {
+      if (nextAppState === 'active' && user) {
+        // App came to foreground - check if permissions changed
+        console.log('📱 App came to foreground, checking notification permissions...');
+        const statusResponse = await getPermissionStatus();
+        
+        // If permission status changed from denied to granted, re-initialize
+        if (statusResponse.status === 'granted' && permissionStatus !== 'granted') {
+          console.log('✅ Notification permissions now granted (user enabled in settings), initializing...');
+          setPermissionStatus('granted');
+          await initializeNotifications();
+        } else if (statusResponse.status !== permissionStatus) {
+          // Permission status changed
+          setPermissionStatus(statusResponse.status);
+          if (statusResponse.status === 'granted' && !expoPushToken) {
+            // Permission granted but no token yet
+            await initializeNotifications();
+          }
+        }
+      }
     };
-  }, []);
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, [user, permissionStatus, expoPushToken, initializeNotifications]);
+
+  /**
+   * Retry requesting permissions with user prompt
+   */
+  const retryRequestPermissions = useCallback(async () => {
+    try {
+      setLoading(true);
+      const permissionResult = await requestPermissions(true); // Force request
+      setPermissionStatus(permissionResult.status);
+
+      if (!permissionResult.granted) {
+        if (permissionResult.status === 'denied' && !permissionResult.canAskAgain) {
+          // Permission permanently denied, offer to open settings
+          Alert.alert(
+            'Permission Denied',
+            'Notifications are disabled. To enable them, please go to Settings and allow notifications for this app.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => openSettings(),
+              },
+            ]
+          );
+        } else {
+          // Permission denied but can ask again
+          Alert.alert(
+            'Permission Required',
+            'Push notifications help you stay connected. Please allow notifications to receive messages and updates.',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              {
+                text: 'Try Again',
+                onPress: () => retryRequestPermissions(),
+              },
+            ]
+          );
+        }
+        setLoading(false);
+        return false;
+      }
+
+      // Permission granted, register for push token
+      const token = await registerForPushNotifications();
+      if (token && validateToken(token)) {
+        setExpoPushToken(token);
+        await syncTokenWithBackend(token);
+        setLoading(false);
+        return true;
+      }
+      
+      setLoading(false);
+      return false;
+    } catch (error) {
+      console.error('Error retrying permission request:', error);
+      setLoading(false);
+      return false;
+    }
+  }, [syncTokenWithBackend]);
+
+  /**
+   * Check current notification permission status
+   * Useful for checking if user enabled notifications in settings
+   */
+  const checkPermissionStatus = useCallback(async () => {
+    const statusResponse = await getPermissionStatus();
+    setPermissionStatus(statusResponse.status);
+    
+    // If granted but no token, re-initialize
+    if (statusResponse.status === 'granted' && !expoPushToken && user) {
+      console.log('✅ Notifications enabled in settings, registering push token...');
+      await initializeNotifications();
+    }
+    
+    return statusResponse;
+  }, [user, expoPushToken, initializeNotifications]);
 
   const value = {
     expoPushToken,
     permissionStatus,
     loading,
     refreshToken,
-    requestPermissions,
+    requestPermissions: requestNotificationPermission, // Use the user-friendly version
+    retryRequestPermissions,
+    initializeNotifications, // Expose for manual initialization
+    checkPermissionStatus, // Check current status (useful after returning from settings)
   };
 
   return (

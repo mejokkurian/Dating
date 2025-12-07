@@ -1,7 +1,14 @@
 const User = require('../models/User');
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
 
 // Create a simple verification schema (could be moved to models later)
 const verifications = new Map(); // In-memory store for now, should use MongoDB collection
+
+// Python verification service URL
+const VERIFICATION_SERVICE_URL = process.env.VERIFICATION_SERVICE_URL || 'http://localhost:8001';
 
 // @desc    Create verification request
 // @route   POST /api/verification
@@ -109,6 +116,139 @@ exports.updateVerificationStatus = async (req, res) => {
     res.json({
       message: 'Verification status updated successfully',
       verification
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Verify account with selfie image
+// @route   POST /api/verification/image-verify
+// @access  Private
+exports.verifyAccountWithSelfie = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Check if image is provided
+    if (!req.body.image && !req.files?.image) {
+      return res.status(400).json({ message: 'Selfie image is required' });
+    }
+
+    let imageBase64;
+    
+    // Handle base64 image from request body
+    if (req.body.image) {
+      imageBase64 = req.body.image;
+      // Remove data URL prefix if present
+      if (imageBase64.includes(',')) {
+        imageBase64 = imageBase64.split(',')[1];
+      }
+    }
+    // Handle file upload
+    else if (req.files?.image) {
+      const imageFile = req.files.image;
+      imageBase64 = imageFile.data.toString('base64');
+    } else {
+      return res.status(400).json({ message: 'Invalid image format' });
+    }
+
+    // Check if user has profile photos
+    const user = await User.findById(userId).select('photos');
+    if (!user || !user.photos || user.photos.length === 0) {
+      return res.status(400).json({ 
+        message: 'Please upload at least one profile photo before verifying your account' 
+      });
+    }
+
+    try {
+      // Call Python verification service
+      const response = await axios.post(`${VERIFICATION_SERVICE_URL}/api/verify-face`, {
+        userId: userId.toString(),
+        selfieImageBase64: imageBase64
+      }, {
+        timeout: 30000 // 30 second timeout
+      });
+
+      const verificationResult = response.data;
+
+      // Update user verification status if verified
+      if (verificationResult.verified) {
+        const updateData = {
+          isVerified: true,
+          verificationMethod: 'image',
+          verificationDate: new Date(),
+          verificationStatus: 'approved'
+        };
+        await User.findByIdAndUpdate(userId, updateData);
+      }
+
+      res.json({
+        success: verificationResult.verified,
+        verified: verificationResult.verified,
+        confidence: verificationResult.confidence,
+        message: verificationResult.message,
+        details: {
+          facesFoundInSelfie: verificationResult.faces_found_in_selfie,
+          profilePhotosCompared: verificationResult.profile_photos_compared,
+          bestMatchConfidence: verificationResult.best_match_confidence,
+          threshold: verificationResult.threshold
+        }
+      });
+
+    } catch (serviceError) {
+      console.error('Verification service error:', serviceError.response?.data || serviceError.message);
+      
+      // Handle service errors
+      if (serviceError.response) {
+        // Service returned an error response
+        const errorData = serviceError.response.data;
+        return res.status(serviceError.response.status || 500).json({
+          success: false,
+          verified: false,
+          message: errorData.message || 'Face verification failed',
+          error: errorData.error || 'VERIFICATION_SERVICE_ERROR'
+        });
+      } else {
+        // Network or other error
+        return res.status(503).json({
+          success: false,
+          verified: false,
+          message: 'Verification service is unavailable. Please try again later.',
+          error: 'SERVICE_UNAVAILABLE'
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('Image verification error:', error);
+    res.status(500).json({ 
+      success: false,
+      verified: false,
+      message: error.message || 'Failed to verify account',
+      error: 'INTERNAL_ERROR'
+    });
+  }
+};
+
+// @desc    Get verification status
+// @route   GET /api/verification/status
+// @access  Private
+exports.getVerificationStatusEndpoint = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    const user = await User.findById(userId).select('isVerified verificationMethod verificationDate verificationStatus photos');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      isVerified: user.isVerified || false,
+      verificationMethod: user.verificationMethod || null,
+      verificationDate: user.verificationDate || null,
+      verificationStatus: user.verificationStatus || null,
+      hasProfilePhotos: user.photos && user.photos.length > 0
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -16,6 +16,7 @@ import OnboardingWizard from '../screens/onboarding/OnboardingWizard';
 
 // Verification
 import KYCUploadScreen from '../screens/verification/KYCUploadScreen';
+import VerifyAccountScreen from '../screens/verification/VerifyAccountScreen';
 import PremiumScreen from '../screens/subscription/PremiumScreen';
 
 // Main App (placeholder - to be implemented)
@@ -165,6 +166,13 @@ const AuthNavigator = ({ navigationRef }) => {
               options={{
                 headerShown: true,
                 title: 'ID Verification',
+              }}
+            />
+            <Stack.Screen 
+              name="VerifyAccount" 
+              component={VerifyAccountScreen}
+              options={{
+                headerShown: false,
               }}
             />
           </>

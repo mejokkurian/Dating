@@ -71,14 +71,24 @@ export const getUserById = async (userId) => {
 /**
  * Register push notification token with backend
  * @param {string} token - Expo push token
+ * @param {string} deviceId - Optional device ID
  * @returns {Promise<Object>}
  */
-export const registerPushToken = async (token) => {
+export const registerPushToken = async (token, deviceId = null) => {
   try {
-    const response = await api.post('/users/push-token', { token });
+    console.log('📤 Registering push token with backend:', { 
+      token: token ? token.substring(0, 30) + '...' : 'null',
+      deviceId 
+    });
+    const response = await api.post('/users/push-token', { token, deviceId });
+    console.log('✅ Push token registration successful:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error registering push token:', error);
+    console.error('❌ Error registering push token:', error.response?.data || error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
     throw error;
   }
 };

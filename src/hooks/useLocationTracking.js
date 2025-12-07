@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
-import { Alert, AppState, Platform } from 'react-native';
+import { Alert, AppState, Platform, Linking } from 'react-native';
 import { updateLocation } from '../services/api/connectNow';
 import socketService from '../services/socket';
 import { LOCATION_UPDATE_INTERVAL, BACKGROUND_UPDATE_INTERVAL, USE_TEST_LOCATION, TEST_COORDINATES } from '../constants/location';
@@ -19,13 +19,58 @@ export const useLocationTracking = (enabled = false) => {
   const isMountedRef = useRef(true);
 
   // Request location permissions
-  const requestPermissions = async () => {
+  const requestPermissions = async (showAlertOnDenied = true) => {
     try {
+      // Check current permission status first
+      const { status: currentStatus, canAskAgain } = await Location.getForegroundPermissionsAsync();
+      
+      if (currentStatus === 'granted') {
+        setPermissionStatus(currentStatus);
+        // Request background permission for iOS if needed
+        if (Platform.OS === 'ios') {
+          const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
+          if (bgStatus !== 'granted') {
+            const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+            if (backgroundStatus.status !== 'granted') {
+              console.warn('Background location permission not granted');
+            }
+          }
+        }
+        return true;
+      }
+
+      // Request foreground permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       setPermissionStatus(status);
 
       if (status !== 'granted') {
         setError('Location permission denied');
+        
+        if (showAlertOnDenied) {
+          // Show alert with retry option
+          Alert.alert(
+            'Location Permission Required',
+            'We need your location to show you nearby users. Please allow location access.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              ...(canAskAgain !== false ? [{
+                text: 'Try Again',
+                onPress: () => requestPermissions(true),
+              }] : []),
+              {
+                text: 'Open Settings',
+                onPress: async () => {
+                  if (Platform.OS === 'ios') {
+                    await Linking.openURL('app-settings:');
+                  } else {
+                    await Linking.openSettings();
+                  }
+                },
+              },
+            ]
+          );
+        }
+        
         return false;
       }
 
@@ -40,6 +85,19 @@ export const useLocationTracking = (enabled = false) => {
       return true;
     } catch (err) {
       setError(err.message);
+      if (showAlertOnDenied) {
+        Alert.alert(
+          'Error',
+          `Failed to request location permission: ${err.message}`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Try Again',
+              onPress: () => requestPermissions(true),
+            },
+          ]
+        );
+      }
       return false;
     }
   };
@@ -111,13 +169,9 @@ export const useLocationTracking = (enabled = false) => {
 
     // If using test location, skip permission request
     if (!USE_TEST_LOCATION) {
-      const hasPermission = await requestPermissions();
+      const hasPermission = await requestPermissions(true); // Show alert on denied
       if (!hasPermission) {
-        Alert.alert(
-          'Location Permission Required',
-          'Please enable location permissions in settings to use Connect Now.',
-          [{ text: 'OK' }]
-        );
+        // Alert is already shown in requestPermissions
         return;
       }
     }

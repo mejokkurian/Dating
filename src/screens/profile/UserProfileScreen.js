@@ -126,7 +126,7 @@ const UserProfileScreen = ({ navigation }) => {
           <Text style={styles.sectionHeader}>Account</Text>
           {renderMenuItem('person-outline', 'Personal Information', null, () => {})}
           {renderMenuItem('shield-checkmark-outline', 'Security', null, () => {})}
-          {renderMenuItem('notifications-outline', 'Notifications', null, () => {})}
+          {renderMenuItem('notifications-outline', 'Notifications', null, () => navigation.navigate('Settings'))}
         </View>
 
         <View style={styles.menuSection}>

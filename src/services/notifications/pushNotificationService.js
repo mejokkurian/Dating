@@ -5,7 +5,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, Linking, Alert } from 'react-native';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -18,46 +18,67 @@ Notifications.setNotificationHandler({
 
 /**
  * Request notification permissions
- * @returns {Promise<{status: string, granted: boolean}>}
+ * @param {boolean} forceRequest - If true, request permission even if previously denied
+ * @returns {Promise<{status: string, granted: boolean, canAskAgain: boolean}>}
  */
-export const requestPermissions = async () => {
+export const requestPermissions = async (forceRequest = false) => {
   if (!Device.isDevice) {
     console.warn('Must use physical device for Push Notifications');
-    return { status: 'not-available', granted: false };
+    return { status: 'not-available', granted: false, canAskAgain: false };
   }
 
   try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus, canAskAgain } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
+    let canStillAsk = canAskAgain !== false;
 
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    // If already granted, return success
+    if (existingStatus === 'granted') {
+      return { status: finalStatus, granted: true, canAskAgain: true };
+    }
+
+    // If denied and can't ask again, return denied status
+    if (existingStatus === 'denied' && !canStillAsk && !forceRequest) {
+      return { status: 'denied', granted: false, canAskAgain: false };
+    }
+
+    // Request permissions if not granted
+    if (existingStatus !== 'granted' && (canStillAsk || forceRequest)) {
+      const response = await Notifications.requestPermissionsAsync();
+      finalStatus = response.status;
+      canStillAsk = response.canAskAgain !== false;
     }
 
     if (finalStatus !== 'granted') {
       console.warn('Failed to get push token for push notification!');
-      return { status: finalStatus, granted: false };
+      return { 
+        status: finalStatus, 
+        granted: false, 
+        canAskAgain: canStillAsk 
+      };
     }
 
-    return { status: finalStatus, granted: true };
+    return { status: finalStatus, granted: true, canAskAgain: true };
   } catch (error) {
     console.error('Error requesting notification permissions:', error);
-    return { status: 'error', granted: false, error };
+    return { status: 'error', granted: false, canAskAgain: false, error };
   }
 };
 
 /**
- * Get current permission status
- * @returns {Promise<string>}
+ * Get current permission status with detailed info
+ * @returns {Promise<{status: string, canAskAgain: boolean}>}
  */
 export const getPermissionStatus = async () => {
   try {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status;
+    const response = await Notifications.getPermissionsAsync();
+    return {
+      status: response.status,
+      canAskAgain: response.canAskAgain !== false,
+    };
   } catch (error) {
     console.error('Error getting permission status:', error);
-    return 'undetermined';
+    return { status: 'undetermined', canAskAgain: true };
   }
 };
 
@@ -65,7 +86,7 @@ export const getPermissionStatus = async () => {
  * Register for push notifications and get token
  * @returns {Promise<string|null>} - Push token or null if unavailable
  */
-export const registerForPushNotifications = async () => {
+export const registerForPushNotifications = async (skipPermissionCheck = false) => {
   try {
     // Check if device supports push notifications
     if (!Device.isDevice) {
@@ -73,17 +94,59 @@ export const registerForPushNotifications = async () => {
       return null;
     }
 
-    // Request permissions first
-    const permissionResult = await requestPermissions();
-    if (!permissionResult.granted) {
-      return null;
+    // Request permissions first (unless already checked)
+    if (!skipPermissionCheck) {
+      const permissionResult = await requestPermissions();
+      if (!permissionResult.granted) {
+        console.warn('Permissions not granted, cannot get push token');
+        return null;
+      }
     }
 
-    // Get push token
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId,
-    });
+    // Get push token - projectId is optional in newer Expo versions
+    // Try multiple ways to get the project ID
+    let projectId = 
+      Constants.expoConfig?.extra?.eas?.projectId || 
+      Constants.easConfig?.projectId ||
+      Constants.expoConfig?.extra?.easProjectId ||
+      Constants.expoConfig?.projectId;
+    
+    // Debug: Log what's available in Constants
+    if (!projectId) {
+      console.log('Constants.expoConfig keys:', Object.keys(Constants.expoConfig || {}));
+      console.log('Constants.expoConfig.extra:', Constants.expoConfig?.extra);
+    }
+    
+    let tokenData;
+    
+    // Try to get push token - projectId is optional for development builds
+    try {
+      if (projectId) {
+        console.log('Getting Expo push token with project ID:', projectId);
+        tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: projectId,
+        });
+      } else {
+        // For development builds, Expo can infer the project ID
+        console.log('Getting Expo push token without explicit project ID (Expo will infer it)');
+        tokenData = await Notifications.getExpoPushTokenAsync();
+      }
+    } catch (error) {
+      console.error('Error getting push token:', error.message);
+      
+      // If it fails with projectId, try without
+      if (projectId) {
+        console.log('Retrying without project ID...');
+        try {
+          tokenData = await Notifications.getExpoPushTokenAsync();
+        } catch (retryError) {
+          console.error('Failed to get push token even without project ID:', retryError.message);
+          throw retryError;
+        }
+      } else {
+        throw error;
+      }
+    }
 
     const token = tokenData.data;
 
@@ -168,8 +231,42 @@ export const clearBadge = async () => {
   }
 };
 
+/**
+ * Open device settings for the app
+ */
+export const openSettings = async () => {
+  try {
+    if (Platform.OS === 'ios') {
+      await Linking.openURL('app-settings:');
+    } else {
+      await Linking.openSettings();
+    }
+  } catch (error) {
+    console.error('Error opening settings:', error);
+  }
+};
+
+/**
+ * Request permissions with retry option and settings prompt
+ * @param {Function} onDenied - Callback when permission is denied
+ * @returns {Promise<{status: string, granted: boolean, canAskAgain: boolean}>}
+ */
+export const requestPermissionsWithRetry = async (onDenied = null) => {
+  const result = await requestPermissions();
+  
+  if (!result.granted) {
+    // If permission was denied and can't ask again, offer to open settings
+    if (result.status === 'denied' && !result.canAskAgain && onDenied) {
+      onDenied(result);
+    }
+  }
+  
+  return result;
+};
+
 export default {
   requestPermissions,
+  requestPermissionsWithRetry,
   getPermissionStatus,
   registerForPushNotifications,
   validateToken,
@@ -177,5 +274,6 @@ export default {
   cancelAllNotifications,
   setBadgeCount,
   clearBadge,
+  openSettings,
 };
 

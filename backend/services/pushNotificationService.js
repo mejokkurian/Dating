@@ -38,11 +38,28 @@ class PushNotificationService {
    */
   async getUserPushTokens(userId) {
     try {
-      const user = await User.findById(userId);
-      if (!user || !user.hasValidPushToken()) {
+      const user = await User.findById(userId).select('pushTokens pushNotificationsEnabled');
+      if (!user) {
+        console.log(`User ${userId} not found when getting push tokens`);
         return [];
       }
-      return user.getPushTokens().filter(token => this.validateToken(token));
+      
+      if (!user.pushNotificationsEnabled) {
+        console.log(`Push notifications disabled for user ${userId}`);
+        return [];
+      }
+      
+      if (!user.pushTokens || user.pushTokens.length === 0) {
+        console.log(`No push tokens found for user ${userId}`);
+        return [];
+      }
+      
+      const tokens = user.pushTokens
+        .map(t => t.token || t) // Handle both object and string formats
+        .filter(token => token && this.validateToken(token));
+      
+      console.log(`Found ${tokens.length} valid push token(s) for user ${userId}`);
+      return tokens;
     } catch (error) {
       console.error('Error getting user push tokens:', error);
       return [];
@@ -63,17 +80,23 @@ class PushNotificationService {
         return { success: false, reason: 'disabled' };
       }
 
+      // Get user and check preferences first
+      const user = await User.findById(userId);
+      if (!user) {
+        console.log(`User ${userId} not found when sending notification`);
+        return { success: false, reason: 'user_not_found' };
+      }
+
+      if (!user.pushNotificationsEnabled) {
+        console.log(`Push notifications disabled for user ${userId}`);
+        return { success: false, reason: 'disabled_by_user' };
+      }
+
       // Get user's push tokens
       const tokens = await this.getUserPushTokens(userId);
       if (tokens.length === 0) {
-        console.log(`No valid push tokens for user ${userId}`);
+        console.log(`No valid push tokens for user ${userId} (user has ${user.pushTokens?.length || 0} token(s))`);
         return { success: false, reason: 'no_tokens' };
-      }
-
-      // Check user's notification preferences
-      const user = await User.findById(userId);
-      if (!user || !user.pushNotificationsEnabled) {
-        return { success: false, reason: 'disabled_by_user' };
       }
 
       // Check specific notification preference based on type
