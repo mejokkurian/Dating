@@ -79,7 +79,13 @@ export const signOut = async () => {
 // Mocking other auth methods for now or implementing if backend supports them
 export const signInWithGoogle = async (googleData) => {
   try {
-    const response = await api.post("/auth/google", googleData);
+    // Map 'token' to 'idToken' if needed
+    const payload = {
+      ...googleData,
+      idToken: googleData.token || googleData.idToken,
+    };
+
+    const response = await api.post("/auth/google", payload);
     if (response.data.token) {
       await AsyncStorage.setItem("userToken", response.data.token);
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
