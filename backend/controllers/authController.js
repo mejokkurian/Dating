@@ -204,12 +204,28 @@ exports.googleSignIn = async (req, res) => {
   try {
     const { idToken, email, displayName, photoURL, type } = req.body;
 
-    if (!email) {
+    // Decode idToken to extract user info if not provided in body
+    let userEmail = email;
+    let userName = displayName;
+    let userPhoto = photoURL;
+    let googleUserId = null;
+
+    if (idToken) {
+        const decoded = jwt.decode(idToken);
+        if (decoded) {
+            userEmail = userEmail || decoded.email;
+            userName = userName || decoded.name;
+            userPhoto = userPhoto || decoded.picture;
+            googleUserId = decoded.sub;
+        }
+    }
+
+    if (!userEmail) {
       return res.status(400).json({ message: 'Email is required from Google sign-in' });
     }
 
     // Check if user exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: userEmail });
 
     // Handle Login Flow
     if (type === 'login') {
@@ -227,19 +243,19 @@ exports.googleSignIn = async (req, res) => {
     if (!user) {
       // Create new user
       user = await User.create({
-        email,
-        displayName: displayName || 'Google User',
-        googleId: idToken, // Store token hash or user ID
-        photos: photoURL ? [photoURL] : [],
+        email: userEmail,
+        displayName: userName || 'Google User',
+        googleId: googleUserId || idToken, // Prefer sub, fallback to token if needed (though token changes)
+        photos: userPhoto ? [userPhoto] : [],
         isVerified: true, // Google accounts are verified
       });
     } else {
       // Update existing user
-      if (!user.googleId) {
-        user.googleId = idToken;
+      if (!user.googleId && googleUserId) {
+        user.googleId = googleUserId;
       }
-      if (photoURL && (!user.photos || user.photos.length === 0)) {
-        user.photos = [photoURL];
+      if (userPhoto && (!user.photos || user.photos.length === 0)) {
+        user.photos = [userPhoto];
       }
       await user.save();
     }
