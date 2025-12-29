@@ -202,7 +202,7 @@ exports.socialLogin = async (req, res) => {
 // @access  Public
 exports.googleSignIn = async (req, res) => {
   try {
-    const { idToken, email, displayName, photoURL } = req.body;
+    const { idToken, email, displayName, photoURL, type } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required from Google sign-in' });
@@ -210,6 +210,19 @@ exports.googleSignIn = async (req, res) => {
 
     // Check if user exists
     let user = await User.findOne({ email });
+
+    // Handle Login Flow
+    if (type === 'login') {
+      if (!user) {
+        return res.status(404).json({ message: 'User not found. Please sign up.' });
+      }
+    } 
+    // Handle Register Flow
+    else if (type === 'register') {
+      if (user) {
+        return res.status(400).json({ message: 'User already exists. Please login.' });
+      }
+    }
 
     if (!user) {
       // Create new user
@@ -249,7 +262,7 @@ exports.googleSignIn = async (req, res) => {
 // @access  Public
 exports.appleSignIn = async (req, res) => {
   try {
-    const { identityToken, email, fullName } = req.body;
+    const { identityToken, email, fullName, type } = req.body;
 
     if (!email && !identityToken) {
       return res.status(400).json({ message: 'Email or identity token is required' });
@@ -263,6 +276,19 @@ exports.appleSignIn = async (req, res) => {
       user = await User.findOne({ $or: [{ email }, { appleId: identityToken }] });
     } else {
       user = await User.findOne({ appleId: identityToken });
+    }
+
+    // Handle Login Flow
+    if (type === 'login') {
+      if (!user) {
+        return res.status(404).json({ message: 'User not found. Please sign up.' });
+      }
+    } 
+    // Handle Register Flow
+    else if (type === 'register') {
+      if (user) {
+        return res.status(400).json({ message: 'User already exists. Please login.' });
+      }
     }
 
     if (!user) {

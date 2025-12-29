@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,9 @@ import {
   LayoutAnimation,
   UIManager,
 } from "react-native";
+import { ResponseType } from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 if (Platform.OS === "android") {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -36,6 +39,11 @@ import { useCustomAlert } from "../../hooks/useCustomAlert";
 import theme from "../../theme/theme";
 import { useAuth } from "../../context/AuthContext";
 import CountryPicker from "../../components/CountryPicker";
+
+// Client IDs from .env
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 const LoginScreen = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -65,6 +73,23 @@ const LoginScreen = ({ navigation }) => {
 
   // Form animation
   const formAnim = useRef(new Animated.Value(0)).current;
+
+  // Google Login Hook
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    responseType: ResponseType.IdToken,
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleGoogleLoginSuccess(id_token);
+    } else if (response?.type === "error") {
+      showAlert("Error", "Google sign-in failed", "error");
+    }
+  }, [response]);
 
   React.useEffect(() => {
     formAnim.setValue(0);
@@ -208,11 +233,33 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleGoogleLogin = async () => {
+    if (!GOOGLE_IOS_CLIENT_ID || !GOOGLE_ANDROID_CLIENT_ID) {
+        console.warn('Google Client IDs are missing!');
+    }
+    try {
+        await promptAsync();
+    } catch(err) {
+        console.error("Google prompt error", err);
+        showAlert("Error", "Failed to start Google sign in", "error");
+    }
+  };
+
+  const handleGoogleLoginSuccess = async (idToken) => {
     try {
       setLoading(true);
-      await signInWithGoogle();
+      const data = await signInWithGoogle({ token: idToken, type: 'login' });
+      await login(data);
     } catch (error) {
-      showAlert("Error", error.message || "Google sign-in failed", "error");
+      if (error.message && error.message.includes("User not found")) {
+         showAlert(
+            "Account Not Found", 
+            "We couldn't find an account with this Google ID. Redirecting you to sign up...", 
+            "info",
+            () => navigation.navigate("SignUp")
+         );
+      } else {
+         showAlert("Error", error.message || "Google sign-in failed", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -221,9 +268,37 @@ const LoginScreen = ({ navigation }) => {
   const handleAppleLogin = async () => {
     try {
       setLoading(true);
-      await signInWithApple();
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      // credential.identityToken is the JWT string
+      // credential.fullName is available only on first sign in
+      const data = await signInWithApple({
+        token: credential.identityToken, // auth service maps this to identityToken
+        fullName: credential.fullName,
+        authorizationCode: credential.authorizationCode,
+        type: 'login'
+      });
+      
+      await login(data);
     } catch (error) {
-      showAlert("Error", error.message || "Apple sign-in failed", "error");
+      if (error.code === 'ERR_CANCELED') {
+        // user canceled
+        return;
+      }
+      if (error.message && error.message.includes("User not found")) {
+         showAlert(
+            "Account Not Found", 
+            "We couldn't find an account with this Apple ID. Redirecting you to sign up...", 
+            "info",
+            () => navigation.navigate("SignUp")
+         );
+      } else {
+         showAlert("Error", error.message || "Apple sign-in failed", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -278,21 +353,18 @@ const LoginScreen = ({ navigation }) => {
                 {/* Social Login Buttons */}
                 <View style={styles.socialSection}>
                   {Platform.OS === "ios" && (
-                    <TouchableOpacity
-                      style={styles.socialButton}
-                      onPress={handleAppleLogin}
-                      disabled={loading}
-                    >
-                      <View style={styles.socialButtonContent}>
-                        <FontAwesome name="apple" size={20} color="#000" />
-                        <Text style={styles.socialButtonText}>Apple</Text>
-                      </View>
-                    </TouchableOpacity>
+                    <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                        cornerRadius={16}
+                        style={{ flex: 1, height: 50 }}
+                        onPress={handleAppleLogin}
+                    />
                   )}
                   <TouchableOpacity
                     style={styles.socialButton}
                     onPress={handleGoogleLogin}
-                    disabled={loading}
+                    disabled={!request || loading}
                   >
                     <View style={styles.socialButtonContent}>
                       <FontAwesome name="google" size={18} color="#DB4437" />

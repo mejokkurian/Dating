@@ -19,6 +19,9 @@ import {
   signInWithGoogle,
   signInWithApple,
 } from '../../services/api/auth';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { ResponseType } from 'expo-auth-session';
 import GradientButton from '../../components/GradientButton';
 import GlassCard from '../../components/GlassCard';
 import RomanticBackground from '../../components/RomanticBackground';
@@ -26,6 +29,11 @@ import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import theme from '../../theme/theme';
 import { useAuth } from '../../context/AuthContext';
+
+// Client IDs from .env
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 const SignUpScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -42,6 +50,23 @@ const SignUpScreen = ({ navigation }) => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-50)).current;
+
+  // Google Login Hook
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    responseType: ResponseType.IdToken,
+  });
+
+  React.useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleGoogleSignUpSuccess(id_token);
+    } else if (response?.type === "error") {
+      showAlert("Error", "Google sign-up failed", "error");
+    }
+  }, [response]);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -139,11 +164,33 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const handleGoogleSignUp = async () => {
+    if (!GOOGLE_IOS_CLIENT_ID || !GOOGLE_ANDROID_CLIENT_ID) {
+        console.warn('Google Client IDs are missing!');
+    }
+    try {
+        await promptAsync();
+    } catch(err) {
+        console.error("Google prompt error", err);
+        showAlert("Error", "Failed to start Google sign up", "error");
+    }
+  };
+
+  const handleGoogleSignUpSuccess = async (idToken) => {
     try {
       setLoading(true);
-      await signInWithGoogle();
+      const data = await signInWithGoogle({ token: idToken, type: 'register' });
+      await login(data);
     } catch (error) {
-      showAlert('Error', error.message || 'Google sign-up failed', 'error');
+      if (error.message && error.message.includes("User already exists")) {
+         showAlert(
+            "Account Exists", 
+            "You already have an account. Redirecting you to login...", 
+            "info",
+            () => navigation.navigate("Login")
+         );
+      } else {
+         showAlert('Error', error.message || 'Google sign-up failed', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -152,9 +199,35 @@ const SignUpScreen = ({ navigation }) => {
   const handleAppleSignUp = async () => {
     try {
       setLoading(true);
-      await signInWithApple();
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      
+      const data = await signInWithApple({
+        token: credential.identityToken,
+        fullName: credential.fullName,
+        authorizationCode: credential.authorizationCode,
+        type: 'register'
+      });
+
+      await login(data);
     } catch (error) {
-      showAlert('Error', error.message || 'Apple sign-up failed', 'error');
+      if (error.code === 'ERR_CANCELED') {
+        return;
+      }
+      if (error.message && error.message.includes("User already exists")) {
+         showAlert(
+            "Account Exists", 
+            "You already have an account. Redirecting you to login...", 
+            "info",
+            () => navigation.navigate("Login")
+         );
+      } else {
+         showAlert('Error', error.message || 'Apple sign-up failed', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -197,21 +270,18 @@ const SignUpScreen = ({ navigation }) => {
             {/* Social Sign Up Buttons */}
             <View style={styles.socialSection}>
               {Platform.OS === 'ios' && (
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={handleAppleSignUp}
-                  disabled={loading}
-                >
-                  <View style={styles.socialButtonContent}>
-                    <FontAwesome name="apple" size={20} color="#000" />
-                    <Text style={styles.socialButtonText}>Apple</Text>
-                  </View>
-                </TouchableOpacity>
+                <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    cornerRadius={16}
+                    style={{ flex: 1, height: 50 }}
+                    onPress={handleAppleSignUp}
+                />
               )}
               <TouchableOpacity
                 style={styles.socialButton}
                 onPress={handleGoogleSignUp}
-                disabled={loading}
+                disabled={!request || loading}
               >
                 <View style={styles.socialButtonContent}>
                   <FontAwesome name="google" size={18} color="#DB4437" />

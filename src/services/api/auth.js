@@ -92,7 +92,13 @@ export const signInWithGoogle = async (googleData) => {
 
 export const signInWithApple = async (appleData) => {
   try {
-    const response = await api.post("/auth/apple", appleData);
+    // Map 'token' to 'identityToken' if needed, or ensure caller passes 'identityToken'
+    const payload = {
+      ...appleData,
+      identityToken: appleData.token || appleData.identityToken,
+    };
+    
+    const response = await api.post("/auth/apple", payload);
     if (response.data.token) {
       await AsyncStorage.setItem("userToken", response.data.token);
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
