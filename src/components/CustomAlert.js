@@ -13,6 +13,7 @@ const CustomAlert = ({
   message, 
   buttons = [],
   onClose,
+  onConfirm,
   type = 'default', // 'success', 'error', 'warning', 'default'
 }) => {
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
@@ -60,9 +61,14 @@ const CustomAlert = ({
 
   if (!visible) return null;
 
-  const alertButtons = buttons.length > 0 ? buttons : [
-    { text: 'OK', onPress: onClose }
-  ];
+  const alertButtons = buttons.length > 0 ? buttons : (
+    onConfirm ? [
+      { text: 'Cancel', style: 'cancel', onPress: onClose },
+      { text: 'Confirm', onPress: onConfirm }
+    ] : [
+      { text: 'OK', onPress: onClose }
+    ]
+  );
 
   const getIconConfig = () => {
     if (title?.includes('Match') || title?.includes('🎉')) {

@@ -23,10 +23,23 @@ import { useAuth } from '../../context/AuthContext';
 import { createUserDocument } from '../../services/api/user';
 
 const AgeVerificationScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [date, setDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() - 18)));
   const [loading, setLoading] = useState(false);
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      showAlert(
+        'Logout',
+        'Do you want to logout and return to the login screen?',
+        'warning',
+        logout
+      );
+    }
+  };
 
   const calculateAge = (birthDate) => {
     const today = new Date();
@@ -101,6 +114,13 @@ const AgeVerificationScreen = ({ navigation }) => {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <SafeAreaView style={styles.container}>
             <View style={styles.content}>
+              <TouchableOpacity 
+                style={styles.backButton} 
+                onPress={handleBack}
+              >
+                <Ionicons name="arrow-back" size={24} color="#000000" />
+              </TouchableOpacity>
+
               <View style={styles.header}>
                 <View style={styles.iconContainer}>
                   <Ionicons name="shield-checkmark" size={48} color="#D4AF37" />
@@ -180,9 +200,14 @@ const styles = StyleSheet.create({
     padding: 32,
     justifyContent: 'space-between',
   },
+  backButton: {
+    padding: 8,
+    alignSelf: 'flex-start',
+    marginLeft: -8,
+  },
   header: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 10,
   },
   iconContainer: {
     marginBottom: 24,

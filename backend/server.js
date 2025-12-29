@@ -40,10 +40,6 @@ app.use(fileUpload({
 }));
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sugar_dating_app')
-.then(() => console.log('MongoDB Connected'))
-.catch(err => console.error('MongoDB Connection Error:', err));
-
 // Make io accessible to routes/controllers
 app.set('io', io);
 
@@ -65,7 +61,23 @@ app.get('/', (req, res) => {
   res.send('Sugar Dating App API is running');
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Socket.IO ready for connections`);
-});
+// Database Connection and Server Startup
+const startServer = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sugar_dating_app', {
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+    });
+    console.log('MongoDB Connected');
+
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Socket.IO ready for connections`);
+    });
+  } catch (err) {
+    console.error('MongoDB Connection Error:', err);
+    process.exit(1); // Exit process with failure
+  }
+};
+
+startServer();
