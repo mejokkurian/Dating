@@ -330,9 +330,15 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
                 styles.avatarContainer,
                 { transform: [{ scale: callStatus === 'calling' || callStatus === 'ringing' ? pulseAnim : 1 }] }
               ]}>
-                {(user?.photos?.[0] || user?.image) ? (
+                {(user?.photos && user.photos.length > 0 
+                  ? (user.photos[user.mainPhotoIndex ?? 0] || user.photos[0])
+                  : null) || user?.image ? (
                   <Image 
-                    source={{ uri: user.photos?.[0] || user.image }} 
+                    source={{ 
+                      uri: (user.photos && user.photos.length > 0
+                        ? (user.photos[user.mainPhotoIndex ?? 0] || user.photos[0])
+                        : null) || user.image
+                    }} 
                     style={{ width: 150, height: 150, borderRadius: 75 }} 
                   />
                 ) : (

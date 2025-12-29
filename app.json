@@ -21,14 +21,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vofox.standbytraveller-mob",
-      "googleServicesFile": "./GoogleService-Info.plist",
+      "bundleIdentifier": "com.internal.standbytest",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses your location to help you discover compatible people nearby when you enable Connect Now.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby.",
         "NSLocationAlwaysUsageDescription": "This app uses your location in the background to notify you when compatible people are nearby.",
         "NSCameraUsageDescription": "We need access to your camera to take a selfie for account verification.",
-        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select a selfie for account verification."
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select a selfie for account verification.",
+        "NSMicrophoneUsageDescription": "We need access to your microphone for audio and video calls."
       }
     },
     "android": {
@@ -73,7 +73,6 @@
         {
           "icon": "./assets/icon.png",
           "color": "#FF6B9D",
-          "sounds": ["./assets/notification.wav"],
           "mode": "production"
         }
       ]

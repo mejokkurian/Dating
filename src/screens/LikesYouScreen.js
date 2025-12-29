@@ -71,7 +71,11 @@ const LikesYouScreen = ({ navigation }) => {
       onPress={() => handleMatchPress(match)}
     >
       <Image 
-        source={{ uri: match.user.image || match.user.photos?.[0] || 'https://via.placeholder.com/60' }} 
+        source={{ 
+          uri: match.user.image || (match.user.photos && match.user.photos.length > 0
+            ? (match.user.photos[match.user.mainPhotoIndex ?? 0] || match.user.photos[0])
+            : null) || 'https://via.placeholder.com/60'
+        }} 
         style={styles.matchAvatar} 
       />
       <View style={styles.matchContent}>

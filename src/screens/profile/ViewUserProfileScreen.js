@@ -77,7 +77,11 @@ const ViewUserProfileScreen = ({ navigation, route }) => {
         {/* Profile Image */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: user.image || user.photos?.[0] }}
+            source={{ 
+              uri: user.image || (user.photos && user.photos.length > 0 
+                ? (user.photos[user.mainPhotoIndex ?? 0] || user.photos[0])
+                : null)
+            }}
             style={styles.profileImage}
             resizeMode="cover"
           />

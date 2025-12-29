@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
+import SignUpScreen from '../screens/auth/SignUpScreen';
 import PhoneOTPScreen from '../screens/auth/PhoneOTPScreen';
 import AgeVerificationScreen from '../screens/auth/AgeVerificationScreen';
 
@@ -28,6 +29,29 @@ const Stack = createStackNavigator();
 
 const AuthNavigator = ({ navigationRef }) => {
   const { user, loading, onboardingComplete } = useAuth();
+  
+  // Custom Transition: Slide from Left + Fade
+  const authTransition = {
+    animationEnabled: true,
+    cardStyleInterpolator: ({ current, layouts }) => {
+      return {
+        cardStyle: {
+          transform: [
+            {
+              translateX: current.progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-layouts.screen.width, 0],
+              }),
+            },
+          ],
+          opacity: current.progress.interpolate({
+            inputRange: [0, 0.5, 1],
+            outputRange: [0, 0.5, 1],
+          }),
+        },
+      };
+    },
+  };
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
   const heartAnims = React.useRef(
     Array.from({ length: 5 }, () => ({
@@ -137,8 +161,21 @@ const AuthNavigator = ({ navigationRef }) => {
         {!user ? (
           // Auth Stack
           <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="PhoneOTP" component={PhoneOTPScreen} />
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen}
+              options={authTransition}
+            />
+            <Stack.Screen 
+              name="SignUp" 
+              component={SignUpScreen}
+              options={authTransition}
+            />
+            <Stack.Screen 
+              name="PhoneOTP" 
+              component={PhoneOTPScreen}
+              options={authTransition}
+            />
           </>
         ) : !onboardingComplete ? (
           // Onboarding Stack

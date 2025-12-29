@@ -127,11 +127,29 @@ exports.updateVerificationStatus = async (req, res) => {
 // @access  Private
 exports.verifyAccountWithSelfie = async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user._id) {
+      console.error('Image verification error: User not authenticated');
+      return res.status(401).json({ 
+        success: false,
+        verified: false,
+        message: 'User not authenticated',
+        error: 'AUTHENTICATION_REQUIRED'
+      });
+    }
+
     const userId = req.user._id;
+    console.log(`Image verification request from user: ${userId}`);
     
     // Check if image is provided
     if (!req.body.image && !req.files?.image) {
-      return res.status(400).json({ message: 'Selfie image is required' });
+      console.error('Image verification error: No image provided');
+      return res.status(400).json({ 
+        success: false,
+        verified: false,
+        message: 'Selfie image is required',
+        error: 'IMAGE_REQUIRED'
+      });
     }
 
     let imageBase64;
@@ -143,22 +161,45 @@ exports.verifyAccountWithSelfie = async (req, res) => {
       if (imageBase64.includes(',')) {
         imageBase64 = imageBase64.split(',')[1];
       }
+      console.log('Image received as base64 string, length:', imageBase64.length);
     }
     // Handle file upload
     else if (req.files?.image) {
       const imageFile = req.files.image;
       imageBase64 = imageFile.data.toString('base64');
+      console.log('Image received as file upload, size:', imageFile.size);
     } else {
-      return res.status(400).json({ message: 'Invalid image format' });
+      console.error('Image verification error: Invalid image format');
+      return res.status(400).json({ 
+        success: false,
+        verified: false,
+        message: 'Invalid image format',
+        error: 'INVALID_IMAGE_FORMAT'
+      });
     }
 
     // Check if user has profile photos
+    console.log(`Checking profile photos for user: ${userId}`);
     const user = await User.findById(userId).select('photos');
-    if (!user || !user.photos || user.photos.length === 0) {
-      return res.status(400).json({ 
-        message: 'Please upload at least one profile photo before verifying your account' 
+    if (!user) {
+      console.error(`Image verification error: User ${userId} not found`);
+      return res.status(404).json({ 
+        success: false,
+        verified: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
       });
     }
+    if (!user.photos || user.photos.length === 0) {
+      console.log(`Image verification error: User ${userId} has no profile photos`);
+      return res.status(400).json({ 
+        success: false,
+        verified: false,
+        message: 'Please upload at least one profile photo before verifying your account',
+        error: 'NO_PROFILE_PHOTOS'
+      });
+    }
+    console.log(`User has ${user.photos.length} profile photo(s)`);
 
     try {
       // Call Python verification service

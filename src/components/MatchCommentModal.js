@@ -56,7 +56,14 @@ const MatchCommentModal = ({ visible, profile, onClose, onSend }) => {
 
             {/* Profile Info */}
             <View style={styles.profileSection}>
-              <Image source={{ uri: profile.photos?.[0] }} style={styles.profileImage} />
+              <Image 
+                source={{ 
+                  uri: profile.photos && profile.photos.length > 0
+                    ? (profile.photos[profile.mainPhotoIndex ?? 0] || profile.photos[0])
+                    : null
+                }} 
+                style={styles.profileImage} 
+              />
               <Text style={styles.name}>{profile.name}, {profile.age}</Text>
               <Text style={styles.subtitle}>Send a message with your match request</Text>
             </View>

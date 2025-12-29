@@ -27,7 +27,7 @@ const FloatingHeart = ({ delay, duration, startX }) => {
         }),
         Animated.sequence([
           Animated.timing(opacity, {
-            toValue: 0.6,
+            toValue: 1,
             duration: 1000,
             delay: delay,
             useNativeDriver: true,
@@ -72,7 +72,7 @@ const FloatingHeart = ({ delay, duration, startX }) => {
         },
       ]}
     >
-      <Ionicons name="heart" size={20} color="rgba(212, 175, 55, 0.8)" />
+      <Ionicons name="heart" size={20} color="#D4AF37" />
     </Animated.View>
   );
 };
@@ -107,7 +107,7 @@ const RomanticBackground = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1a1a1a', '#2d2d2d', '#1a1a1a']}
+        colors={['#FFFFFF', '#F8F9FA', '#FFFFFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
 });
 

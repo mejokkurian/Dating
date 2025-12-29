@@ -26,8 +26,12 @@ const UserProfileScreen = ({ navigation }) => {
     isPremium: false,
   };
 
-  const renderMenuItem = (icon, title, subtitle, onPress, showChevron = true) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+  const renderMenuItem = (icon, title, subtitle, onPress, showChevron = true, isLast = false) => (
+    <TouchableOpacity 
+      style={[styles.menuItem, isLast && styles.menuItemLast]} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.menuIconContainer}>
         <Ionicons name={icon} size={20} color="#000" />
       </View>
@@ -35,7 +39,7 @@ const UserProfileScreen = ({ navigation }) => {
         <Text style={styles.menuTitle}>{title}</Text>
         {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
       </View>
-      {showChevron && <Ionicons name="chevron-forward" size={20} color="#CCC" />}
+      {showChevron && <Ionicons name="chevron-forward" size={20} color="#999" />}
     </TouchableOpacity>
   );
 
@@ -61,10 +65,17 @@ const UserProfileScreen = ({ navigation }) => {
                   const singleImage = profileData.photoURL || profileData.profilePicture || profileData.image || profileData.avatar;
                   
                   let imageUrl;
-                  if (Array.isArray(images) && images.length > 0) imageUrl = images[0];
-                  else if (typeof images === 'string' && images.length > 0) imageUrl = images;
-                  else if (singleImage && typeof singleImage === 'string') imageUrl = singleImage;
-                  else imageUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500';
+                  if (Array.isArray(images) && images.length > 0) {
+                    // Use main photo index if available
+                    const mainIndex = profileData.mainPhotoIndex ?? 0;
+                    imageUrl = images[mainIndex] || images[0];
+                  } else if (typeof images === 'string' && images.length > 0) {
+                    imageUrl = images;
+                  } else if (singleImage && typeof singleImage === 'string') {
+                    imageUrl = singleImage;
+                  } else {
+                    imageUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500';
+                  }
                   
                   console.log('Profile image URL:', imageUrl);
                   return imageUrl;
@@ -101,7 +112,9 @@ const UserProfileScreen = ({ navigation }) => {
         <TouchableOpacity 
           style={styles.editButton}
           onPress={() => navigation.navigate('EditProfile')}
+          activeOpacity={0.8}
         >
+          <Ionicons name="create-outline" size={20} color="#FFF" />
           <Text style={styles.editButtonText}>Edit Profile</Text>
         </TouchableOpacity>
 
@@ -110,14 +123,14 @@ const UserProfileScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.premiumBanner} onPress={() => navigation.navigate('Premium')}>
             <View style={styles.premiumContent}>
               <View style={styles.premiumIconCircle}>
-                <Ionicons name="diamond" size={24} color="#FFF" />
+                <Ionicons name="diamond" size={24} color="#000" />
               </View>
               <View>
                 <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
                 <Text style={styles.premiumSubtitle}>Get unlimited swipes & more</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#FFF" />
+            <Ionicons name="chevron-forward" size={20} color="#000" />
           </TouchableOpacity>
         )}
 
@@ -125,15 +138,14 @@ const UserProfileScreen = ({ navigation }) => {
         <View style={styles.menuSection}>
           <Text style={styles.sectionHeader}>Account</Text>
           {renderMenuItem('person-outline', 'Personal Information', null, () => {})}
-          {renderMenuItem('shield-checkmark-outline', 'Security', null, () => {})}
-          {renderMenuItem('notifications-outline', 'Notifications', null, () => navigation.navigate('Settings'))}
+          {renderMenuItem('settings-outline', 'Settings', 'Manage app preferences and security', () => navigation.navigate('Settings'), true, true)}
         </View>
 
         <View style={styles.menuSection}>
           <Text style={styles.sectionHeader}>Support</Text>
           {renderMenuItem('help-circle-outline', 'Help Center', null, () => {})}
           {renderMenuItem('document-text-outline', 'Terms of Service', null, () => {})}
-          {renderMenuItem('lock-closed-outline', 'Privacy Policy', null, () => {})}
+          {renderMenuItem('lock-closed-outline', 'Privacy Policy', null, () => {}, true, true)}
         </View>
 
         <TouchableOpacity style={styles.deleteAccountButton}>
@@ -149,7 +161,7 @@ const UserProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F0F0F0',
   },
   scrollContent: {
     paddingTop: 60,
@@ -165,12 +177,22 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
     color: '#000',
+    letterSpacing: -0.5,
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
     paddingHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    padding: 20,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   imageContainer: {
     position: 'relative',
@@ -180,39 +202,54 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    borderWidth: 3,
-    borderColor: '#F5F5F5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   verifiedBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#FFF',
+    backgroundColor: '#D4AF37',
     borderRadius: 12,
-    padding: 2,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   profileInfo: {
     flex: 1,
   },
   name: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 2,
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
   location: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#666',
     marginBottom: 12,
+    fontWeight: '500',
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9F9F9',
-    paddingVertical: 8,
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statItem: {
     alignItems: 'center',
@@ -225,38 +262,50 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 11,
     color: '#666',
+    fontWeight: '500',
+    marginTop: 2,
   },
   statDivider: {
     width: 1,
-    height: 20,
+    height: 24,
     backgroundColor: '#DDD',
     marginHorizontal: 16,
   },
   editButton: {
     backgroundColor: '#000',
-    paddingVertical: 12,
+    paddingVertical: 16,
     marginHorizontal: 24,
-    borderRadius: 24,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+    flexDirection: 'row',
+    gap: 8,
   },
   editButtonText: {
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   premiumBanner: {
     marginHorizontal: 24,
-    backgroundColor: '#000',
+    backgroundColor: '#D4AF37',
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 30,
-    shadowColor: '#000',
+    shadowColor: '#D4AF37',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
@@ -268,69 +317,99 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   premiumTitle: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 16,
     fontWeight: '700',
   },
   premiumSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(0,0,0,0.7)',
     fontSize: 12,
   },
   menuSection: {
-    marginBottom: 24,
-    paddingHorizontal: 24,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: 20,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sectionHeader: {
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F5F5F5',
   },
+  menuItemLast: {
+    borderBottomWidth: 0,
+  },
   menuIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F9F9F9',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F0F0F0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   menuTextContainer: {
     flex: 1,
   },
   menuTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#000',
   },
   menuSubtitle: {
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+    fontWeight: '400',
   },
   deleteAccountButton: {
     marginHorizontal: 24,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   deleteAccountText: {
     color: '#FF3B30',
     fontSize: 14,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
 });
 

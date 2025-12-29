@@ -89,7 +89,7 @@ const AgeVerificationScreen = ({ navigation }) => {
 
   return (
     <LinearGradient
-      colors={['#000000', '#1A1A1A']} // Force Dark Premium Background
+      colors={['#FFFFFF', '#F8F9FA']} // Light Premium Background
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -119,8 +119,8 @@ const AgeVerificationScreen = ({ navigation }) => {
                     mode="date"
                     display="spinner"
                     onChange={onChange}
-                    textColor="#FFFFFF"
-                    themeVariant="dark"
+                    textColor="#000000"
+                    themeVariant="light"
                     maximumDate={new Date()}
                     style={styles.datePicker}
                   />
@@ -194,14 +194,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '300', // Light font for elegance
-    color: '#FFFFFF',
+    color: '#000000',
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 1,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.text.secondary,
     textAlign: 'center',
     fontWeight: '300',
   },
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   ageLabel: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.text.secondary,
     fontWeight: '300',
   },
   ageValue: {
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: theme.colors.text.secondary,
     textAlign: 'center',
     marginBottom: 32,
     fontWeight: '500',
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
   },
   buttonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     opacity: 0.5,
   },
   continueButtonText: {

@@ -899,7 +899,9 @@ const ChatScreen = ({ route, navigation }) => {
       <ProfanityWarningModal
         visible={profanityModalVisible}
         messageText={pendingMessage || ''}
-        userPhoto={userData?.photos?.[0]?.url || userData?.photos?.[0]}
+        userPhoto={(userData?.photos && userData.photos.length > 0
+          ? (userData.photos[userData.mainPhotoIndex ?? 0]?.url || userData.photos[userData.mainPhotoIndex ?? 0] || userData.photos[0]?.url || userData.photos[0])
+          : null)}
         userName={userData?.displayName || userData?.name || 'You'}
         onKeepEditing={handleKeepEditing}
         onSendAnyway={handleSendAnyway}

@@ -11,7 +11,10 @@ import theme from '../theme/theme';
 
 const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile }) => {
   const displayName = user.displayName || user.name || 'Unknown User';
-  const profileImage = user.image || user.photos?.[0] || null;
+  const mainPhotoIndex = user.mainPhotoIndex ?? 0;
+  const profileImage = user.image || (user.photos && user.photos.length > 0 
+    ? (user.photos[mainPhotoIndex] || user.photos[0])
+    : null) || null;
   const hasMatch = user.hasMatch || false;
   const matchStatus = user.matchStatus || null;
   const isActiveMatch = matchStatus === 'active';

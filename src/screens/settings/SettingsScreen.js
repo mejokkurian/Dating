@@ -1,6 +1,6 @@
 /**
  * Settings Screen
- * Allows users to manage app settings including notifications
+ * Comprehensive settings screen with all app controls organized in sections
  */
 import React, { useState, useEffect } from "react";
 import {
@@ -9,182 +9,156 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   SafeAreaView,
+  Switch,
   Alert,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNotification } from "../../context/NotificationContext";
-import { openSettings } from "../../services/notifications/pushNotificationService";
 import { useAuth } from "../../context/AuthContext";
-import { getImageVerificationStatus } from "../../services/api/verification";
+import ProfileSection from "../profile/components/ProfileSection";
+import { updateUserDocument } from "../../services/api/user";
+import DeleteAccountBottomSheet from "./components/DeleteAccountBottomSheet";
 
 const SettingsScreen = ({ navigation }) => {
-  console.log("🔧 SettingsScreen component rendered");
+  const { userData, user, setUserData, logout } = useAuth();
+  const [profileVisible, setProfileVisible] = useState(
+    userData?.isVisibleToOthers !== false
+  );
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const {
-    permissionStatus,
-    expoPushToken,
-    loading: notificationLoading,
-    requestPermissions,
-    retryRequestPermissions,
-    checkPermissionStatus,
-  } = useNotification();
-  const { user } = useAuth();
-  const [isEnabled, setIsEnabled] = useState(permissionStatus === "granted");
-  const [checkingStatus, setCheckingStatus] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState(null);
-  const [loadingVerification, setLoadingVerification] = useState(false);
+  useEffect(() => {
+    // Sync with userData when it changes
+    setProfileVisible(userData?.isVisibleToOthers !== false);
+  }, [userData]);
 
-  // Load verification status function - defined before useEffect
-  const loadVerificationStatus = React.useCallback(async () => {
-    console.log("🔄 Loading verification status...");
+  const handleVisibilityToggle = async (value) => {
     try {
-      setLoadingVerification(true);
-      const status = await getImageVerificationStatus();
-      console.log("✅ Verification status loaded:", status);
-      setVerificationStatus(status);
-    } catch (error) {
-      console.error("❌ Error loading verification status:", error);
-      // Set default status on error so button still shows
-      setVerificationStatus({
-        isVerified: false,
-        hasProfilePhotos: user?.photos?.length > 0 || false,
+      setUpdating(true);
+      const updatedData = await updateUserDocument(userData?._id, {
+        isVisibleToOthers: value,
       });
-    } finally {
-      setLoadingVerification(false);
-    }
-  }, [user?.photos]);
 
-  useEffect(() => {
-    setIsEnabled(permissionStatus === "granted");
-  }, [permissionStatus]);
+      // Update local state
+      setProfileVisible(value);
+      setUserData((prev) => ({ ...prev, ...updatedData }));
 
-  // Check status when screen comes into focus
-  useEffect(() => {
-    console.log("📱 Settings screen mounted/focused");
-
-    const unsubscribe = navigation.addListener("focus", async () => {
-      console.log("📱 Settings screen focused - loading status");
-      setCheckingStatus(true);
-      await checkPermissionStatus();
-      setCheckingStatus(false);
-
-      // Load verification status
-      await loadVerificationStatus();
-    });
-
-    // Load verification status on mount
-    console.log("📱 Loading verification status on mount");
-    loadVerificationStatus();
-
-    return unsubscribe;
-  }, [navigation, checkPermissionStatus, loadVerificationStatus]);
-
-  const handleToggle = async (value) => {
-    if (value) {
-      // User wants to enable notifications
-      const hasPermission = await requestPermissions();
-      if (hasPermission) {
-        setIsEnabled(true);
-        Alert.alert(
-          "Notifications Enabled",
-          "You will now receive notifications for new messages, matches, and nearby users.",
-          [{ text: "OK" }]
-        );
-      } else {
-        // Permission denied
-        setIsEnabled(false);
-        if (permissionStatus === "denied") {
-          Alert.alert(
-            "Notifications Disabled",
-            "To enable notifications, please go to your device Settings and allow notifications for this app.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Open Settings",
-                onPress: () => openSettings(),
-              },
-            ]
-          );
-        }
-      }
-    } else {
-      // User wants to disable notifications
       Alert.alert(
-        "Disable Notifications?",
-        "You will no longer receive push notifications. You can enable them again at any time.",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => setIsEnabled(true), // Keep switch enabled
-          },
-          {
-            text: "Disable",
-            style: "destructive",
-            onPress: () => {
-              setIsEnabled(false);
-              // Note: We can't programmatically disable system notifications,
-              // but we can guide user to settings
-              Alert.alert(
-                "Go to Settings",
-                "To disable notifications, please go to your device Settings and turn off notifications for this app.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Open Settings",
-                    onPress: () => openSettings(),
-                  },
-                ]
-              );
-            },
-          },
-        ]
+        value ? "Profile Visible" : "Profile Hidden",
+        value
+          ? "Your profile is now visible to other users in discovery."
+          : "Your profile is now hidden. Other users won't see you in discovery.",
+        [{ text: "OK" }]
       );
+    } catch (error) {
+      console.error("Error updating visibility:", error);
+      Alert.alert(
+        "Error",
+        "Failed to update visibility. Please try again.",
+        [{ text: "OK" }]
+      );
+      // Revert toggle on error
+      setProfileVisible(!value);
+    } finally {
+      setUpdating(false);
     }
   };
 
-  const handleOpenSettings = () => {
+  const renderMenuItem = (
+    icon,
+    title,
+    subtitle,
+    onPress,
+    showChevron = true,
+    badge = null
+  ) => (
+    <TouchableOpacity
+      style={styles.menuItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.menuIconContainer}>
+        <Ionicons name={icon} size={20} color="#000" />
+      </View>
+      <View style={styles.menuTextContainer}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+      </View>
+      {badge && <View style={styles.badge}>{badge}</View>}
+      {showChevron && <Ionicons name="chevron-forward" size={20} color="#999" />}
+    </TouchableOpacity>
+  );
+
+  const getLoginMethod = () => {
+    // Determine login method from user data
+    if (userData?.email) return "Email";
+    if (user?.phoneNumber || userData?.phoneNumber) return "Phone";
+    if (user?.providerData?.[0]?.providerId === "google.com") return "Google";
+    if (user?.providerData?.[0]?.providerId === "apple.com") return "Apple";
+    return "Email"; // Default fallback
+  };
+
+  const isVerified = userData?.isVerified || false;
+
+  const handleLogout = () => {
     Alert.alert(
-      "Open Settings",
-      "You will be taken to your device Settings to manage notification permissions.",
+      "Logout",
+      "Are you sure you want to logout?",
       [
-        { text: "Cancel", style: "cancel" },
         {
-          text: "Open Settings",
-          onPress: () => openSettings(),
+          text: "Cancel",
+          style: "cancel",
         },
-      ]
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await logout();
+              // Navigation will be handled by AuthNavigator based on auth state
+            } catch (error) {
+              console.error("Error logging out:", error);
+              Alert.alert("Error", "Failed to logout. Please try again.");
+            }
+          },
+        },
+      ],
+      { cancelable: true }
     );
   };
 
-  const getStatusText = () => {
-    if (checkingStatus || notificationLoading) {
-      return "Checking...";
-    }
+  const [showDeleteSheet, setShowDeleteSheet] = useState(false);
 
-    switch (permissionStatus) {
-      case "granted":
-        return "Enabled";
-      case "denied":
-        return "Disabled in Settings";
-      case "undetermined":
-        return "Not Set";
-      default:
-        return "Unknown";
-    }
+  const handleDeleteAccount = () => {
+    setShowDeleteSheet(true);
   };
 
-  const getStatusColor = () => {
-    switch (permissionStatus) {
-      case "granted":
-        return "#34C759"; // Green
-      case "denied":
-        return "#FF3B30"; // Red
-      default:
-        return "#8E8E93"; // Gray
+  const handleConfirmDelete = async () => {
+    try {
+      setDeleting(true);
+      // TODO: Implement delete account API call
+      // const response = await deleteUserAccount(userData?._id);
+      
+      // For now, show placeholder
+      setShowDeleteSheet(false);
+      Alert.alert(
+        "Delete Account",
+        "Account deletion feature will be implemented soon. Please contact support for account deletion.",
+        [
+          {
+            text: "OK",
+            onPress: () => setDeleting(false),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      Alert.alert(
+        "Error",
+        "Failed to delete account. Please try again or contact support."
+      );
+      setDeleting(false);
     }
   };
 
@@ -197,7 +171,10 @@ const SettingsScreen = ({ navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              // Always navigate back to Profile when coming from Profile screen
+              navigation.navigate("Profile");
+            }}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color="#000" />
@@ -206,227 +183,298 @@ const SettingsScreen = ({ navigation }) => {
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* Notifications Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <Text style={styles.sectionDescription}>
-            Manage how you receive notifications for messages, matches, and
-            nearby users.
-          </Text>
+        {/* NOTIFICATIONS Section */}
+        <ProfileSection icon="notifications-outline" title="NOTIFICATIONS">
+          {renderMenuItem(
+            "notifications-outline",
+            "Notification Preferences",
+            "Manage push notifications and alerts",
+            () => navigation.navigate("NotificationSettings")
+          )}
+        </ProfileSection>
 
-          {/* Notification Toggle */}
+        {/* SECURITY Section */}
+        <ProfileSection icon="shield-checkmark-outline" title="SECURITY">
+          {renderMenuItem(
+            "lock-closed-outline",
+            "Login Method",
+            `Currently using: ${getLoginMethod()}`,
+            () => {
+              // Show current login method info (can be expanded to change method later)
+              alert(`Current login method: ${getLoginMethod()}\n\nLogin method changes coming soon.`);
+            }
+          )}
+          {renderMenuItem(
+            "camera-outline",
+            "Image Verification",
+            isVerified
+              ? "Your account is verified"
+              : "Verify your account with selfie",
+            () => navigation.navigate("VerifyAccount"),
+            true,
+            !isVerified ? (
+              <View style={styles.verificationBadge}>
+                <Text style={styles.verificationBadgeText}>!</Text>
+              </View>
+            ) : null
+          )}
+        </ProfileSection>
+
+        {/* PRIVACY Section */}
+        <ProfileSection icon="lock-closed-outline" title="PRIVACY">
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="notifications" size={24} color="#000" />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="eye-outline" size={20} color="#000" />
               </View>
               <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>Push Notifications</Text>
-                <Text
-                  style={[styles.settingStatus, { color: getStatusColor() }]}
-                >
-                  {getStatusText()}
+                <Text style={styles.menuTitle}>Profile Visibility</Text>
+                <Text style={styles.menuSubtitle}>
+                  {profileVisible
+                    ? "Your profile is visible to other users"
+                    : "Your profile is hidden from other users"}
                 </Text>
               </View>
             </View>
-            {checkingStatus || notificationLoading ? (
+            {updating ? (
               <ActivityIndicator size="small" color="#000" />
             ) : (
               <Switch
-                value={isEnabled}
-                onValueChange={handleToggle}
+                value={profileVisible}
+                onValueChange={handleVisibilityToggle}
                 trackColor={{ false: "#E5E5EA", true: "#D1D1D6" }}
-                thumbColor={isEnabled ? "#000" : "#FFFFFF"}
+                thumbColor={profileVisible ? "#000" : "#FFFFFF"}
                 ios_backgroundColor="#E5E5EA"
               />
             )}
           </View>
-
-          {/* Additional Info */}
-          {permissionStatus === "granted" && expoPushToken && (
-            <View style={styles.infoBox}>
-              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.infoText}>
-                You'll receive notifications for new messages, matches, and
-                nearby users.
-              </Text>
-            </View>
+          {renderMenuItem(
+            "ban-outline",
+            "Blocked Users",
+            "Manage your block list",
+            () => {
+              // Navigate to block list (can be implemented later)
+              // For now, show placeholder
+              alert("Block List feature coming soon");
+            },
+            true,
+            null,
+            true
           )}
+        </ProfileSection>
 
-          {permissionStatus === "denied" && (
-            <View style={styles.warningBox}>
-              <Ionicons name="alert-circle" size={20} color="#FF9500" />
-              <Text style={styles.warningText}>
-                Notifications are disabled in your device Settings. Tap "Open
-                Settings" below to enable them.
-              </Text>
-            </View>
-          )}
-
-          {/* Open Settings Button */}
-          {permissionStatus !== "granted" && (
-            <TouchableOpacity
-              style={styles.settingsButton}
-              onPress={handleOpenSettings}
-            >
-              <Ionicons name="settings-outline" size={20} color="#000" />
-              <Text style={styles.settingsButtonText}>
-                Open Device Settings
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Retry Button */}
-          {permissionStatus === "denied" && (
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={async () => {
-                setCheckingStatus(true);
-                const success = await retryRequestPermissions();
-                setCheckingStatus(false);
-                if (success) {
-                  setIsEnabled(true);
-                }
-              }}
-            >
-              <Text style={styles.retryButtonText}>
-                Retry Permission Request
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Notification Types Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            What You'll Get Notified About
-          </Text>
-          <View style={styles.notificationTypes}>
-            <View style={styles.notificationType}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#000" />
-              <Text style={styles.notificationTypeText}>New Messages</Text>
-            </View>
-            <View style={styles.notificationType}>
-              <Ionicons name="heart" size={20} color="#000" />
-              <Text style={styles.notificationTypeText}>New Matches</Text>
-            </View>
-            <View style={styles.notificationType}>
-              <Ionicons name="location" size={20} color="#000" />
-              <Text style={styles.notificationTypeText}>Nearby Users</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Account Verification Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Verification</Text>
-          <Text style={styles.sectionDescription}>
-            Verify your account to increase trust and show you're a real person.
-          </Text>
-
-          {/* Verification Status */}
+        {/* SUBSCRIPTION Section */}
+        <ProfileSection icon="diamond-outline" title="SUBSCRIPTION">
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <View style={styles.iconContainer}>
+              <View style={styles.menuIconContainer}>
                 <Ionicons
-                  name={
-                    verificationStatus?.isVerified
-                      ? "checkmark-circle"
-                      : "ellipse-outline"
-                  }
-                  size={24}
-                  color={verificationStatus?.isVerified ? "#34C759" : "#999"}
+                  name={userData?.isPremium ? "diamond" : "diamond-outline"}
+                  size={20}
+                  color={userData?.isPremium ? "#D4AF37" : "#000"}
                 />
               </View>
               <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>Verification Status</Text>
-                <Text
-                  style={[
-                    styles.settingStatus,
-                    {
-                      color: verificationStatus?.isVerified
-                        ? "#34C759"
-                        : "#666",
-                    },
-                  ]}
-                >
-                  {loadingVerification
-                    ? "Loading..."
-                    : verificationStatus?.isVerified
-                    ? "Verified"
-                    : "Not Verified"}
+                <Text style={styles.menuTitle}>
+                  {userData?.isPremium ? "Premium Active" : "Free Plan"}
+                </Text>
+                <Text style={styles.menuSubtitle}>
+                  {userData?.isPremium
+                    ? userData?.subscriptionPlan
+                      ? `${userData.subscriptionPlan.charAt(0).toUpperCase() + userData.subscriptionPlan.slice(1)} Plan`
+                      : "Premium Subscription"
+                    : "Upgrade to unlock premium features"}
+                </Text>
+                {userData?.isPremium && userData?.subscriptionExpiryDate && (
+                  <Text style={styles.expiryText}>
+                    Expires: {new Date(userData.subscriptionExpiryDate).toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
+            </View>
+            {!userData?.isPremium && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Premium")}
+                style={styles.upgradeButton}
+              >
+                <Text style={styles.upgradeButtonText}>Upgrade</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {renderMenuItem(
+            "refresh-outline",
+            "Restore Purchases",
+            "Restore your previous subscriptions",
+            async () => {
+              try {
+                Alert.alert(
+                  "Restore Purchases",
+                  "Checking for previous purchases...",
+                  [{ text: "OK" }]
+                );
+                // TODO: Implement actual restore purchases logic
+                // This would typically use expo-in-app-purchases or similar
+                Alert.alert(
+                  "Restore Purchases",
+                  "No previous purchases found, or restore feature coming soon.",
+                  [{ text: "OK" }]
+                );
+              } catch (error) {
+                console.error("Error restoring purchases:", error);
+                Alert.alert(
+                  "Error",
+                  "Failed to restore purchases. Please try again.",
+                  [{ text: "OK" }]
+                );
+              }
+            },
+            true,
+            null,
+            true
+          )}
+        </ProfileSection>
+
+        {/* ACCOUNT Section */}
+        <ProfileSection icon="person-outline" title="ACCOUNT">
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="mail-outline" size={20} color="#000" />
+              </View>
+              <View style={styles.settingTextContainer}>
+                <Text style={styles.menuTitle}>Email</Text>
+                <Text style={styles.menuSubtitle} numberOfLines={1}>
+                  {userData?.email || "Not set"}
                 </Text>
               </View>
             </View>
-            {loadingVerification && (
-              <ActivityIndicator size="small" color="#000" />
-            )}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("EditEmail")}
+              style={styles.editButton}
+            >
+              <Ionicons name="create-outline" size={18} color="#666" />
+            </TouchableOpacity>
           </View>
-
-          {/* Verification Date */}
-          {verificationStatus?.isVerified &&
-            verificationStatus?.verificationDate && (
-              <View style={styles.infoBox}>
-                <Ionicons name="calendar-outline" size={20} color="#34C759" />
-                <Text style={styles.infoText}>
-                  Verified on{" "}
-                  {new Date(
-                    verificationStatus.verificationDate
-                  ).toLocaleDateString()}
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="call-outline" size={20} color="#000" />
+              </View>
+              <View style={styles.settingTextContainer}>
+                <Text style={styles.menuTitle}>Phone Number</Text>
+                <Text style={styles.menuSubtitle} numberOfLines={1}>
+                  {userData?.phoneNumber || user?.phoneNumber || "Not set"}
                 </Text>
               </View>
-            )}
-
-          {/* Verify Button - Show if not verified */}
-          {(!verificationStatus || !verificationStatus?.isVerified) && (
-            <>
-              {verificationStatus && !verificationStatus?.hasProfilePhotos && (
-                <View style={styles.warningBox}>
-                  <Ionicons name="alert-circle" size={20} color="#FF9500" />
-                  <Text style={styles.warningText}>
-                    Please upload at least one profile photo before verifying
-                    your account.
-                  </Text>
-                </View>
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.verifyButton,
-                  (verificationStatus &&
-                    !verificationStatus?.hasProfilePhotos) ||
-                  loadingVerification
-                    ? styles.verifyButtonDisabled
-                    : null,
-                ]}
-                onPress={() => {
-                  if (
-                    verificationStatus &&
-                    !verificationStatus?.hasProfilePhotos
-                  ) {
-                    Alert.alert(
-                      "Profile Photo Required",
-                      "Please upload at least one profile photo before verifying your account.",
-                      [{ text: "OK" }]
-                    );
-                    return;
-                  }
-                  navigation.navigate("VerifyAccount");
-                }}
-                disabled={
-                  (verificationStatus &&
-                    !verificationStatus?.hasProfilePhotos) ||
-                  loadingVerification
-                }
-              >
-                <Ionicons name="camera" size={20} color="#FFF" />
-                <Text style={styles.verifyButtonText}>Verify with Selfie</Text>
-              </TouchableOpacity>
-            </>
+            </View>
+          </View>
+          {renderMenuItem(
+            "information-circle-outline",
+            "Account Information",
+            "View your account details",
+            () => {
+              // Navigate to account info
+              navigation.navigate("Profile");
+            },
+            true,
+            null,
+            true
           )}
+        </ProfileSection>
+
+        {/* LEGAL Section */}
+        <ProfileSection icon="document-text-outline" title="LEGAL">
+          {renderMenuItem(
+            "document-text-outline",
+            "Terms of Service",
+            "Read our terms and conditions",
+            () => {
+              // Navigate to Terms of Service (to be implemented)
+              Alert.alert(
+                "Terms of Service",
+                "Terms of Service screen will be implemented soon.",
+                [{ text: "OK" }]
+              );
+            }
+          )}
+          {renderMenuItem(
+            "shield-checkmark-outline",
+            "Privacy Policy",
+            "Read our privacy policy",
+            () => {
+              // Navigate to Privacy Policy (to be implemented)
+              Alert.alert(
+                "Privacy Policy",
+                "Privacy Policy screen will be implemented soon.",
+                [{ text: "OK" }]
+              );
+            }
+          )}
+          {renderMenuItem(
+            "information-circle-outline",
+            "Cookie Policy",
+            "Learn about our cookie usage",
+            () => {
+              // Navigate to Cookie Policy (to be implemented)
+              Alert.alert(
+                "Cookie Policy",
+                "Cookie Policy screen will be implemented soon.",
+                [{ text: "OK" }]
+              );
+            }
+          )}
+          {renderMenuItem(
+            "code-outline",
+            "Open Source Licenses",
+            "View third-party licenses",
+            () => {
+              // Navigate to Licenses (to be implemented)
+              Alert.alert(
+                "Open Source Licenses",
+                "Licenses screen will be implemented soon.",
+                [{ text: "OK" }]
+              );
+            },
+            true,
+            null,
+            true
+          )}
+        </ProfileSection>
+
+        {/* Logout and Delete Account */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            onPress={handleLogout}
+            activeOpacity={0.7}
+            style={styles.actionTextButton}
+          >
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleDeleteAccount}
+            activeOpacity={0.7}
+            disabled={deleting}
+            style={styles.actionTextButton}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="#FF3B30" />
+            ) : (
+              <Text style={styles.deleteButtonText}>Delete Account</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Delete Account Confirmation Bottom Sheet */}
+      <DeleteAccountBottomSheet
+        visible={showDeleteSheet}
+        onClose={() => setShowDeleteSheet(false)}
+        onConfirm={handleConfirmDelete}
+        loading={deleting}
+      />
     </SafeAreaView>
   );
 };
@@ -434,177 +482,140 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F0F0F0",
   },
   scrollContent: {
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 20,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   backButton: {
-    padding: 4,
+    padding: 8,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: "800",
     color: "#000",
+    letterSpacing: -0.5,
   },
   headerSpacer: {
     width: 32,
   },
-  section: {
-    marginBottom: 32,
-    paddingHorizontal: 24,
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 8,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 20,
-    lineHeight: 20,
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F9F9F9",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
   },
   settingLeft: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
   },
-  iconContainer: {
+  settingTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  menuIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    backgroundColor: "#F0F0F0",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  settingTextContainer: {
+  menuTextContainer: {
     flex: 1,
   },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 4,
-  },
-  settingStatus: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  infoBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#E8F5E9",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#2E7D32",
-    marginLeft: 8,
-    lineHeight: 18,
-  },
-  warningBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#FFF3E0",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#E65100",
-    marginLeft: 8,
-    lineHeight: 18,
-  },
-  settingsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#000",
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  settingsButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  retryButton: {
-    backgroundColor: "#F9F9F9",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
-  },
-  retryButtonText: {
-    color: "#000",
+  menuTitle: {
     fontSize: 15,
     fontWeight: "600",
-  },
-  notificationTypes: {
-    gap: 12,
-  },
-  notificationType: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F9F9F9",
-    padding: 16,
-    borderRadius: 12,
-  },
-  notificationTypeText: {
-    fontSize: 15,
     color: "#000",
-    marginLeft: 12,
-    fontWeight: "500",
+    marginBottom: 2,
   },
-  verifyButton: {
-    flexDirection: "row",
+  menuSubtitle: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "400",
+  },
+  badge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#FF3B30",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#000",
-    paddingVertical: 14,
+    marginRight: 8,
+  },
+  verificationBadgeText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  expiryText: {
+    fontSize: 11,
+    color: "#999",
+    marginTop: 2,
+    fontStyle: "italic",
+  },
+  upgradeButton: {
+    backgroundColor: "#D4AF37",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  upgradeButtonText: {
+    color: "#000",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  editButton: {
+    padding: 8,
+  },
+  actionButtonsContainer: {
     paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 12,
+    marginTop: 8,
     gap: 8,
   },
-  verifyButtonDisabled: {
-    opacity: 0.5,
+  actionTextButton: {
+    paddingVertical: 12,
+    alignItems: "center",
   },
-  verifyButtonText: {
-    color: "#FFFFFF",
+  logoutButtonText: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
+    color: "#666",
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#FF3B30",
   },
 });
 

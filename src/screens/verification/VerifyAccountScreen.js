@@ -14,7 +14,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { Camera } from "expo-camera";
+import { CameraView, Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -42,14 +42,57 @@ const VerifyAccountScreen = ({ navigation }) => {
   }, []);
 
   const checkPermissions = async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    setHasPermission(status === "granted");
+    try {
+      console.log("🔍 Checking camera permissions...");
+      
+      // Add a timeout to prevent hanging
+      const permissionPromise = (async () => {
+        // First check current permission status using Camera namespace
+        const existingStatus = await Camera.getCameraPermissionsAsync();
+        console.log("📋 Existing camera permission status:", existingStatus.status);
+        
+        if (existingStatus.status === "granted") {
+          console.log("✅ Camera permission already granted");
+          return "granted";
+        }
+        
+        // If not granted, request permission
+        console.log("📢 Requesting camera permission...");
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        console.log("📋 Camera permission status after request:", status);
+        return status;
+      })();
 
-    if (status !== "granted") {
+      // Add timeout fallback (10 seconds)
+      const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+          console.warn("⏱️ Permission check timed out");
+          resolve("timeout");
+        }, 10000);
+      });
+
+      const status = await Promise.race([permissionPromise, timeoutPromise]);
+      
+      if (status === "timeout") {
+        console.error("⏱️ Permission check timed out, defaulting to false");
+        setHasPermission(false);
+        showAlert(
+          "Permission Timeout",
+          "Camera permission check is taking too long. Please check your app permissions in device settings.",
+          "warning"
+        );
+      } else {
+        setHasPermission(status === "granted");
+        console.log(status === "granted" ? "✅ Permission granted" : "❌ Permission denied");
+      }
+    } catch (error) {
+      console.error("❌ Error checking camera permissions:", error);
+      // Set to false on error so UI can still render
+      setHasPermission(false);
       showAlert(
-        "Camera Permission Required",
-        "We need camera access to take your verification selfie.",
-        "warning"
+        "Permission Error",
+        `Failed to check camera permissions: ${error.message || "Unknown error"}. Please try again.`,
+        "error"
       );
     }
   };
@@ -71,6 +114,7 @@ const VerifyAccountScreen = ({ navigation }) => {
         quality: 0.8,
         base64: true,
         skipProcessing: false,
+        isImageMirror: false, // Don't mirror the captured image
       });
 
       // Store both URI and base64 for later use
@@ -163,9 +207,10 @@ const VerifyAccountScreen = ({ navigation }) => {
           "success"
         );
 
-        // Navigate back after a delay (Settings screen will reload status on focus)
+        // Navigate back to Settings after a delay (Settings screen will reload status on focus)
         setTimeout(() => {
-          navigation.goBack();
+          // Navigate back to Settings (which will then navigate to Profile)
+          navigation.navigate("Settings");
         }, 2000);
       } else {
         showAlert(
@@ -209,7 +254,10 @@ const VerifyAccountScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              // Navigate back to Settings (which will then navigate to Profile)
+              navigation.navigate("Settings");
+            }}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color="#000" />
@@ -254,13 +302,16 @@ const VerifyAccountScreen = ({ navigation }) => {
       <CustomAlert
         {...alertConfig}
         onConfirm={handleConfirm}
-        onCancel={hideAlert}
+        onClose={hideAlert}
       />
 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            // Navigate back to Settings (which will then navigate to Profile)
+            navigation.navigate("Settings");
+          }}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -288,7 +339,13 @@ const VerifyAccountScreen = ({ navigation }) => {
             </View>
             <View style={styles.instructionItem}>
               <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.instructionText}>Good lighting</Text>
+              <Text style={styles.instructionText}>Good lighting, no shadows</Text>
+            </View>
+            <View style={styles.instructionItem}>
+              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
+              <Text style={styles.instructionText}>
+                Clear, uncluttered background
+              </Text>
             </View>
             <View style={styles.instructionItem}>
               <Ionicons name="checkmark-circle" size={20} color="#34C759" />
@@ -308,11 +365,13 @@ const VerifyAccountScreen = ({ navigation }) => {
         {/* Camera or Preview */}
         {!capturedImage ? (
           <View style={styles.cameraContainer}>
-            <Camera
+            <CameraView
               ref={cameraRef}
               style={styles.camera}
-              type={cameraType}
+              facing={cameraType}
+              mode="picture"
               ratio="1:1"
+              mirror={false}
             >
               <View style={styles.cameraOverlay}>
                 <View style={styles.captureButtonContainer}>
@@ -323,15 +382,8 @@ const VerifyAccountScreen = ({ navigation }) => {
                     <View style={styles.captureButtonInner} />
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.galleryButton}
-                  onPress={pickFromGallery}
-                >
-                  <Ionicons name="images-outline" size={24} color="#FFF" />
-                  <Text style={styles.galleryButtonText}>Gallery</Text>
-                </TouchableOpacity>
               </View>
-            </Camera>
+            </CameraView>
           </View>
         ) : (
           <View style={styles.previewContainer}>
@@ -507,20 +559,6 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: "#FFF",
-  },
-  galleryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    gap: 8,
-  },
-  galleryButtonText: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "600",
   },
   previewContainer: {
     width: "100%",

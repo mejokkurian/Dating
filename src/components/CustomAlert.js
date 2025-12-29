@@ -1,62 +1,194 @@
-import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { FontAwesome5 } from '@expo/vector-icons';
-import GlassCard from './GlassCard';
-import GradientButton from './GradientButton';
+import { Ionicons } from '@expo/vector-icons';
 import theme from '../theme/theme';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const CustomAlert = ({ visible, title, message, onClose, onConfirm, type = 'error' }) => {
+const CustomAlert = ({ 
+  visible, 
+  title, 
+  message, 
+  buttons = [],
+  onClose,
+  type = 'default', // 'success', 'error', 'warning', 'default'
+}) => {
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const iconScaleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(100),
+          Animated.spring(iconScaleAnim, {
+            toValue: 1,
+            tension: 50,
+            friction: 6,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      scaleAnim.setValue(0.3);
+      opacityAnim.setValue(0);
+      slideAnim.setValue(50);
+      iconScaleAnim.setValue(0);
+    }
+  }, [visible]);
+
   if (!visible) return null;
 
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return { name: 'check-circle', color: '#4ADE80' };
-      case 'warning':
-        return { name: 'exclamation-triangle', color: '#FBBF24' };
-      case 'error':
-      default:
-        return { name: 'exclamation-circle', color: '#F87171' };
+  const alertButtons = buttons.length > 0 ? buttons : [
+    { text: 'OK', onPress: onClose }
+  ];
+
+  const getIconConfig = () => {
+    if (title?.includes('Match') || title?.includes('🎉')) {
+      return { name: 'heart', color: '#FFFFFF', gradient: ['#FF6B9D', '#C44569'], size: 42 };
     }
+    if (title?.includes('Super Like') || title?.includes('⭐')) {
+      return { name: 'star', color: '#FFFFFF', gradient: ['#FFD700', '#FFA500'], size: 42 };
+    }
+    if (title?.includes('Error')) {
+      return { name: 'alert-circle', color: '#FFFFFF', gradient: ['#FF5252', '#D32F2F'], size: 44 };
+    }
+    if (title?.includes('Propose') || title?.includes('☕') || title?.includes('🍷')) {
+      return { name: 'cafe', color: '#FFFFFF', gradient: ['#F2994A', '#F2C94C'], size: 40 };
+    }
+    return { name: 'checkmark-circle', color: '#FFFFFF', gradient: ['#11998e', '#38ef7d'], size: 42 };
   };
 
-  const icon = getIcon();
-
-  const handlePress = () => {
-    if (onConfirm) {
-      onConfirm();
-    }
-    onClose();
-  };
+  const iconConfig = getIconConfig();
 
   return (
     <Modal
       transparent
       visible={visible}
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
+        <BlurView intensity={30} style={StyleSheet.absoluteFill} tint="dark" />
         
-        <GlassCard style={styles.alertContainer} opacity={0.95}>
-          <View style={styles.iconContainer}>
-            <FontAwesome5 name={icon.name} size={40} color={icon.color} />
-          </View>
-          
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
-          
-          <GradientButton
-            title="Got it"
-            onPress={handlePress}
-            size="medium"
-            style={styles.button}
-          />
-        </GlassCard>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        
+        <Animated.View
+          style={[
+            styles.alertContainer,
+            {
+              opacity: opacityAnim,
+              transform: [
+                { scale: scaleAnim },
+                { translateY: slideAnim }
+              ],
+            },
+          ]}
+        >
+          {/* Gradient Background */}
+          <LinearGradient
+            colors={theme.colors.gradients.background}
+            style={styles.gradientBackground}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {/* Icon Bubble */}
+            <View style={styles.iconWrapper}>
+               <Animated.View
+                style={[
+                  styles.iconCircle,
+                  {
+                    transform: [{ scale: iconScaleAnim }],
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={iconConfig.gradient}
+                  style={styles.iconGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name={iconConfig.name} size={iconConfig.size} color={iconConfig.color} />
+                </LinearGradient>
+              </Animated.View>
+            </View>
+            
+            {/* Text Content */}
+            <View style={styles.contentContainer}>
+              {title && (
+                <Text style={styles.title}>{title}</Text>
+              )}
+              
+              {message && (
+                <Text style={styles.message}>{message}</Text>
+              )}
+            </View>
+            
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              {alertButtons.map((button, index) => {
+                const isCancel = button.style === 'cancel';
+                const isPrimary = !isCancel; 
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.button, { flex: 1 }]}
+                    onPress={() => {
+                      button.onPress?.();
+                      onClose?.();
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {isPrimary ? (
+                      <LinearGradient
+                        colors={theme.colors.gradients.primary}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.primaryButtonGradient}
+                      >
+                        <Text style={styles.primaryButtonText}>
+                          {button.text}
+                        </Text>
+                      </LinearGradient>
+                    ) : (
+                      <View style={styles.secondaryButton}>
+                        <Text style={styles.secondaryButtonText}>
+                          {button.text}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </LinearGradient>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -67,39 +199,118 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   alertContainer: {
-    width: width * 0.85,
-    padding: theme.spacing.xl,
-    alignItems: 'center',
+    width: width * 0.82,
+    maxWidth: 360,
     borderRadius: theme.borderRadius.xl,
-    backgroundColor: 'rgba(30, 30, 30, 0.9)', // Darker background for contrast
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
   },
-  iconContainer: {
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 50,
+  gradientBackground: {
+    paddingTop: 32,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  iconWrapper: {
+    marginBottom: 20,
+    ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
+        },
+        android: {
+          elevation: 8,
+        },
+      }),
+  },
+  iconCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    overflow: 'hidden',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contentContainer: {
+    alignItems: 'center',
+    marginBottom: 28,
   },
   title: {
-    fontSize: theme.typography.fontSize.xl,
+    fontSize: theme.typography.fontSize['2xl'],
     fontWeight: theme.typography.fontWeight.bold,
-    color: '#fff',
-    marginBottom: theme.spacing.sm,
+    color: theme.colors.text.primary,
     textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: -0.5,
   },
   message: {
     fontSize: theme.typography.fontSize.base,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: theme.colors.text.secondary,
     textAlign: 'center',
-    marginBottom: theme.spacing.xl,
     lineHeight: 22,
+    opacity: 0.9,
+    paddingHorizontal: 4,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12, // Gap between buttons
+    width: '100%',
+    justifyContent: 'space-between',
   },
   button: {
-    width: '100%',
+    height: 52,
+    borderRadius: theme.borderRadius.full,
+    overflow: 'hidden',
+  },
+  primaryButtonGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.bold,
+    letterSpacing: 0.5,
+  },
+  secondaryButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceDark,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: 'transparent', // Looks cleaner without border or very subtle one
+  },
+  secondaryButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.semiBold,
   },
 });
 

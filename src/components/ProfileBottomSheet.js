@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,24 +10,49 @@ import {
   Animated,
   Modal,
   PanResponder,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
-import GlassCard from './GlassCard';
-import theme from '../theme/theme';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  Ionicons,
+  FontAwesome5,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import GlassCard from "./GlassCard";
+import theme from "../theme/theme";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuperLike }) => {
+const ProfileBottomSheet = ({
+  visible,
+  profile,
+  onClose,
+  onLike,
+  onPass,
+  onSuperLike,
+}) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const panY = useRef(new Animated.Value(0)).current;
+
+  // Heart button feedback animation
+  const heartScale = useRef(new Animated.Value(1)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const heartTranslateY = useRef(new Animated.Value(0)).current;
+
+  // Super like button feedback animation
+  const superLikeScale = useRef(new Animated.Value(1)).current;
+  const superLikeOpacity = useRef(new Animated.Value(0)).current;
+  const superLikeTranslateY = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to vertical drags
-        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        // Only respond to vertical drags down from the top area
+        // This prevents interference with action buttons at the bottom
+        const isVerticalDrag =
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        const isDraggingDown = gestureState.dy > 0;
+        return isVerticalDrag && isDraggingDown;
       },
       onPanResponderMove: (_, gestureState) => {
         // Only allow dragging down
@@ -53,6 +78,15 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
 
   useEffect(() => {
     if (visible) {
+      // Reset feedback animations to ensure no ghost icons
+      heartScale.setValue(0.5);
+      heartOpacity.setValue(0);
+      heartTranslateY.setValue(0);
+      
+      superLikeScale.setValue(0.8);
+      superLikeOpacity.setValue(0);
+      superLikeTranslateY.setValue(0);
+
       Animated.spring(slideAnim, {
         toValue: 0,
         tension: 50,
@@ -81,25 +115,30 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
 
   if (!profile) return null;
 
-  const renderBadge = (type) => {
-    if (type === 'verified' && profile.isVerified) {
-      return (
-        <View style={[styles.badge, { backgroundColor: '#4CAF50' }]}>
-          <MaterialCommunityIcons name="check-decagram" size={14} color="#fff" />
-          <Text style={styles.badgeText}>Verified</Text>
-        </View>
-      );
+  // Organize photos: primary first, then others
+  const organizePhotos = () => {
+    if (!profile.photos || profile.photos.length === 0) {
+      return [];
     }
-    if (type === 'premium' && profile.isPremium) {
-      return (
-        <View style={[styles.badge, { backgroundColor: '#FFD700' }]}>
-          <MaterialCommunityIcons name="crown" size={14} color="#000" />
-          <Text style={[styles.badgeText, { color: '#000' }]}>Premium</Text>
-        </View>
-      );
-    }
-    return null;
+    const mainIndex = profile.mainPhotoIndex ?? 0;
+    const primaryPhoto = profile.photos[mainIndex] || profile.photos[0];
+    const otherPhotos = profile.photos.filter(
+      (_, index) => index !== mainIndex
+    );
+    return [primaryPhoto, ...otherPhotos];
   };
+
+  const organizedPhotos = organizePhotos();
+
+  // Render full-width embedded photo
+  const renderFullWidthPhoto = (photoUri, index) => (
+    <View key={`photo-${index}`} style={styles.embeddedPhotoContainer}>
+      <Image
+        source={{ uri: photoUri || "https://via.placeholder.com/400x600" }}
+        style={styles.embeddedPhoto}
+      />
+    </View>
+  );
 
   const combinedTranslateY = Animated.add(slideAnim, panY);
 
@@ -111,8 +150,12 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
-        
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+
         <Animated.View
           style={[
             styles.bottomSheet,
@@ -124,91 +167,66 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
             <View style={styles.handle} />
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-            {/* Photo Gallery */}
-            <View style={styles.photoGalleryContainer}>
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                style={styles.photoGallery}
-                contentContainerStyle={styles.photoGalleryContent}
-              >
-                {(profile.photos && profile.photos.length > 0 ? profile.photos : [profile.image]).map((photo, index) => (
-                  <View key={index} style={styles.photoWrapper}>
-                    <Image
-                      source={{ uri: photo || 'https://via.placeholder.com/400x600' }}
-                      style={styles.photo}
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-              
-              {/* Photo Indicators */}
-              {profile.photos && profile.photos.length > 1 && (
-                <View style={styles.photoIndicators}>
-                  {profile.photos.map((_, index) => (
-                    <View key={index} style={[styles.indicator, index === 0 && styles.activeIndicator]} />
-                  ))}
-                </View>
-              )}
-            </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Primary Photo */}
+            {organizedPhotos.length > 0 &&
+              renderFullWidthPhoto(organizedPhotos[0], 0)}
 
             {/* Profile Info */}
             <View style={styles.content}>
-              <View style={styles.header}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.name}>
-                    {profile.name || profile.displayName}, {profile.age}
-                  </Text>
-                  <View style={styles.badgesRow}>
-                    {renderBadge('verified')}
-                    {renderBadge('premium')}
-                  </View>
-                </View>
-                
-                {profile.location && (
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location" size={16} color={theme.colors.text.secondary} />
-                    <Text style={styles.location}>{profile.location}</Text>
-                    {profile.distance && (
-                      <Text style={styles.distance}> • {profile.distance} km away</Text>
-                    )}
-                  </View>
-                )}
+              {/* Bio */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About</Text>
+                <Text style={styles.bioTextPlain}>
+                  {profile.bio || "No bio available"}
+                </Text>
               </View>
 
-              {/* Bio */}
-              {profile.bio && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>About</Text>
-                  <GlassCard style={styles.card} opacity={0.1}>
-                    <Text style={styles.bioText}>{profile.bio}</Text>
-                  </GlassCard>
-                </View>
-              )}
+              {/* Photo 2 */}
+              {organizedPhotos.length > 1 &&
+                renderFullWidthPhoto(organizedPhotos[1], 1)}
 
               {/* Quick Stats */}
               <View style={styles.statsRow}>
                 {profile.occupation && (
                   <GlassCard style={styles.statCard} opacity={0.1}>
-                    <FontAwesome5 name="briefcase" size={16} color={theme.colors.text.secondary} />
+                    <FontAwesome5
+                      name="briefcase"
+                      size={16}
+                      color={theme.colors.text.secondary}
+                    />
                     <Text style={styles.statText}>{profile.occupation}</Text>
                   </GlassCard>
                 )}
                 {profile.height && (
                   <GlassCard style={styles.statCard} opacity={0.1}>
-                    <FontAwesome5 name="ruler-vertical" size={16} color={theme.colors.text.secondary} />
+                    <FontAwesome5
+                      name="ruler-vertical"
+                      size={16}
+                      color={theme.colors.text.secondary}
+                    />
                     <Text style={styles.statText}>{profile.height} cm</Text>
                   </GlassCard>
                 )}
                 {profile.education && (
                   <GlassCard style={styles.statCard} opacity={0.1}>
-                    <FontAwesome5 name="graduation-cap" size={16} color={theme.colors.text.secondary} />
+                    <FontAwesome5
+                      name="graduation-cap"
+                      size={16}
+                      color={theme.colors.text.secondary}
+                    />
                     <Text style={styles.statText}>{profile.education}</Text>
                   </GlassCard>
                 )}
               </View>
+
+              {/* Photo 3 */}
+              {organizedPhotos.length > 2 &&
+                renderFullWidthPhoto(organizedPhotos[2], 2)}
 
               {/* Interests */}
               {profile.interests && profile.interests.length > 0 && (
@@ -224,6 +242,10 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
                 </View>
               )}
 
+              {/* Photo 4 */}
+              {organizedPhotos.length > 3 &&
+                renderFullWidthPhoto(organizedPhotos[3], 3)}
+
               {/* Lifestyle */}
               {(profile.drinking || profile.smoking || profile.drugs) && (
                 <View style={styles.section}>
@@ -231,37 +253,60 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
                   <View style={styles.lifestyleGrid}>
                     {profile.drinking && (
                       <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                        <FontAwesome5 name="wine-glass-alt" size={16} color={theme.colors.text.secondary} />
-                        <Text style={styles.lifestyleText}>Drinks: {profile.drinking}</Text>
+                        <FontAwesome5
+                          name="wine-glass-alt"
+                          size={16}
+                          color={theme.colors.text.secondary}
+                        />
+                        <Text style={styles.lifestyleText}>
+                          Drinks: {profile.drinking}
+                        </Text>
                       </GlassCard>
                     )}
                     {profile.smoking && (
                       <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                        <FontAwesome5 name="smoking" size={16} color={theme.colors.text.secondary} />
-                        <Text style={styles.lifestyleText}>Smokes: {profile.smoking}</Text>
+                        <FontAwesome5
+                          name="smoking"
+                          size={16}
+                          color={theme.colors.text.secondary}
+                        />
+                        <Text style={styles.lifestyleText}>
+                          Smokes: {profile.smoking}
+                        </Text>
                       </GlassCard>
                     )}
                     {profile.drugs && (
                       <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                        <FontAwesome5 name="cannabis" size={16} color={theme.colors.text.secondary} />
-                        <Text style={styles.lifestyleText}>Weed: {profile.drugs}</Text>
+                        <FontAwesome5
+                          name="cannabis"
+                          size={16}
+                          color={theme.colors.text.secondary}
+                        />
+                        <Text style={styles.lifestyleText}>
+                          Weed: {profile.drugs}
+                        </Text>
                       </GlassCard>
                     )}
                   </View>
                 </View>
               )}
 
+              {/* Photo 5+ (remaining photos after Lifestyle) */}
+              {organizedPhotos
+                .slice(4)
+                .map((photo, index) => renderFullWidthPhoto(photo, index + 4))}
+
               {/* Looking For */}
               {profile.relationshipExpectations && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Looking For</Text>
-                  <GlassCard style={styles.card} opacity={0.1}>
-                    <Text style={styles.bioText}>{profile.relationshipExpectations}</Text>
-                  </GlassCard>
+                  <Text style={styles.bioTextPlain}>
+                    {profile.relationshipExpectations}
+                  </Text>
                 </View>
               )}
 
-              <View style={{ height: 120 }} />
+              <View style={{ height: 200 }} />
             </View>
           </ScrollView>
 
@@ -273,16 +318,85 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.actionButton, styles.superLikeButton]} onPress={onSuperLike}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.superLikeButton]}
+              onPress={() => {
+                 onSuperLike();
+              }}
+            >
               <View style={[styles.actionButtonCircle, styles.superLikeCircle]}>
                 <Ionicons name="star" size={28} color="#D4AF37" />
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={onLike}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                if (onLike) {
+                  onLike(profile);
+                }
+              }}
+              onPressIn={() => {
+                // Heart feedback animation - Powerful Pop!
+                heartScale.setValue(0.5);
+                heartOpacity.setValue(0);
+                heartTranslateY.setValue(0);
+
+                Animated.parallel([
+                  Animated.spring(heartScale, {
+                    toValue: 1.5,
+                    friction: 3, // Bouncy
+                    tension: 80,
+                    useNativeDriver: true,
+                  }),
+                  Animated.timing(heartOpacity, {
+                     toValue: 1,
+                     duration: 50,
+                     useNativeDriver: true
+                  }),
+                  Animated.timing(heartTranslateY, {
+                    toValue: -80, // Float higher
+                    duration: 500,
+                    useNativeDriver: true,
+                  }),
+                  Animated.sequence([
+                      Animated.delay(250),
+                      Animated.timing(heartOpacity, {
+                          toValue: 0,
+                          duration: 300,
+                          useNativeDriver: true,
+                      })
+                  ])
+                ]).start();
+              }}
+            >
               <View style={[styles.actionButtonCircle, styles.likeButton]}>
                 <Ionicons name="heart" size={32} color="#FFF" />
               </View>
+              {/* Heart Feedback Icon */}
+              <Animated.View
+                style={[
+                  styles.buttonFeedback,
+                  {
+                    opacity: heartOpacity,
+                    transform: [
+                      { scale: heartScale },
+                      { translateY: heartTranslateY },
+                    ],
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                <Ionicons name="heart" size={60} color="#FF1744" 
+                    style={{ 
+                        shadowColor: '#FF1744', 
+                        shadowOpacity: 0.5, 
+                        shadowRadius: 15,
+                        textShadowColor: '#FF1744',
+                        textShadowRadius: 10
+                    }}
+                />
+              </Animated.View>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -294,13 +408,13 @@ const ProfileBottomSheet = ({ visible, profile, onClose, onLike, onPass, onSuper
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   backdrop: {
     flex: 1,
   },
   bottomSheet: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
@@ -311,7 +425,7 @@ const styles = StyleSheet.create({
     ...theme.shadows.xl,
   },
   handleContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
   handle: {
@@ -323,171 +437,129 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  photoGalleryContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    marginBottom: 20,
+  scrollContent: {
+    paddingBottom: 200,
   },
-  photoGallery: {
-    height: 450,
+  embeddedPhotoContainer: {
+    width: "100%",
+    marginVertical: 20,
+    paddingHorizontal: 16,
   },
-  photoGalleryContent: {
-    gap: 12,
-  },
-  photoWrapper: {
-    width: SCREEN_WIDTH - 40,
-    height: 450,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-    ...theme.shadows.lg,
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  photoIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-  },
-  indicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.text.tertiary,
-    opacity: 0.3,
-  },
-  activeIndicator: {
-    backgroundColor: theme.colors.primary,
-    opacity: 1,
-    width: 20,
+  embeddedPhoto: {
+    width: "100%",
+    height: 480,
+    resizeMode: "cover",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
   },
   content: {
-    padding: 20,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: theme.colors.text.primary,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fff',
-    textTransform: 'uppercase',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  location: {
-    fontSize: 14,
-    color: theme.colors.text.secondary,
-  },
-  distance: {
-    fontSize: 14,
-    color: theme.colors.text.tertiary,
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: "800",
     color: theme.colors.text.primary,
-    marginBottom: 12,
-  },
-  card: {
-    padding: 16,
+    marginBottom: 16,
+    letterSpacing: -0.5,
   },
   bioText: {
-    fontSize: 15,
+    fontSize: 16,
     color: theme.colors.text.secondary,
-    lineHeight: 24,
+    lineHeight: 26,
+    letterSpacing: 0.2,
+  },
+  bioTextPlain: {
+    fontSize: 16,
+    color: theme.colors.text.secondary,
+    lineHeight: 26,
+    marginTop: 4,
+    letterSpacing: 0.2,
   },
   statsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 28,
   },
   statCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderRadius: 12,
   },
   statText: {
-    fontSize: 14,
+    fontSize: 15,
     color: theme.colors.text.primary,
+    fontWeight: "500",
   },
   tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
   },
   tag: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
   },
   tagText: {
     color: theme.colors.text.primary,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: "500",
   },
   lifestyleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   lifestyleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: '45%',
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: "45%",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderRadius: 12,
   },
   lifestyleText: {
-    fontSize: 14,
+    fontSize: 15,
     color: theme.colors.text.primary,
+    fontWeight: "500",
   },
   actionBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 20,
     paddingVertical: 20,
     paddingHorizontal: 40,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
+    borderTopColor: "#F2F2F7",
+    zIndex: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
   },
   actionButton: {
     width: 64,
@@ -498,30 +570,39 @@ const styles = StyleSheet.create({
     height: 56,
   },
   actionButtonCircle: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 5,
   },
   passButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderWidth: 2,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   superLikeCircle: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: '#D4AF37',
+    borderColor: "#D4AF37",
     borderRadius: 28,
   },
   likeButton: {
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
+  },
+  buttonFeedback: {
+    position: "absolute",
+    top: -30,
+    left: "50%",
+    marginLeft: -25,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
 });
 

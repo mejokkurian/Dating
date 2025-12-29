@@ -111,12 +111,18 @@ const ConversationsScreen = ({ navigation }) => {
         user: {
           _id: item.otherUser._id,
           name: item.otherUser.displayName,
-          image: item.otherUser.photos?.[0] || 'https://via.placeholder.com/150',
+          image: (item.otherUser.photos && item.otherUser.photos.length > 0
+            ? (item.otherUser.photos[item.otherUser.mainPhotoIndex ?? 0] || item.otherUser.photos[0])
+            : null) || 'https://via.placeholder.com/150',
         }
       })}
     >
       <Image
-        source={{ uri: item.otherUser.photos?.[0] || 'https://via.placeholder.com/150' }}
+        source={{ 
+          uri: (item.otherUser.photos && item.otherUser.photos.length > 0
+            ? (item.otherUser.photos[item.otherUser.mainPhotoIndex ?? 0] || item.otherUser.photos[0])
+            : null) || 'https://via.placeholder.com/150'
+        }}
         style={styles.avatar}
       />
       <View style={styles.conversationInfo}>

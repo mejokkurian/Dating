@@ -108,7 +108,7 @@ const PhoneOTPScreen = ({ route, navigation }) => {
             style={styles.backButtonTop}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={24} color="#000000" />
           </TouchableOpacity>
 
           {/* Header */}
@@ -255,13 +255,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: theme.typography.fontSize['4xl'],
     fontWeight: theme.typography.fontWeight.extraBold,
-    color: '#FFFFFF',
+    color: '#000000',
     marginBottom: theme.spacing.xs,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: theme.typography.fontSize.sm,
-    color: '#CCCCCC',
+    color: theme.colors.text.secondary,
     opacity: 0.8,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
   },
   resendText: {
-    color: '#CCCCCC',
+    color: theme.colors.text.secondary,
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
   },
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
   },
   changeNumberText: {
-    color: '#FFFFFF',
+    color: theme.colors.text.primary,
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
     opacity: 0.8,

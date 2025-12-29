@@ -22,9 +22,9 @@ const userSchema = new mongoose.Schema({
   dealBreakers: { type: String },
   budget: { type: String },
   height: { type: Number }, // in cm
-  bodyType: { type: String },
   ethnicity: { type: String },
   occupation: { type: String },
+  zodiac: { type: String },
   interests: [{ type: String }],
   
   // Extended Profile
@@ -35,16 +35,24 @@ const userSchema = new mongoose.Schema({
   drinking: { type: String },
   smoking: { type: String },
   drugs: { type: String },
+  relationshipType: { type: String }, // Monogamy, Non-monogamy, Figuring out
+  schoolUniversity: { type: String }, // School or university name
   
   // Media
   photos: [{ type: String }], // URLs
+  mainPhotoIndex: { type: Number, default: 0 }, // Index of main photo in photos array
   
   // Status & Flags
   onboardingCompleted: { type: Boolean, default: false },
   isPremium: { type: Boolean, default: false },
+  subscriptionPlan: { type: String, enum: ['monthly', 'yearly', 'lifetime', null], default: null },
+  subscriptionExpiryDate: { type: Date },
+  subscriptionPurchaseDate: { type: Date },
+  subscriptionProductId: { type: String }, // Store IAP product ID
   isVerified: { type: Boolean, default: false },
   verificationMethod: { type: String, enum: ['kyc', 'image', null], default: null },
   verificationDate: { type: Date },
+  isVisibleToOthers: { type: Boolean, default: true }, // Profile visibility in discovery
   lastActive: { type: Date, default: Date.now },
   
   // Location & Connect Now

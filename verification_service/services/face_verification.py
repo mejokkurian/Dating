@@ -15,7 +15,7 @@ from bson import ObjectId
 
 def decode_base64_image(base64_string: str) -> Image.Image:
     """
-    Decode base64 string to PIL Image
+    Decode base64 string to PIL Image with preprocessing
     """
     try:
         # Remove data URL prefix if present
@@ -33,14 +33,33 @@ def decode_base64_image(base64_string: str) -> Image.Image:
         elif image.mode != 'RGB':
             image = image.convert('RGB')
         
+        # Resize if image is too large (face_recognition works better with reasonable sizes)
+        # Very large images can cause issues, very small images lack detail
+        max_dimension = 2000
+        if image.width > max_dimension or image.height > max_dimension:
+            image.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+            print(f"Image resized to: {image.size}")
+        
+        # Ensure minimum size for face detection
+        min_dimension = 200
+        if image.width < min_dimension or image.height < min_dimension:
+            scale = min_dimension / min(image.width, image.height)
+            new_size = (int(image.width * scale), int(image.height * scale))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+            print(f"Image upscaled to: {image.size}")
+        
         return image
     except Exception as e:
         raise ValueError(f"Failed to decode image: {str(e)}")
 
 
-def get_face_encodings(image: Image.Image) -> List[np.ndarray]:
+def get_face_encodings(image: Image.Image, model: str = 'hog') -> List[np.ndarray]:
     """
     Detect faces and return face encodings from image
+    
+    Args:
+        image: PIL Image
+        model: Face detection model - 'hog' (faster, less accurate) or 'cnn' (slower, more accurate)
     
     Returns:
         List of face encodings (128-dimensional vectors)
@@ -48,18 +67,31 @@ def get_face_encodings(image: Image.Image) -> List[np.ndarray]:
     try:
         # Convert PIL Image to numpy array
         image_array = np.array(image)
+        print(f"Image shape: {image_array.shape}, dtype: {image_array.dtype}")
         
-        # Find face locations
-        face_locations = face_recognition.face_locations(image_array)
+        # Find face locations - try both models if first fails
+        face_locations = face_recognition.face_locations(image_array, model=model)
+        print(f"Face locations found with {model} model: {len(face_locations)}")
+        
+        # If no faces found with default model and we used 'hog', try 'cnn'
+        if len(face_locations) == 0 and model == 'hog':
+            print("Trying CNN model (more accurate but slower)...")
+            face_locations = face_recognition.face_locations(image_array, model='cnn')
+            print(f"Face locations found with cnn model: {len(face_locations)}")
         
         if len(face_locations) == 0:
+            print("WARNING: No faces detected in image")
             return []
         
+        print(f"Face locations: {face_locations}")
+        
         # Get face encodings
-        face_encodings = face_recognition.face_encodings(image_array, face_locations)
+        face_encodings = face_recognition.face_encodings(image_array, face_locations, model='large')
+        print(f"Face encodings generated: {len(face_encodings)}")
         
         return face_encodings
     except Exception as e:
+        print(f"ERROR in get_face_encodings: {str(e)}")
         raise ValueError(f"Failed to get face encodings: {str(e)}")
 
 
@@ -112,15 +144,30 @@ def verify_face(user_id: str, selfie_base64: str) -> Dict:
     """
     try:
         # Get user from database
-        user = users_collection.find_one({'_id': ObjectId(user_id)})
+        try:
+            user_object_id = ObjectId(user_id)
+        except Exception as e:
+            print(f"ERROR: Invalid user_id format: {user_id}, error: {str(e)}")
+            return {
+                'verified': False,
+                'confidence': 0,
+                'message': f'Invalid user ID format: {str(e)}',
+                'error': 'INVALID_USER_ID'
+            }
+        
+        print(f"Looking up user with ObjectId: {user_object_id}")
+        user = users_collection.find_one({'_id': user_object_id})
         
         if not user:
+            print(f"ERROR: User not found with ID: {user_id}")
             return {
                 'verified': False,
                 'confidence': 0,
                 'message': 'User not found',
                 'error': 'USER_NOT_FOUND'
             }
+        
+        print(f"User found: {user.get('_id')}, has {len(user.get('photos', []))} photos")
         
         # Get user's profile photos
         profile_photos = user.get('photos', [])
@@ -135,8 +182,11 @@ def verify_face(user_id: str, selfie_base64: str) -> Dict:
         
         # Decode selfie image
         try:
+            print("Decoding selfie image from base64...")
             selfie_image = decode_base64_image(selfie_base64)
+            print(f"Selfie image decoded: size={selfie_image.size}, mode={selfie_image.mode}")
         except Exception as e:
+            print(f"ERROR decoding selfie image: {str(e)}")
             return {
                 'verified': False,
                 'confidence': 0,
@@ -145,13 +195,15 @@ def verify_face(user_id: str, selfie_base64: str) -> Dict:
             }
         
         # Get face encoding from selfie
+        print("Detecting faces in selfie...")
         selfie_encodings = get_face_encodings(selfie_image)
         
         if len(selfie_encodings) == 0:
+            print("ERROR: No faces detected in selfie image")
             return {
                 'verified': False,
                 'confidence': 0,
-                'message': 'No face detected in selfie. Please ensure your face is clearly visible.',
+                'message': 'No face detected in selfie. Please ensure your face is clearly visible, well-lit, and facing the camera directly.',
                 'error': 'NO_FACE_IN_SELFIE'
             }
         

@@ -45,6 +45,7 @@ def verify_face_endpoint():
         data = request.get_json()
         
         if not data:
+            print("ERROR: No JSON data in request")
             return jsonify({
                 'verified': False,
                 'confidence': 0,
@@ -55,7 +56,12 @@ def verify_face_endpoint():
         user_id = data.get('userId')
         selfie_base64 = data.get('selfieImageBase64')
         
+        print(f"Received verification request for userId: {user_id}")
+        print(f"Image data present: {bool(selfie_base64)}")
+        print(f"Image data length: {len(selfie_base64) if selfie_base64 else 0}")
+        
         if not user_id:
+            print("ERROR: Missing userId")
             return jsonify({
                 'verified': False,
                 'confidence': 0,
@@ -64,6 +70,7 @@ def verify_face_endpoint():
             }), 400
         
         if not selfie_base64:
+            print("ERROR: Missing selfieImageBase64")
             return jsonify({
                 'verified': False,
                 'confidence': 0,
@@ -72,14 +79,44 @@ def verify_face_endpoint():
             }), 400
         
         # Verify face
+        print(f"Calling verify_face for user: {user_id}")
         result = verify_face(user_id, selfie_base64)
         
+        print(f"Verification result: verified={result.get('verified')}, error={result.get('error')}, message={result.get('message')}")
+        
         # Return appropriate status code
-        status_code = 200 if result.get('verified') or not result.get('error') else 400
+        # Most verification failures should return 200 with verified: false
+        # Only return 400 for actual request errors (missing params, invalid format)
+        # Server errors return 500
+        error = result.get('error')
+        
+        # These are validation/user errors, should return 200
+        validation_errors = [
+            'NO_FACE_IN_SELFIE',
+            'MULTIPLE_FACES_IN_SELFIE',
+            'NO_FACES_IN_PROFILE_PHOTOS',
+            'INVALID_IMAGE',
+            'USER_NOT_FOUND',
+            'NO_PROFILE_PHOTOS'
+        ]
+        
+        if error and error not in validation_errors:
+            # Actual server/verification errors
+            if error == 'VERIFICATION_ERROR':
+                status_code = 500
+            else:
+                status_code = 400
+        else:
+            # Validation failures or success - return 200
+            status_code = 200
         
         return jsonify(result), status_code
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"EXCEPTION in verify_face_endpoint: {str(e)}")
+        print(f"Traceback: {error_trace}")
         return jsonify({
             'verified': False,
             'confidence': 0,
