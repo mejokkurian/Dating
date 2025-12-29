@@ -79,13 +79,21 @@ const LoginScreen = ({ navigation }) => {
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    responseType: ResponseType.IdToken,
+    // responseType: ResponseType.IdToken, // Removed to default to 'code' for native IDs
   });
 
   useEffect(() => {
     if (response?.type === "success") {
-      const { id_token } = response.params;
-      handleGoogleLoginSuccess(id_token);
+      // For code flow, we might get authentication object with idToken after internal exchange
+      const { authentication } = response;
+      const idToken = authentication?.idToken || response.params?.id_token;
+      
+      if (idToken) {
+        handleGoogleLoginSuccess(idToken);
+      } else {
+        // Should not happen if exchange works
+        showAlert("Error", "Could not retrieve Google ID Token", "error");
+      }
     } else if (response?.type === "error") {
       showAlert("Error", "Google sign-in failed", "error");
     }

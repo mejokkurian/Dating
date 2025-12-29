@@ -264,18 +264,29 @@ exports.appleSignIn = async (req, res) => {
   try {
     const { identityToken, email, fullName, type } = req.body;
 
-    if (!email && !identityToken) {
-      return res.status(400).json({ message: 'Email or identity token is required' });
+    if (!identityToken) {
+      return res.status(400).json({ message: 'Identity token is required' });
     }
 
-    // For Apple Sign-In, email might not be provided on subsequent logins
-    // We need to find user by appleId or email
-    let user;
+    // Decode token to get stable user ID (sub)
+    // Note: In a production app, you should verify this token with Apple's public keys
+    const decoded = jwt.decode(identityToken);
     
-    if (email) {
-      user = await User.findOne({ $or: [{ email }, { appleId: identityToken }] });
-    } else {
-      user = await User.findOne({ appleId: identityToken });
+    if (!decoded || !decoded.sub) {
+        return res.status(400).json({ message: 'Invalid identity token' });
+    }
+
+    const appleUserId = decoded.sub;
+    const tokenEmail = decoded.email; // Apple often includes email in the token
+
+    // Check if user exists by appleId (stable sub) or email
+    // Prioritize appleId because email might not be present or could be a relay email
+    let user = await User.findOne({ appleId: appleUserId });
+    
+    // If not found by ID, try finding by email if we have one (from body or token)
+    const emailToCheck = email || tokenEmail;
+    if (!user && emailToCheck) {
+        user = await User.findOne({ email: emailToCheck });
     }
 
     // Handle Login Flow
@@ -297,16 +308,19 @@ exports.appleSignIn = async (req, res) => {
         ? `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim()
         : 'Apple User';
 
+      // Use efficient placeholder if email missing
+      const userEmail = emailToCheck || `${appleUserId}@appleid.user`;
+
       user = await User.create({
-        email: email || `${identityToken.substring(0, 10)}@appleid.user`,
+        email: userEmail,
         displayName,
-        appleId: identityToken,
-        isVerified: true, // Apple accounts are verified
+        appleId: appleUserId, // Store the stable 'sub'
+        isVerified: true, 
       });
     } else {
       // Update existing user
       if (!user.appleId) {
-        user.appleId = identityToken;
+        user.appleId = appleUserId;
       }
       await user.save();
     }

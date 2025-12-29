@@ -56,13 +56,19 @@ const SignUpScreen = ({ navigation }) => {
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    responseType: ResponseType.IdToken,
+    // responseType: ResponseType.IdToken, // Removed to default to 'code' for native IDs
   });
 
   React.useEffect(() => {
     if (response?.type === "success") {
-      const { id_token } = response.params;
-      handleGoogleSignUpSuccess(id_token);
+      const { authentication } = response;
+      const idToken = authentication?.idToken || response.params?.id_token;
+
+      if (idToken) {
+        handleGoogleSignUpSuccess(idToken);
+      } else {
+        showAlert("Error", "Could not retrieve Google ID Token", "error");
+      }
     } else if (response?.type === "error") {
       showAlert("Error", "Google sign-up failed", "error");
     }
