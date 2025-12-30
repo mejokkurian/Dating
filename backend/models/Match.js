@@ -40,7 +40,9 @@ matchSchema.index({ user1Id: 1, user2Id: 1 }, { unique: true });
 
 // Helper method to get conversation ID
 matchSchema.methods.getConversationId = function() {
-  const ids = [this.user1Id.toString(), this.user2Id.toString()].sort();
+  const id1 = (this.user1Id && this.user1Id._id) ? this.user1Id._id.toString() : this.user1Id.toString();
+  const id2 = (this.user2Id && this.user2Id._id) ? this.user2Id._id.toString() : this.user2Id.toString();
+  const ids = [id1, id2].sort();
   return `${ids[0]}_${ids[1]}`;
 };
 

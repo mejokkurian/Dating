@@ -129,8 +129,13 @@ exports.getMyMatches = async (req, res) => {
           },
           lastMessage: lastMessage
             ? {
-                content: lastMessage.content,
+                content: lastMessage.content || 
+                  (lastMessage.messageType === 'image' ? '📷 Photo' : 
+                   lastMessage.messageType === 'audio' ? '🎤 Audio Message' : 
+                   lastMessage.messageType === 'sticker' ? 'Sticker' : 
+                   lastMessage.messageType === 'file' ? '📎 File' : 'Message'),
                 createdAt: lastMessage.createdAt,
+                messageType: lastMessage.messageType,
               }
             : null,
           unreadCount,

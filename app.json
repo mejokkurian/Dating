@@ -42,8 +42,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION"
-      ],
-      "googleServicesFile": "./google-services.json"
+      ]
+     
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -60,6 +60,9 @@
         {
           "cameraPermission": "The app accesses your camera to take ID verification photos."
         }
+      ],
+      [
+        "expo-apple-authentication"
       ],
       [
         "expo-location",

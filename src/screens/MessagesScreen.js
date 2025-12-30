@@ -26,7 +26,6 @@ const MessagesScreen = ({ navigation }) => {
       // Don't show loading spinner on subsequent refreshes to avoid flickering
       if (matches.length === 0) setLoading(true);
       const data = await getMyMatches();
-      setMatches(data);
     } catch (error) {
       console.error('Load matches error:', error);
     } finally {
