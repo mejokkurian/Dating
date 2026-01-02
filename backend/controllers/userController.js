@@ -184,3 +184,85 @@ exports.registerPushToken = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Send test notification (for debugging)
+// @route   POST /api/users/test-notification
+// @access  Private
+exports.sendTestNotification = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user has push tokens
+    if (!user.pushTokens || user.pushTokens.length === 0) {
+      return res.status(400).json({ 
+        message: 'No push tokens registered for this user',
+        hint: 'Make sure notifications are enabled in the app'
+      });
+    }
+
+    // Check if notifications are enabled
+    if (!user.pushNotificationsEnabled) {
+      return res.status(400).json({ 
+        message: 'Push notifications are disabled for this user',
+        hint: 'Enable notifications in app settings'
+      });
+    }
+
+    // Create test notification
+    const notification = {
+      title: '🔔 Test Notification',
+      body: 'This is a test notification from the server. If you see this, notifications are working!',
+      data: {
+        type: 'test',
+        timestamp: new Date().toISOString(),
+      },
+      sound: 'default',
+      priority: 'high',
+    };
+
+    console.log(`📤 Sending test notification to user ${user._id} (${user.displayName})`);
+    console.log(`   User has ${user.pushTokens.length} push token(s)`);
+    console.log(`   Tokens:`, user.pushTokens.map(t => t.token.substring(0, 30) + '...'));
+
+    // Send notification
+    const result = await pushNotificationService.sendNotification(
+      user._id.toString(), 
+      notification
+    );
+
+    if (result.success) {
+      console.log(`✅ Test notification sent successfully to user ${user._id}`);
+      res.json({ 
+        success: true,
+        message: 'Test notification sent successfully',
+        details: {
+          tokenCount: user.pushTokens.length,
+          notificationsEnabled: user.pushNotificationsEnabled,
+          result: result
+        }
+      });
+    } else {
+      console.warn(`❌ Failed to send test notification to user ${user._id}:`, result.reason || result.error);
+      res.status(400).json({ 
+        success: false,
+        message: 'Failed to send test notification',
+        reason: result.reason || result.error,
+        details: {
+          tokenCount: user.pushTokens.length,
+          notificationsEnabled: user.pushNotificationsEnabled,
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while sending test notification',
+      error: error.message 
+    });
+  }
+};

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "874722826990",
+    "project_id": "sugar-ac627",
+    "storage_bucket": "sugar-ac627.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:874722826990:android:3866d3c21da433c7e871ff",
+        "android_client_info": {
+          "package_name": "com.sugardating.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "874722826990-6dmnea07hlr6g4830ialk2pts3a1v8n8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClbHvrVDfDK136kbX6oZXFllSMgjC8bdQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "874722826990-6dmnea07hlr6g4830ialk2pts3a1v8n8.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "874722826990-c0dgfsinkj9omo6lb97uf3406h0aporc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.internal.standbytest",
+                "app_store_id": "6757138203"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

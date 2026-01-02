@@ -40,17 +40,28 @@ export const NotificationProvider = ({ children, navigationRef }) => {
    */
   const syncTokenWithBackend = useCallback(async (token) => {
     if (!token || !user) {
-      console.log('Cannot sync token - missing token or user:', { hasToken: !!token, hasUser: !!user });
+      console.log('⚠️ Cannot sync token - missing token or user:', { hasToken: !!token, hasUser: !!user });
       return;
     }
 
     try {
-      console.log('Syncing push token with backend for user:', user._id);
+      console.log('\n🔄 ========== SYNCING TOKEN WITH BACKEND ==========');
+      console.log(`📋 User: ${user._id}`);
+      console.log(`📋 Token: ${token.substring(0, 30)}...`);
+      console.log('📤 Sending POST request to /api/users/push-token...');
+      
       await registerPushToken(token); // Register token
+      
       console.log('✅ Push token successfully synced with backend');
+      console.log('🔄 ========== SYNC COMPLETE ==========\n');
     } catch (error) {
       console.error('❌ Error syncing push token with backend:', error);
       console.error('Error details:', error.response?.data || error.message);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
+      console.log('🔄 ========== SYNC FAILED ==========\n');
     }
   }, [user]);
 
@@ -126,41 +137,70 @@ export const NotificationProvider = ({ children, navigationRef }) => {
    */
   const initializeNotifications = useCallback(async () => {
     if (!user) {
+      console.log('⏭️ Skipping notification initialization - no user logged in');
       return;
     }
 
     try {
+      console.log('\n📱 ========== NOTIFICATION INITIALIZATION ==========');
+      console.log(`👤 User: ${user.displayName || user.email} (${user._id})`);
       setLoading(true);
 
       // Check permission status
+      console.log('🔍 Step 1: Checking notification permissions...');
       const statusResponse = await getPermissionStatus();
       setPermissionStatus(statusResponse.status);
+      console.log(`   Permission status: ${statusResponse.status}`);
 
       if (statusResponse.status !== 'granted') {
+        console.log('⚠️ Permissions not granted, requesting...');
         // Request permissions with user prompt
         const hasPermission = await requestNotificationPermission();
         
         if (!hasPermission) {
-          console.warn('Notification permissions not granted');
+          console.warn('❌ Notification permissions not granted by user');
+          console.log('📱 ========== INITIALIZATION FAILED (NO PERMISSION) ==========\n');
           setLoading(false);
           return;
         }
+        console.log('✅ User granted notification permissions');
+      } else {
+        console.log('✅ Permissions already granted');
       }
 
       // Register for push notifications (skip permission check since we already have permission)
-      console.log('Registering for push notifications...');
+      console.log('🔍 Step 2: Registering for push notifications...');
       const token = await registerForPushNotifications(true); // Skip permission check - already granted
-      console.log('Received push token:', token ? token.substring(0, 30) + '...' : 'null');
+      
+      if (!token) {
+        console.error('❌ Failed to get push token (null returned)');
+        console.log('📱 ========== INITIALIZATION FAILED (NO TOKEN) ==========\n');
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`📋 Received push token: ${token.substring(0, 30)}...`);
+      console.log(`📋 Token length: ${token.length} characters`);
       
       if (token && validateToken(token)) {
-        console.log('✅ Valid push token received, setting and syncing...');
+        console.log('✅ Push token is valid');
+        console.log('🔍 Step 3: Setting token in state...');
         setExpoPushToken(token);
+        
+        console.log('🔍 Step 4: Syncing token with backend...');
         await syncTokenWithBackend(token);
+        console.log('✅ Token synced with backend successfully');
+        console.log('📱 ========== INITIALIZATION COMPLETE ==========\n');
       } else {
-        console.warn('❌ Failed to get valid push token:', { token: token?.substring(0, 30), isValid: token ? validateToken(token) : false });
+        console.error('❌ Push token validation failed');
+        console.error(`   Token: ${token?.substring(0, 50)}...`);
+        console.error(`   Is valid: ${token ? validateToken(token) : 'N/A'}`);
+        console.log('📱 ========== INITIALIZATION FAILED (INVALID TOKEN) ==========\n');
       }
     } catch (error) {
-      console.error('Error initializing notifications:', error);
+      console.error('❌ Error initializing notifications:', error);
+      console.error('Stack trace:', error.stack);
+      console.log('📱 ========== INITIALIZATION FAILED (ERROR) ==========\n');
     } finally {
       setLoading(false);
     }

@@ -28,16 +28,23 @@ export const AuthProvider = ({ children }) => {
         setUser(parsedUser); // Set basic user info from storage
         
         // Fetch latest profile data
-        try {
-          const profile = await getUserDocument(parsedUser._id);
-          setUserData(profile);
-          setOnboardingComplete(profile.onboardingCompleted);
-        } catch (err) {
-          console.error('Failed to fetch latest profile:', err);
-          // Fallback to stored data if offline or error
-          setUserData(parsedUser);
-          setOnboardingComplete(parsedUser.onboardingCompleted);
-        }
+          try {
+            const profile = await getUserDocument(parsedUser._id);
+            setUserData(profile);
+            setOnboardingComplete(profile.onboardingCompleted);
+          } catch (err) {
+            console.error('Failed to fetch latest profile:', err);
+            // If the token is invalid (e.g. secret changed), we should logout
+            // Checking if the error implies an auth failure would be ideal, but for now:
+            if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+               console.log('Token invalid, logging out...');
+               await logout();
+               return;
+            }
+            // Fallback to stored data if offline or other error
+            setUserData(parsedUser);
+            setOnboardingComplete(parsedUser.onboardingCompleted);
+          }
       } else {
         setUser(null);
         setUserData(null);

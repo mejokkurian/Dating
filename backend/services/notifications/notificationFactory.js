@@ -75,7 +75,45 @@ class NotificationFactory {
         userName: user.displayName || user.name,
         message: message || null,
       },
+    badge: 1,
+    };
+  }
+
+  /**
+   * Create a call notification
+   * @param {Object} caller - Caller user object
+   * @param {string} callType - Type of call ('audio' or 'video')
+   * @returns {Object} - Formatted notification payload
+   */
+  static createCallNotification(caller, callType = 'audio') {
+    const callTypeText = callType === 'video' ? '📹 Video' : '📞 Audio';
+    
+    return {
+      to: null, // Will be set by service
+      sound: 'default',
+      title: `Incoming ${callType === 'video' ? 'Video' : 'Audio'} Call`,
+      body: `${caller.displayName || caller.name || 'Someone'} is calling you`,
+      data: {
+        type: NOTIFICATION_TYPES.CALL,
+        callType,
+        callerId: caller._id.toString(),
+        callerName: caller.displayName || caller.name,
+        // Add timestamp for handling stale notifications
+        timestamp: Date.now(),
+      },
       badge: 1,
+      priority: 'high', // High priority for immediate delivery
+      channelId: 'calls', // Android notification channel for calls
+      // iOS specific - content-available wakes app in background
+      _contentAvailable: true,
+      // Android specific - high priority data message
+      _data: {
+        type: 'call',
+        callType,
+        callerId: caller._id.toString(),
+        callerName: caller.displayName || caller.name,
+        timestamp: Date.now(),
+      },
     };
   }
 }

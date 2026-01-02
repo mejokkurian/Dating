@@ -542,12 +542,29 @@ module.exports = (io) => {
       const { to, callType, from } = data;
       console.log(`Call from ${from} to ${to}, type: ${callType}`);
       
-      // Notify the recipient
+      // Notify the recipient via Socket.IO
       io.to(to).emit('incoming_call', {
         from,
         callType,
         signal: data.signal,
       });
+
+      // Also send push notification in case recipient is not connected to socket
+      try {
+        const caller = await User.findById(from).select('displayName name');
+        if (caller) {
+          const notification = NotificationFactory.createCallNotification(caller, callType);
+          console.log(`Sending call push notification to user ${to}`);
+          const result = await pushNotificationService.sendNotification(to, notification);
+          if (!result.success) {
+            console.warn(`Failed to send call notification to user ${to}:`, result.reason || result.error);
+          } else {
+            console.log(`Call push notification sent successfully to user ${to}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error sending call push notification:', error);
+      }
     });
 
     // Send WebRTC offer

@@ -63,24 +63,27 @@ exports.getMyMatches = async (req, res) => {
       .sort({ lastMessageAt: -1, createdAt: -1 });
 
     // Format the response to show the other user
-    const formattedMatches = await Promise.all(
+    const matchesWithLastMessage = await Promise.all(
       matches.map(async (match) => {
-        const otherUser =
-          match.user1Id._id.toString() === req.user._id.toString()
-            ? match.user2Id
-            : match.user1Id;
-
-        // Get conversation ID
         const conversationId = match.getConversationId();
+        
+        // Populate user details - check if user1 is 'me' or 'them'
+        const otherUser = match.user1Id._id.toString() === req.user._id.toString() 
+          ? match.user2Id 
+          : match.user1Id;
 
         // Get last message (only for active matches)
         let lastMessage = null;
         let unreadCount = 0;
 
+        console.log(`Debug Match: ID=${match._id}, Status=${match.status}, ConvID=${conversationId}`);
+
         if (match.status === "active") {
           lastMessage = await Message.findOne({ conversationId })
             .sort({ createdAt: -1 })
             .limit(1);
+            
+          console.log(`Debug LastMsg: Found=${!!lastMessage}, Content="${lastMessage?.content}"`);
 
           // Get unread count
           unreadCount = await Message.countDocuments({
@@ -144,7 +147,7 @@ exports.getMyMatches = async (req, res) => {
       })
     );
 
-    res.json(formattedMatches);
+    res.json(matchesWithLastMessage);
   } catch (error) {
     console.error("Get my matches error:", error);
     res.status(500).json({ message: error.message });

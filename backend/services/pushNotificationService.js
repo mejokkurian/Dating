@@ -74,52 +74,83 @@ class PushNotificationService {
    */
   async sendNotification(userId, notification) {
     try {
+      console.log(`\n🔔 ========== NOTIFICATION SEND ATTEMPT ==========`);
+      console.log(`📋 User ID: ${userId}`);
+      console.log(`📋 Notification Type: ${notification.data?.type || 'unknown'}`);
+      console.log(`📋 Title: ${notification.title}`);
+      console.log(`📋 Body: ${notification.body?.substring(0, 50)}...`);
+      
       // Check if notifications are enabled globally
       if (process.env.NOTIFICATION_ENABLED === 'false') {
-        console.log('Notifications disabled globally');
+        console.log('❌ Notifications disabled globally (NOTIFICATION_ENABLED=false)');
         return { success: false, reason: 'disabled' };
       }
+      console.log('✅ Global notifications enabled');
 
       // Get user and check preferences first
       const user = await User.findById(userId);
       if (!user) {
-        console.log(`User ${userId} not found when sending notification`);
+        console.log(`❌ User ${userId} not found when sending notification`);
         return { success: false, reason: 'user_not_found' };
       }
+      console.log(`✅ User found: ${user.displayName || user.email}`);
 
       if (!user.pushNotificationsEnabled) {
-        console.log(`Push notifications disabled for user ${userId}`);
+        console.log(`❌ Push notifications disabled for user ${userId} (pushNotificationsEnabled=false)`);
         return { success: false, reason: 'disabled_by_user' };
       }
+      console.log(`✅ User has notifications enabled`);
 
       // Get user's push tokens
       const tokens = await this.getUserPushTokens(userId);
       if (tokens.length === 0) {
-        console.log(`No valid push tokens for user ${userId} (user has ${user.pushTokens?.length || 0} token(s))`);
+        console.log(`❌ No valid push tokens for user ${userId}`);
+        console.log(`   User has ${user.pushTokens?.length || 0} token(s) in database`);
+        if (user.pushTokens?.length > 0) {
+          console.log(`   Tokens in DB:`, user.pushTokens.map(t => ({
+            token: t.token?.substring(0, 30) + '...',
+            valid: this.validateToken(t.token)
+          })));
+        }
         return { success: false, reason: 'no_tokens' };
       }
+      console.log(`✅ Found ${tokens.length} valid push token(s)`);
+      tokens.forEach((token, i) => {
+        console.log(`   Token ${i + 1}: ${token.substring(0, 30)}...`);
+      });
 
       // Check specific notification preference based on type
       const notificationType = notification.data?.type;
       if (notificationType === NOTIFICATION_TYPES.MESSAGE && !user.notificationPreferences?.messages) {
+        console.log(`❌ Message notifications disabled in user preferences`);
         return { success: false, reason: 'preference_disabled' };
       }
       if (notificationType === NOTIFICATION_TYPES.NEARBY_USER && !user.notificationPreferences?.nearbyUsers) {
+        console.log(`❌ Nearby user notifications disabled in user preferences`);
         return { success: false, reason: 'preference_disabled' };
       }
       if (notificationType === NOTIFICATION_TYPES.MATCH && !user.notificationPreferences?.matches) {
+        console.log(`❌ Match notifications disabled in user preferences`);
         return { success: false, reason: 'preference_disabled' };
       }
+      console.log(`✅ Notification type preferences allow sending`);
 
       // Send to all user's devices
+      console.log(`📤 Sending notification to ${tokens.length} device(s)...`);
       const results = await this.sendBatchNotifications(tokens.map(token => ({
         ...notification,
         to: token,
       })));
 
+      console.log(`✅ Notification sent successfully`);
+      console.log(`📊 Results:`, JSON.stringify(results, null, 2));
+      console.log(`🔔 ========== END NOTIFICATION ATTEMPT ==========\n`);
+      
       return { success: true, results };
     } catch (error) {
-      console.error('Error sending notification:', error);
+      console.error('❌ Error sending notification:', error);
+      console.error('Stack trace:', error.stack);
+      console.log(`🔔 ========== END NOTIFICATION ATTEMPT (ERROR) ==========\n`);
       return { success: false, error: error.message };
     }
   }

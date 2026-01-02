@@ -7,8 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "buildConfiguration": "Debug",
-        "simulator": true
+        "buildConfiguration": "Debug"
       }
     },
     "preview": {
@@ -27,4 +26,3 @@
     "production": {}
   }
 }
-

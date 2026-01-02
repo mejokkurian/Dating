@@ -42,8 +42,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION"
-      ]
-     
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -77,10 +77,10 @@
         {
           "icon": "./assets/icon.png",
           "color": "#FF6B9D",
-          "mode": "production"
+          "mode": "production",
+          "useNextNotificationsApi": true
         }
       ]
     ]
   }
 }
-
