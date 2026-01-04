@@ -257,6 +257,8 @@ export const NotificationProvider = ({ children, navigationRef }) => {
       }
     );
 
+
+
     // Cleanup listeners
     return () => {
       if (notificationListener.current) {
@@ -265,8 +267,9 @@ export const NotificationProvider = ({ children, navigationRef }) => {
       if (responseListener.current) {
         Notifications.removeNotificationSubscription(responseListener.current);
       }
+
     };
-  }, [navigationRef]);
+  }, [navigationRef, user]);
 
   // Check notification status when app comes to foreground (after user might have enabled in settings)
   useEffect(() => {

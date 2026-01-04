@@ -6,16 +6,13 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
-  Image,
   ActivityIndicator,
   Animated,
-  TouchableWithoutFeedback,
   Alert,
   Linking,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
 import socketService from '../../services/socket';
 import { useAuth } from '../../context/AuthContext';
 import { useCall } from '../../context/CallContext';
@@ -25,6 +22,7 @@ import StickerMessage from './components/StickerMessage';
 import AudioMessage from './components/messages/AudioMessage';
 import ImageMessage from './components/messages/ImageMessage';
 import FileMessage from './components/messages/FileMessage';
+import CallMessage from './components/messages/CallMessage';
 import SwipeableMessage from './components/actions/SwipeableMessage';
 import ChatHeader from './components/ChatHeader';
 import ReplyBubble from './components/actions/ReplyBubble';
@@ -158,6 +156,11 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
                 Linking.openURL(item.fileUrl).catch(err => console.error('Error opening file:', err));
               }
             }}
+          />
+        ) : item.messageType === 'call' ? (
+          <CallMessage
+            message={item}
+            isMine={isMine}
           />
           ) : (
             <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText]}>
@@ -757,7 +760,7 @@ const ChatScreen = ({ route, navigation }) => {
 
   // Render
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={Platform.OS === 'android' ? ['top', 'bottom'] : ['top']}>
       <ChatHeader 
         user={user} 
         matchStatus={matchStatus} 
@@ -800,7 +803,7 @@ const ChatScreen = ({ route, navigation }) => {
         </View>
       ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior='padding'
           keyboardVerticalOffset={0}
           style={styles.inputWrapper}
         >
@@ -822,13 +825,7 @@ const ChatScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* Hold to Record Hint Toast */}
-          {showHoldHint && (
-            <Animated.View style={[styles.hintToast, { opacity: hintOpacity }]}>
-              <Text style={styles.hintText}>Hold to record voice message</Text>
-            </Animated.View>
-          )}
-
+          {/* Chat Input */}
           <ChatInput
             isRecording={isRecording}
             recordingDuration={recordingDuration}
@@ -837,7 +834,8 @@ const ChatScreen = ({ route, navigation }) => {
             inputText={inputText}
             handleTyping={handleTyping}
             handleSend={handleSend}
-            handleAudioSend={handleAudioSend}
+            handleAudioSend={uploadAndSendAudio}
+            onAttachmentPress={handleAttachmentPress}
             pickImage={pickImage}
             setStickerPickerVisible={setStickerPickerVisible}
             handleMicPressIn={handleMicPressIn}
@@ -849,21 +847,18 @@ const ChatScreen = ({ route, navigation }) => {
             cancelRecording={cancelRecording}
             stopRecording={stopRecording}
             showHoldToRecordHint={showHoldToRecordHint}
-            onAttachmentPress={handleAttachmentPress}
           />
         </KeyboardAvoidingView>
       )}
 
-      <MessageActionSheet
-        visible={showActionSheet}
-        onClose={() => setShowActionSheet(false)}
-        selectedMessage={selectedMessage}
-        userData={userData}
-        handleReply={handleReply}
-        handlePin={handlePin}
-        handleStar={handleStar}
-        handleDelete={handleDelete}
-        confirmDelete={confirmDelete}
+      {/* Modals */}
+      <StickerPicker
+        visible={stickerPickerVisible}
+        onClose={() => setStickerPickerVisible(false)}
+        onStickerSelect={handleStickerSelect}
+        onCreateSticker={handleCreateSticker}
+        recentStickers={recentStickers}
+        customStickers={customStickers}
       />
 
       <AttachmentOptionsModal
@@ -872,28 +867,38 @@ const ChatScreen = ({ route, navigation }) => {
         onSelectImage={handleSelectImage}
         onSelectFile={handleSelectFile}
       />
-      <StickerPicker
-        visible={stickerPickerVisible}
-        onClose={() => setStickerPickerVisible(false)}
-        onStickerSelect={handleStickerSelect}
-        recentStickers={recentStickers}
-        customStickers={customStickers}
-        onCreateSticker={handleCreateSticker}
-      />
 
       <ImagePreviewModal
         visible={imageModalVisible}
         imageUri={selectedImageUri}
-        onClose={() => setImageModalVisible(false)}
-        onSend={uploadAndSendImage}
         isViewOnce={isViewOnce}
-        onViewOnceToggle={() => setIsViewOnce(!isViewOnce)}
+        onToggleViewOnce={() => setIsViewOnce(!isViewOnce)}
+        onClose={() => {
+          setImageModalVisible(false);
+          setSelectedImageUri(null);
+          setIsViewOnce(false);
+        }}
+        onSend={uploadAndSendImage}
       />
 
       <ImageViewModal
         visible={imageViewModalVisible}
-        imageUri={currentViewImage}
-        onClose={() => setImageViewModalVisible(false)}
+        imageUrl={currentViewImage}
+        onClose={() => {
+          setImageViewModalVisible(false);
+          setCurrentViewImage(null);
+        }}
+      />
+
+      <MessageActionSheet
+        visible={showActionSheet}
+        message={selectedMessage}
+        onClose={() => setShowActionSheet(false)}
+        onReply={handleReply}
+        onPin={handlePin}
+        onStar={handleStar}
+        onDelete={handleDelete}
+        isMine={selectedMessage?.senderId?._id === userData._id}
       />
 
       <ProfanityWarningModal
@@ -906,6 +911,14 @@ const ChatScreen = ({ route, navigation }) => {
         onKeepEditing={handleKeepEditing}
         onSendAnyway={handleSendAnyway}
       />
+
+      {/* Hold to Record Hint - Shows on first tap */}
+      {showHoldHint && (
+        <Animated.View style={[styles.holdHintContainer, { opacity: hintOpacity }]}>
+          <Ionicons name="hand-left" size={20} color="#FFF" style={{ marginRight: 8 }} />
+          <Text style={styles.holdHintText}>Hold mic button to record</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };

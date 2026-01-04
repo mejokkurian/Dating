@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/context/AuthContext';
 import { CallProvider } from './src/context/CallContext';
@@ -54,16 +55,18 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <BadgeProvider>
-          <NotificationProvider navigationRef={navigationRef}>
-            <CallProvider>
-              <AuthNavigator navigationRef={navigationRef} />
-            </CallProvider>
-          </NotificationProvider>
-        </BadgeProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AuthProvider>
+          <BadgeProvider>
+            <NotificationProvider navigationRef={navigationRef}>
+              <CallProvider>
+                <AuthNavigator navigationRef={navigationRef} />
+              </CallProvider>
+            </NotificationProvider>
+          </BadgeProvider>
+        </AuthProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

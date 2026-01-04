@@ -24,12 +24,12 @@ if (Platform.OS === "android") {
 }
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import auth from '@react-native-firebase/auth';
 import {
   signInWithEmail,
   createAccountWithEmail,
   signInWithGoogle,
   signInWithApple,
-  signInWithPhoneNumber,
 } from "../../services/api/auth";
 import GradientButton from "../../components/GradientButton";
 import GlassCard from "../../components/GlassCard";
@@ -190,10 +190,27 @@ const LoginScreen = ({ navigation }) => {
     try {
       setLoading(true);
       const formattedPhone = `${selectedCountry.dialCode}${phoneNumber}`;
-      await signInWithPhoneNumber(formattedPhone);
-      navigation.navigate("PhoneOTP", { phoneNumber: formattedPhone });
+      
+      // Use Firebase phone authentication
+      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+      
+      // Navigate to OTP screen with confirmation object
+      navigation.navigate("PhoneOTP", { 
+        phoneNumber: formattedPhone,
+        confirmation 
+      });
+      
+      console.log('✅ Firebase OTP sent to:', formattedPhone);
     } catch (error) {
-      setPhoneError(error.message || "Failed to send OTP");
+      console.error('Firebase phone auth error:', error);
+      
+      if (error.code === 'auth/invalid-phone-number') {
+        setPhoneError("Invalid phone number format");
+      } else if (error.code === 'auth/too-many-requests') {
+        setPhoneError("Too many attempts. Please try again later.");
+      } else {
+        setPhoneError(error.message || "Failed to send OTP");
+      }
     } finally {
       setLoading(false);
     }

@@ -42,9 +42,10 @@ const LikesYouScreen = ({ navigation }) => {
   };
 
   const handleMatchPress = (match) => {
-    // Navigate to Discover screen to swipe on them
-    navigation.navigate('Discover', { 
-      pendingProfile: match.user
+    // Navigate to LikeProfile screen to review the user
+    navigation.navigate('LikeProfile', { 
+      user: match.user,
+      matchId: match.matchId || match._id 
     });
   };
 
