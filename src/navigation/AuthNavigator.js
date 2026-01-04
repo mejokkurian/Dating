@@ -24,6 +24,7 @@ import PremiumScreen from '../screens/subscription/PremiumScreen';
 import TabNavigator from './TabNavigator';
 import ChatScreen from '../screens/chat/ChatScreen';
 import ViewUserProfileScreen from '../screens/profile/ViewUserProfileScreen';
+import LikeProfileScreen from '../screens/LikeProfileScreen';
 
 const Stack = createStackNavigator();
 
@@ -190,6 +191,13 @@ const AuthNavigator = ({ navigationRef }) => {
           <>
             <Stack.Screen name="MainTab" component={TabNavigator} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen 
+              name="LikeProfile" 
+              component={LikeProfileScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
             <Stack.Screen 
               name="ViewUserProfile" 
               component={ViewUserProfileScreen}

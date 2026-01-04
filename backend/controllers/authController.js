@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { sendOTP, verifyOTP } = require('../services/twilioService');
+const admin = require('../config/firebase');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -187,6 +188,84 @@ exports.verifyPhoneOTP = async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+// @desc    Verify Firebase Phone Token & Login
+// @route   POST /api/auth/firebase-phone
+// @access  Public
+exports.verifyFirebasePhone = async (req, res) => {
+  try {
+    const { idToken, createAccount } = req.body;
+    
+    if (!idToken) {
+      return res.status(400).json({ message: 'Firebase ID token is required' });
+    }
+
+    // Verify the Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const phoneNumber = decodedToken.phone_number;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ message: 'Phone number not found in token' });
+    }
+
+    console.log(`✅ Firebase phone verified: ${phoneNumber}`);
+
+    // Check if user exists
+    let user = await User.findOne({ phoneNumber });
+
+    if (!user) {
+      // If createAccount flag is not set, return that user needs to create account
+      if (!createAccount) {
+        return res.json({
+          isNewUser: true,
+          phoneNumber,
+          firebaseUid: decodedToken.uid,
+          message: 'Phone verified. Please complete account creation.',
+        });
+      }
+
+      // Create new user only if createAccount flag is true
+      user = await User.create({
+        phoneNumber,
+        email: `${phoneNumber.replace(/\+/g, '')}@phone.user`, // Placeholder email
+        displayName: 'New User',
+        isVerified: true, // Phone is verified via Firebase
+        firebaseUid: decodedToken.uid,
+      });
+      
+      console.log(`✅ New user created: ${user._id}`);
+    } else {
+      // Update Firebase UID if not set
+      if (!user.firebaseUid) {
+        user.firebaseUid = decodedToken.uid;
+        await user.save();
+      }
+      
+      console.log(`✅ Existing user logged in: ${user._id}`);
+    }
+
+    res.json({
+      isNewUser: false,
+      _id: user._id,
+      phoneNumber: user.phoneNumber,
+      displayName: user.displayName,
+      photos: user.photos,
+      onboardingCompleted: user.onboardingCompleted,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error('Firebase phone verification error:', error);
+    
+    if (error.code === 'auth/id-token-expired') {
+      return res.status(401).json({ message: 'Token expired. Please try again.' });
+    }
+    if (error.code === 'auth/argument-error') {
+      return res.status(400).json({ message: 'Invalid token format' });
+    }
+    
+    res.status(400).json({ message: error.message || 'Phone verification failed' });
   }
 };
 

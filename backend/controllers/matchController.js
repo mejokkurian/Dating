@@ -1,5 +1,7 @@
 const axios = require("axios");
 const User = require("../models/User");
+const pushNotificationService = require("../services/pushNotificationService");
+const NotificationFactory = require("../services/notifications/NotificationFactory");
 
 // Matching Engine URL (Django)
 const MATCHING_ENGINE_URL =
@@ -220,6 +222,29 @@ exports.recordInteraction = async (req, res) => {
         // If both users liked, activate the match
         if (match.user1Liked && match.user2Liked) {
           match.status = "active";
+          
+          // Send match notification to both users
+          try {
+            const currentUser = await User.findById(userId);
+            const otherUser = await User.findById(targetId);
+            
+            if (currentUser && otherUser) {
+              // Notify the other user about the match
+              const notification = NotificationFactory.createMatchNotification(
+                currentUser,
+                match._id.toString()
+              );
+              
+              await pushNotificationService.sendNotification(
+                targetId.toString(),
+                notification
+              );
+              
+              console.log(`✅ Match notification sent to ${otherUser.displayName}`);
+            }
+          } catch (notifError) {
+            console.error('Error sending match notification:', notifError);
+          }
         }
 
         await match.save();
@@ -257,6 +282,94 @@ exports.recordInteraction = async (req, res) => {
     res.json({ message: "Interaction recorded" });
   } catch (error) {
     console.error("Record interaction error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Respond to a like (Accept/Decline)
+// @route   POST /api/matches/:matchId/respond
+// @access  Private
+exports.respondToLike = async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const { action } = req.body; // 'accept' or 'decline'
+    const userId = req.user._id;
+
+    const Match = require("../models/Match");
+
+    // Find the match
+    const match = await Match.findById(matchId);
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    // Verify user is part of this match
+    const isUser1 = match.user1Id.toString() === userId.toString();
+    const isUser2 = match.user2Id.toString() === userId.toString();
+
+    if (!isUser1 && !isUser2) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    if (action === 'accept') {
+      // Accept the like - update the match to liked
+      if (isUser1) {
+        match.user1Liked = true;
+      } else {
+        match.user2Liked = true;
+      }
+
+      // If both liked, activate the match
+      if (match.user1Liked && match.user2Liked) {
+        match.status = "active";
+        
+        // Send match notification to the other user
+        try {
+          const currentUser = await User.findById(userId);
+          const otherUserId = isUser1 ? match.user2Id : match.user1Id;
+          const otherUser = await User.findById(otherUserId);
+          
+          if (currentUser && otherUser) {
+            const notification = NotificationFactory.createMatchNotification(
+              currentUser,
+              match._id.toString()
+            );
+            
+            await pushNotificationService.sendNotification(
+              otherUserId.toString(),
+              notification
+            );
+            
+            console.log(`✅ Match notification sent to ${otherUser.displayName}`);
+          }
+        } catch (notifError) {
+          console.error('Error sending match notification:', notifError);
+        }
+      }
+
+      await match.save();
+
+      return res.json({
+        message: "Match accepted",
+        match: {
+          id: match._id,
+          status: match.status,
+          isMutual: match.status === "active",
+        },
+      });
+    } else if (action === 'decline') {
+      // Decline the like - delete the match
+      await Match.findByIdAndDelete(matchId);
+
+      return res.json({
+        message: "Match declined",
+      });
+    } else {
+      return res.status(400).json({ message: "Invalid action. Use 'accept' or 'decline'" });
+    }
+  } catch (error) {
+    console.error("Respond to like error:", error);
     res.status(500).json({ message: error.message });
   }
 };

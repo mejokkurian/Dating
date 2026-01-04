@@ -250,6 +250,61 @@ module.exports = (io) => {
       }
     });
 
+    // Handle call logging
+    socket.on('log_call', async (data) => {
+      try {
+        const { receiverId, callType, duration, status } = data;
+        const senderId = socket.userId;
+
+        // Create conversation ID
+        const conversationId = getConversationId(senderId, receiverId);
+
+        // Create call log message
+        const messageData = {
+          conversationId,
+          senderId,
+          receiverId,
+          messageType: 'call',
+          content: `${callType === 'video' ? '📹' : '📞'} ${callType.charAt(0).toUpperCase() + callType.slice(1)} call`,
+          callData: {
+            callType,
+            duration: duration || 0,
+            status: status || 'completed',
+          },
+          read: false,
+          status: 'sent',
+        };
+
+        const message = await Message.create(messageData);
+
+        // Update match's last message time
+        await Match.findOneAndUpdate(
+          {
+            $or: [
+              { user1Id: senderId, user2Id: receiverId },
+              { user1Id: receiverId, user2Id: senderId },
+            ],
+          },
+          { lastMessageAt: new Date() },
+          { upsert: false }
+        );
+
+        // Populate sender info
+        await message.populate('senderId', 'displayName photos');
+
+        // Emit to both users
+        const messageObj = message.toObject();
+        socket.emit('call_logged', messageObj);
+        io.to(receiverId.toString()).emit('call_logged', messageObj);
+
+        console.log(`📞 Call logged: ${callType} call between ${senderId} and ${receiverId}, duration: ${duration}s`);
+
+      } catch (error) {
+        console.error('Log call error:', error);
+        socket.emit('call_log_error', { error: error.message });
+      }
+    });
+
     // Handle message delivery acknowledgment
     socket.on('ack_delivered', async (data) => {
       try {

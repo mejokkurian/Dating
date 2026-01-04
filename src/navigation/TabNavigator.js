@@ -2,7 +2,7 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { View, StyleSheet, Platform, Text } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import theme from "../theme/theme";
 import { useBadge } from "../context/BadgeContext";
 
@@ -25,6 +25,7 @@ const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
   const { likesYouCount, unreadMessagesCount, updateBadgeCounts } = useBadge();
+  const insets = useSafeAreaInsets();
 
   // Update badge counts when navigator comes into focus
   React.useEffect(() => {
@@ -36,7 +37,11 @@ const TabNavigator = () => {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          ...styles.tabBar,
+          bottom: Platform.OS === 'ios' ? 20 : Math.max(insets.bottom, 10),
+          paddingBottom: Platform.OS === 'ios' ? 10 : Math.max(insets.bottom / 2, 8),
+        },
         tabBarActiveTintColor: theme.colors.primary || "#000000",
         tabBarInactiveTintColor: "#999999",
         tabBarLabelStyle: styles.tabBarLabel,
@@ -149,7 +154,6 @@ const TabNavigator = () => {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    bottom: Platform.OS === "ios" ? 20 : 10,
     left: 16,
     right: 16,
     elevation: 0,
@@ -157,7 +161,6 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     height: 70,
     borderTopWidth: 0,
-    paddingBottom: Platform.OS === "ios" ? 10 : 8,
     paddingTop: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },

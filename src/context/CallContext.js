@@ -39,6 +39,7 @@ export const CallProvider = ({ children }) => {
   };
 
   const callStateRef = useRef(callState);
+  const callStartTime = useRef(null);
 
   useEffect(() => {
     callStateRef.current = callState;
@@ -138,8 +139,30 @@ export const CallProvider = ({ children }) => {
           return;
         }
 
-        console.log('📞 Opening call UI from notification...');
-        // Show call UI immediately
+        // Try to use native full-screen notification on Android
+        if (nativeCallService.isAvailable()) {
+          console.log('📱 Using native Android full-screen call notification');
+          const result = await nativeCallService.showIncomingCall(callerId, callerName, callType);
+          
+          if (result.success) {
+            console.log('✅ Native full-screen notification shown');
+            // Native notification will handle the UI
+            // We still set state for when user accepts
+            setCallState({
+              visible: true,
+              callType: callType || 'audio',
+              user: { _id: callerId, name: callerName || 'Unknown Caller', image: null },
+              isIncoming: true,
+              incomingOffer: null,
+            });
+            return;
+          } else {
+            console.log('⚠️ Native notification failed, falling back to Phase 1');
+          }
+        }
+
+        // Fallback to Phase 1 (in-app notification)
+        console.log('📞 Opening call UI from notification (Phase 1 fallback)...');
         setCallState({
           visible: true,
           callType: callType || 'audio',
@@ -165,14 +188,21 @@ export const CallProvider = ({ children }) => {
       }
     });
 
+
+
     return () => {
       socketService.removeListener('incoming_call');
       socketService.removeListener('webrtc_offer');
       notificationSubscription.remove();
+      
+      // Clean up native listeners
+      if (nativeAcceptListener) nativeAcceptListener.remove();
+      if (nativeDeclineListener) nativeDeclineListener.remove();
     };
   }, [user?._id]); // Removed callState dependency to avoid listener thrashing
 
   const startCall = (targetUser, type = 'audio') => {
+    callStartTime.current = Date.now();
     setCallState({
       visible: true,
       callType: type,
@@ -183,6 +213,23 @@ export const CallProvider = ({ children }) => {
   };
 
   const endCall = () => {
+    // Log the call if it was connected
+    if (callStartTime.current && callState.user) {
+      const duration = Math.floor((Date.now() - callStartTime.current) / 1000);
+      
+      // Only log if call lasted more than 2 seconds (was actually connected)
+      if (duration > 2) {
+        socketService.emit('log_call', {
+          receiverId: callState.user._id,
+          callType: callState.callType,
+          duration,
+          status: 'completed',
+        });
+      }
+      
+      callStartTime.current = null;
+    }
+    
     resetCallState();
   };
 

@@ -11,7 +11,9 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { verifyPhoneOTP, signInWithPhoneNumber } from '../../services/api/auth';
+import auth from '@react-native-firebase/auth';
+import axios from 'axios';
+import { API_URL } from '../../services/api/config';
 import { useAuth } from '../../context/AuthContext';
 import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -20,7 +22,7 @@ import GlassCard from '../../components/GlassCard';
 import theme from '../../theme/theme';
 
 const PhoneOTPScreen = ({ route, navigation }) => {
-  const { phoneNumber } = route.params;
+  const { phoneNumber, confirmation } = route.params;
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef(null);
@@ -63,11 +65,45 @@ const PhoneOTPScreen = ({ route, navigation }) => {
 
     try {
       setLoading(true);
-      const response = await verifyPhoneOTP(phoneNumber, otpCode);
-      await login(response);
-      // Navigation is handled by AuthContext
+
+      // Confirm the verification code with Firebase
+      const credential = await confirmation.confirm(otpCode);
+      
+      // Get Firebase ID token
+      const idToken = await credential.user.getIdToken();
+
+      // Send token to backend to check if user exists
+      const response = await axios.post(`${API_URL}/auth/firebase-phone`, {
+        idToken,
+        createAccount: false, // First check if user exists
+      });
+
+      // Check if this is a new user
+      if (response.data.isNewUser) {
+        console.log('✅ New user - navigating to onboarding');
+        
+        // Store the ID token and phone for account creation
+        // Navigate to age verification (first step of onboarding)
+        navigation.navigate('AgeVerification', {
+          phoneNumber: response.data.phoneNumber,
+          firebaseUid: response.data.firebaseUid,
+          idToken, // Pass token to create account after onboarding
+        });
+      } else {
+        // Existing user - login
+        console.log('✅ Existing user - logging in');
+        await login(response.data);
+      }
     } catch (error) {
-      showAlert('Error', error.message || 'Invalid verification code', 'error');
+      console.error('Firebase verification error:', error);
+      
+      if (error.code === 'auth/invalid-verification-code') {
+        showAlert('Error', 'Invalid verification code. Please try again.', 'error');
+      } else if (error.code === 'auth/code-expired') {
+        showAlert('Error', 'Verification code expired. Please request a new one.', 'error');
+      } else {
+        showAlert('Error', error.message || 'Verification failed', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -76,11 +112,20 @@ const PhoneOTPScreen = ({ route, navigation }) => {
   const handleResend = async () => {
     try {
       setLoading(true);
-      await signInWithPhoneNumber(phoneNumber);
+      
+      // Resend verification code via Firebase
+      const newConfirmation = await auth().signInWithPhoneNumber(phoneNumber);
+      
+      // Update the confirmation in route params
+      navigation.setParams({ confirmation: newConfirmation });
+      
       showAlert('Success', 'OTP has been resent', 'success');
-      // Refocus input after resend
+      
+      // Clear existing code and refocus
+      setCode(['', '', '', '', '', '']);
       setTimeout(() => inputRefs.current?.focus(), 100);
     } catch (error) {
+      console.error('Resend error:', error);
       showAlert('Error', error.message || 'Failed to resend OTP', 'error');
     } finally {
       setLoading(false);
@@ -279,14 +324,14 @@ const styles = StyleSheet.create({
     gap: 8,
     position: 'relative',
   },
-  hiddenInput: {
+  hiddenInputOverlay: {
     position: 'absolute',
     width: '100%',
     height: '100%',
     opacity: 0.01,
-    zIndex: 10, // Ensure it sits on top to capture touches
+    zIndex: 10,
   },
-  codeBoxContainer: {
+  codeBoxWrapper: {
     flex: 1,
     height: 64,
   },

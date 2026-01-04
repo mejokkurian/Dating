@@ -1,6 +1,7 @@
 import {
     
   StyleSheet,
+  Platform,
 } from 'react-native';
 
 const styles = StyleSheet.create({
@@ -95,6 +96,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F2F2F7',
+    paddingBottom: Platform.OS === 'ios' ? 10 : 0,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -257,6 +259,43 @@ const styles = StyleSheet.create({
   hintText: {
     color: '#FFF',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  holdHintContainer: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  holdHintText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  holdHintPermanent: {
+    position: 'absolute',
+    bottom: 70,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  holdHintPermanentText: {
+    color: '#FFF',
+    fontSize: 13,
     fontWeight: '500',
   },
   // Action Sheet Styles (WhatsApp Style)
