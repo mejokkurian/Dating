@@ -76,17 +76,17 @@ const DraggablePill = ({ option, onDrop, swipeAnimatedValue }) => {
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.pillContainer, animatedStyle, containerAnimatedStyle]}>
         <LinearGradient
-          colors={option.gradient || ["#FF9A9E", "#FECFEF"]}
+          colors={["rgba(20,20,20,0.9)", "rgba(40,40,40,0.8)"]} // Dark Premium Gradient
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.gradient}
         >
           <View style={styles.iconContainer}>
-            <Ionicons name={option.icon} size={16} color="#FFF" />
+            <Ionicons name={option.icon} size={14} color="#D4AF37" />
           </View>
           <Text style={styles.text}>{option.label}</Text>
           <View style={styles.dragIndicator}>
-              <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="chevron-down" size={10} color="#D4AF37" />
           </View>
         </LinearGradient>
       </Animated.View>
@@ -100,21 +100,18 @@ const DATE_OPTIONS = [
     label: 'Coffee', 
     icon: 'cafe', 
     message: "☕ Let's grab a coffee!",
-    gradient: ['#F2994A', '#F2C94C'] // Vivid Orange/Gold
   },
   { 
     id: 'drinks', 
     label: 'Drinks', 
     icon: 'wine', 
     message: "🍷 Grab a drink?",
-    gradient: ['#DA22FF', '#9733EE'] // Neon Purple
   },
   { 
     id: 'dinner', 
     label: 'Dinner', 
     icon: 'restaurant', 
     message: "🍽️ Dinner sometime?",
-    gradient: ['#00C6FF', '#0072FF'] // Science Blue
   },
 ];
 
@@ -142,38 +139,40 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     zIndex: 100,
     flexDirection: "row", // Horizontal layout
-    gap: 10, // Space between pills
+    gap: 8, // Space between pills
   },
   pillContainer: {
-    shadowColor: "#000",
+    shadowColor: "#D4AF37", // Golden shadow (subtle)
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
+    borderRadius: 20,
   },
   gradient: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 6, 
-    paddingHorizontal: 10, 
+    paddingHorizontal: 12, 
     borderRadius: 20,
-    gap: 5,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(212, 175, 55, 0.4)", // Subtle Gold Border
   },
   iconContainer: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(212, 175, 55, 0.1)", // Gold tint background
     borderRadius: 12,
-    padding: 3,
+    padding: 4,
   },
   text: {
-    color: "#FFF",
+    color: "#F5F5F5", // Off-white
     fontWeight: "600",
     fontSize: 12,
-    textShadowColor: "rgba(0,0,0,0.1)",
-    textShadowRadius: 2,
+    letterSpacing: 0.5,
   },
   dragIndicator: {
-    marginLeft: 0,
-    marginTop: 1
+    marginLeft: 2,
+    opacity: 0.8
   }
 });
 

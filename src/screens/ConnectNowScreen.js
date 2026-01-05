@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 import { useProximityMatching } from '../hooks/useProximityMatching';
 import { toggleConnectNow, updateLocationPrivacy, sendQuickHello } from '../services/api/connectNow';
+import { respondToMatch } from '../services/api/match';
 import socketService from '../services/socket';
 import NearbyUserCard from '../components/NearbyUserCard';
 import PrivacyConsentModal from '../components/PrivacyConsentModal';
@@ -35,6 +36,7 @@ const ConnectNowScreen = ({ navigation }) => {
     shareLocation: true,
   });
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('nearby'); // 'nearby' or 'requests'
 
   // Location tracking hook
   const {
@@ -51,6 +53,23 @@ const ConnectNowScreen = ({ navigation }) => {
     error: nearbyUsersError,
     refreshNearbyUsers,
   } = useProximityMatching(connectNowEnabled);
+
+  // Filter users based on active tab
+  const nearbyUsersFiltered = nearbyUsers.filter(user => {
+    const hasPendingRequest = user.matchStatus === 'pending';
+    
+    if (activeTab === 'nearby') {
+      // Show users without pending requests
+      return !hasPendingRequest;
+    } else {
+      // Show users with pending requests (incoming or outgoing)
+      return hasPendingRequest;
+    }
+  });
+
+  // Count users for badges
+  const nearbyCount = nearbyUsers.filter(u => u.matchStatus !== 'pending').length;
+  const requestsCount = nearbyUsers.filter(u => u.matchStatus === 'pending').length;
 
   // Load initial state
   useEffect(() => {
@@ -145,6 +164,18 @@ const ConnectNowScreen = ({ navigation }) => {
 
   // Handle say hello
   const handleSayHello = (user) => {
+    // Check if duplicate or active match
+    const isMatched = user.matchStatus === 'active' || user.hasMatch;
+    
+    if (isMatched) {
+      navigation.navigate('Chat', {
+        user: user,
+        matchStatus: 'active',
+        isInitiator: false, // Assuming if listed here and matched, we can talk
+      });
+      return;
+    }
+
     setSelectedUser(user);
     setShowQuickHelloModal(true);
   };
@@ -191,10 +222,50 @@ const ConnectNowScreen = ({ navigation }) => {
 
   // Handle view profile
   const handleViewProfile = (user) => {
-    navigation.navigate('ViewUserProfile', {
-      userId: user._id,
+    navigation.navigate('LikeProfile', {
       user: user,
+      matchId: user.matchId || null,
+      fromConnectNow: true, // Flag to hide Like/Pass buttons
     });
+  };
+
+  // Handle accept match
+  const handleAcceptMatch = async (user) => {
+    try {
+      setLoading(true);
+      await respondToMatch(user.matchId, 'accept');
+      
+      // Navigate to chat
+      navigation.navigate('Chat', {
+        user: user,
+        matchStatus: 'active',
+        isInitiator: false,
+      });
+      
+      // Refresh list to update status
+      refreshNearbyUsers();
+    } catch (error) {
+      console.error('Error accepting match:', error);
+      Alert.alert('Error', 'Failed to accept invitation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle decline match
+  const handleDeclineMatch = async (user) => {
+    try {
+      setLoading(true);
+      await respondToMatch(user.matchId, 'decline');
+      
+      // Refresh list to remove user
+      refreshNearbyUsers();
+    } catch (error) {
+      console.error('Error declining match:', error);
+      Alert.alert('Error', 'Failed to decline invitation');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -210,6 +281,7 @@ const ConnectNowScreen = ({ navigation }) => {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={nearbyUsersLoading}
@@ -269,13 +341,60 @@ const ConnectNowScreen = ({ navigation }) => {
           )}
         </GlassCard>
 
+        {/* Tab Navigation */}
+        {connectNowEnabled && (
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'nearby' && styles.activeTab]}
+              onPress={() => setActiveTab('nearby')}
+            >
+              <Ionicons 
+                name="people" 
+                size={20} 
+                color={activeTab === 'nearby' ? theme.colors.primary : '#666'} 
+              />
+              <Text style={[styles.tabText, activeTab === 'nearby' && styles.activeTabText]}>
+                Nearby
+              </Text>
+              {nearbyCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{nearbyCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
+              onPress={() => setActiveTab('requests')}
+            >
+              <Ionicons 
+                name="mail" 
+                size={20} 
+                color={activeTab === 'requests' ? theme.colors.primary : '#666'} 
+              />
+              <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
+                Requests
+              </Text>
+              {requestsCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{requestsCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Nearby Users Section */}
         {connectNowEnabled && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your Nearby Matches</Text>
-              {nearbyUsers.length > 0 && (
-                <Text style={styles.sectionCount}>{nearbyUsers.length} nearby</Text>
+              <Text style={styles.sectionTitle}>
+                {activeTab === 'nearby' ? 'Nearby Users' : 'Pending Requests'}
+              </Text>
+              {nearbyUsersFiltered.length > 0 && (
+                <Text style={styles.sectionCount}>
+                  {nearbyUsersFiltered.length} {activeTab === 'nearby' ? 'nearby' : 'requests'}
+                </Text>
               )}
             </View>
 
@@ -284,23 +403,33 @@ const ConnectNowScreen = ({ navigation }) => {
                 <ActivityIndicator size="large" color={theme.colors.primary} />
                 <Text style={styles.loadingText}>Finding people nearby...</Text>
               </View>
-            ) : nearbyUsers.length === 0 ? (
+            ) : nearbyUsersFiltered.length === 0 ? (
               <GlassCard style={styles.emptyCard}>
-                <Ionicons name="location-outline" size={48} color="#ccc" />
-                <Text style={styles.emptyTitle}>No one nearby</Text>
+                <Ionicons 
+                  name={activeTab === 'nearby' ? "location-outline" : "mail-outline"} 
+                  size={48} 
+                  color="#ccc" 
+                />
+                <Text style={styles.emptyTitle}>
+                  {activeTab === 'nearby' ? 'No one nearby' : 'No pending requests'}
+                </Text>
                 <Text style={styles.emptyDescription}>
-                  We'll notify you when compatible people are within 1km
+                  {activeTab === 'nearby' 
+                    ? "We'll notify you when compatible people are within 1km"
+                    : "Requests you send or receive will appear here"}
                 </Text>
               </GlassCard>
             ) : (
               <FlatList
-                data={nearbyUsers}
+                data={nearbyUsersFiltered}
                 keyExtractor={(item) => item._id}
                 renderItem={({ item }) => (
                   <NearbyUserCard
                     user={item}
                     onSayHello={() => handleSayHello(item)}
                     onViewProfile={() => handleViewProfile(item)}
+                    onAccept={() => handleAcceptMatch(item)}
+                    onDecline={() => handleDeclineMatch(item)}
                   />
                 )}
                 scrollEnabled={false}
@@ -382,7 +511,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 100, // Increased to account for bottom tab bar
   },
   mainHeader: {
     paddingHorizontal: 24,
@@ -487,6 +616,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     padding: 40,
     alignItems: 'center',
+    marginHorizontal: 16,
   },
   emptyTitle: {
     fontSize: 18,
@@ -519,6 +649,54 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 12,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  activeTab: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeTabText: {
+    color: theme.colors.primary,
+  },
+  badge: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 

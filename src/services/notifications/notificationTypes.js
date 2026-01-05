@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPES = {
   MESSAGE: 'message',
   NEARBY_USER: 'nearby_user',
   MATCH: 'match',
+  LIKE_REQUEST: 'like_request',
 };
 
 /**
@@ -36,6 +37,13 @@ export const validateNotificationData = (data, type) => {
       );
 
     case NOTIFICATION_TYPES.MATCH:
+      return (
+        typeof data.matchId === 'string' &&
+        typeof data.userId === 'string' &&
+        typeof data.userName === 'string'
+      );
+
+    case NOTIFICATION_TYPES.LIKE_REQUEST:
       return (
         typeof data.matchId === 'string' &&
         typeof data.userId === 'string' &&
@@ -86,6 +94,13 @@ export const NotificationSchemas = {
     userId: null,
     userName: null,
     message: null,
+  },
+  [NOTIFICATION_TYPES.LIKE_REQUEST]: {
+    type: NOTIFICATION_TYPES.LIKE_REQUEST,
+    matchId: null,
+    userId: null,
+    userName: null,
+    isSuperLike: false,
   },
 };
 

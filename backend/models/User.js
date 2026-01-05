@@ -133,6 +133,7 @@ userSchema.pre('save', function(next) {
 // Create sparse geospatial index on lastLocation for efficient proximity queries
 // Sparse index only indexes documents where the field exists and is valid
 userSchema.index({ 'lastLocation': '2dsphere' }, { sparse: true });
+userSchema.index({ 'lastLocation.coordinates': '2dsphere' }, { sparse: true });
 
 // Index push tokens for efficient queries
 userSchema.index({ 'pushTokens.token': 1 }, { sparse: true });

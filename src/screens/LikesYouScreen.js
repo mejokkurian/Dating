@@ -87,12 +87,12 @@ const LikesYouScreen = ({ navigation }) => {
           </Text>
         </View>
         <View style={styles.likesYouContainer}>
-          <Ionicons name="heart" size={14} color="#E91E63" />
-          <Text style={styles.likesYouText}>Liked you! Swipe right to match</Text>
+          <Ionicons name="heart" size={14} color="#D4AF37" />
+          <Text style={styles.likesYouText}>Liked you</Text>
         </View>
       </View>
       <View style={styles.heartBadge}>
-        <Ionicons name="heart" size={20} color="#E91E63" />
+        <Ionicons name="heart" size={18} color="#FFFFFF" />
       </View>
     </TouchableOpacity>
   );
@@ -221,17 +221,22 @@ const styles = StyleSheet.create({
   },
   likesYouText: {
     fontSize: 13,
-    color: '#E91E63',
-    fontStyle: 'italic',
+    color: '#757575',
+    fontWeight: '500',
   },
   heartBadge: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FCE4EC',
+    backgroundColor: '#D4AF37', // Gold
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
+    shadowColor: "#D4AF37",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
 });
 

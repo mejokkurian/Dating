@@ -39,7 +39,7 @@ export const useProximityMatching = (enabled = false) => {
       setNearbyUsers(formattedUsers);
     } catch (err) {
       console.error('Error loading nearby users:', err);
-      setError(err.message);
+      setError(err.response?.data?.message || err.message);
     } finally {
       setLoading(false);
     }

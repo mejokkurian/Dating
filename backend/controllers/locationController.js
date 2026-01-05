@@ -65,7 +65,9 @@ exports.getNearbyUsers = async (req, res) => {
     const currentUser = await User.findById(req.user._id);
 
     if (!currentUser || !currentUser.lastLocation || !currentUser.lastLocation.coordinates) {
-      return res.status(400).json({ message: 'User location not set' });
+      // return res.status(400).json({ message: 'User location not set' });
+      // Return empty list instead of error to avoid frontend 400 bugs while location initializes
+      return res.json([]); 
     }
 
     const [currentLon, currentLat] = currentUser.lastLocation.coordinates;
@@ -94,13 +96,17 @@ exports.getNearbyUsers = async (req, res) => {
       ]
     }).select('user1Id user2Id status');
 
-    // Create a map of matched user IDs to their match status
+    // Create a map of matched user IDs to their match info
     const matchMap = new Map();
     userMatches.forEach(match => {
       const otherUserId = match.user1Id.toString() === req.user._id.toString() 
         ? match.user2Id.toString() 
         : match.user1Id.toString();
-      matchMap.set(otherUserId, match.status);
+      matchMap.set(otherUserId, {
+        status: match.status,
+        matchId: match._id,
+        initiatorId: match.initiatorId
+      });
     });
 
     // Calculate exact distances and add to results, including match information
@@ -116,9 +122,11 @@ exports.getNearbyUsers = async (req, res) => {
       const userObj = user.toObject();
       userObj.distance = Math.round(distance); // Distance in meters
       const userIdStr = user._id.toString();
-      const matchStatus = matchMap.get(userIdStr) || null;
-      userObj.hasMatch = matchStatus !== null;
-      userObj.matchStatus = matchStatus;
+      const matchInfo = matchMap.get(userIdStr) || null;
+      userObj.hasMatch = matchInfo !== null;
+      userObj.matchStatus = matchInfo ? matchInfo.status : null;
+      userObj.matchId = matchInfo ? matchInfo.matchId : null;
+      userObj.initiatorId = matchInfo ? matchInfo.initiatorId : null;
       return userObj;
     });
 
@@ -153,6 +161,48 @@ exports.toggleConnectNow = async (req, res) => {
 
     if (!updatedUser) {
       return res.status(404).json({ message: 'User not found after update' });
+    }
+
+    if (enabled === true && updatedUser.lastLocation && updatedUser.lastLocation.coordinates) {
+      const [lon, lat] = updatedUser.lastLocation.coordinates;
+      console.log(`[ConnectNow] Triggering notifications for user ${updatedUser._id} at [${lon}, ${lat}]`);
+      
+      // Find nearby users to notify
+      // We wrap this in a non-blocking block to avoid delaying the response
+      (async () => {
+        try {
+          const nearbyToNotify = await User.find({
+            _id: { $ne: req.user._id },
+            connectNowEnabled: true,
+            'lastLocation.coordinates': { $exists: true, $ne: null },
+            'lastLocation': {
+              $nearSphere: {
+                $geometry: {
+                  type: 'Point',
+                  coordinates: [lon, lat]
+                },
+                $maxDistance: 1000 // 1km
+              }
+            }
+          }).select('_id displayName name');
+
+          console.log(`[ConnectNow] Found ${nearbyToNotify.length} nearby active users to notify`);
+
+          for (const nearbyUser of nearbyToNotify) {
+            try {
+              console.log(`[ConnectNow] Sending notification to ${nearbyUser.displayName} (${nearbyUser._id})`);
+              const notification = NotificationFactory.createConnectNowNotification(updatedUser);
+              await pushNotificationService.sendNotification(nearbyUser._id.toString(), notification);
+            } catch (notifErr) {
+              console.error(`[ConnectNow] Failed to notify user ${nearbyUser._id}:`, notifErr);
+            }
+          }
+        } catch (nearbyErr) {
+          console.error('[ConnectNow] Error finding nearby users for notification:', nearbyErr);
+        }
+      })();
+    } else {
+      console.log(`[ConnectNow] Notification skipped. Enabled: ${enabled}, HasLocation: ${!!updatedUser.lastLocation}`);
     }
 
     res.json({ 
@@ -266,11 +316,15 @@ exports.sendQuickHello = async (req, res) => {
     // Sort IDs to match the Match model's expected format (sorted for consistency)
     if (!match) {
       const sortedIds = [senderId, userId].sort((a, b) => a.toString().localeCompare(b.toString()));
+      const isUser1 = senderId.toString() === sortedIds[0].toString();
+      
       match = new Match({
         user1Id: sortedIds[0],
         user2Id: sortedIds[1],
         status: 'pending',
-        initiatorId: senderId
+        initiatorId: senderId,
+        user1Liked: isUser1,
+        user2Liked: !isUser1
       });
       await match.save();
     } else if (match.status === 'pending') {

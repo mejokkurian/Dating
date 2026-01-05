@@ -50,7 +50,7 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
     if (isSending) return;
     
     setIsSending(true);
-    await onSend(profile, comment);
+    await onSend(profile, comment); 
     setComment('');
     setIsSending(false);
     handleClose();
@@ -178,7 +178,7 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
                           ) : (
                               <>
                                   <Text style={styles.sendButtonText}>Send</Text>
-                                  <Ionicons name="paper-plane" size={16} color="#FFF" style={{ marginLeft: 6 }} />
+                                  <Ionicons name="heart" size={18} color="#FFF" style={{ marginLeft: 6 }} />
                               </>
                           )}
                       </LinearGradient>
@@ -197,6 +197,8 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
             </View>
           </InputAccessoryView>
         )}
+
+
       </View>
     </Modal>
   );
@@ -344,6 +346,23 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontWeight: '600',
     color: '#007AFF',
+  },
+  likeAnimationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  likeMainHeart: {
+    shadowColor: "#FF3B30",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  likeParticle: {
+    position: 'absolute',
   },
 });
 

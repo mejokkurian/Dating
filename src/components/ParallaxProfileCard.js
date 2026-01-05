@@ -193,7 +193,7 @@ const ParallaxProfileCard = ({
           />
           
           <Animated.View style={[styles.rejectStamp, rejectOpacity]}>
-            <Ionicons name="close-circle" size={100} color="#F44336" />
+            <Ionicons name="close-circle" size={100} color="#FFFFFF" />
             <Text style={styles.rejectText}>PASS</Text>
           </Animated.View>
           
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   rejectText: {
-    color: "#F44336",
+    color: "#FFFFFF",
     fontSize: 24,
     fontWeight: "bold",
     textShadowColor: 'rgba(0,0,0,0.5)',

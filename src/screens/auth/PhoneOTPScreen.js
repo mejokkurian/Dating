@@ -11,20 +11,19 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import auth from '@react-native-firebase/auth';
-import axios from 'axios';
-import { API_URL } from '../../services/api/config';
 import { useAuth } from '../../context/AuthContext';
 import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import RomanticBackground from '../../components/RomanticBackground';
 import GlassCard from '../../components/GlassCard';
 import theme from '../../theme/theme';
+import api from '../../services/api/config';
 
 const PhoneOTPScreen = ({ route, navigation }) => {
   const { phoneNumber, confirmation } = route.params;
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [confirmationObj, setConfirmationObj] = useState(confirmation);
   const inputRefs = useRef(null);
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { login } = useAuth();
@@ -66,44 +65,35 @@ const PhoneOTPScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
 
-      // Confirm the verification code with Firebase
-      const credential = await confirmation.confirm(otpCode);
-      
-      // Get Firebase ID token
-      const idToken = await credential.user.getIdToken();
+      // Verify OTP via Twilio backend
+      const response = await verifyPhoneNumber(phoneNumber, otpCode);
 
-      // Send token to backend to check if user exists
-      const response = await axios.post(`${API_URL}/auth/firebase-phone`, {
-        idToken,
-        createAccount: false, // First check if user exists
-      });
-
-      // Check if this is a new user
-      if (response.data.isNewUser) {
-        console.log('✅ New user - navigating to onboarding');
+      if (response && response.token) {
+        // Authenticate the user
+        await login(response); // This will update the auth context
         
-        // Store the ID token and phone for account creation
-        // Navigate to age verification (first step of onboarding)
-        navigation.navigate('AgeVerification', {
-          phoneNumber: response.data.phoneNumber,
-          firebaseUid: response.data.firebaseUid,
-          idToken, // Pass token to create account after onboarding
-        });
+        // Check user status and navigate accordingly
+        // If user already exists (onboardingComplete is true), login will take care of redirect
+        // But we want to be explicit about new users
+        if (response.user.onboardingComplete) {
+          console.log('User already completed onboarding');
+          // No need to do anything, AuthContext will redirect to Main
+        } else {
+          console.log('New user or incomplete onboarding');
+          // Pass phone number to next screen
+          navigation.navigate('AgeVerification', {
+             phoneNumber: phoneNumber
+          });
+        }
       } else {
-        // Existing user - login
-        console.log('✅ Existing user - logging in');
-        await login(response.data);
+        // Fallback if no token (shouldn't happen with correct API response)
+        showAlert('Error', 'Verification failed. Please try again.', 'error');
       }
     } catch (error) {
-      console.error('Firebase verification error:', error);
-      
-      if (error.code === 'auth/invalid-verification-code') {
-        showAlert('Error', 'Invalid verification code. Please try again.', 'error');
-      } else if (error.code === 'auth/code-expired') {
-        showAlert('Error', 'Verification code expired. Please request a new one.', 'error');
-      } else {
-        showAlert('Error', error.message || 'Verification failed', 'error');
-      }
+      console.error('Verify error:', error);
+      console.log('Error details:', error.response?.data);
+      const message = error.response?.data?.message || 'Invalid verification code';
+      showAlert('Error', message, 'error');
     } finally {
       setLoading(false);
     }
@@ -112,14 +102,8 @@ const PhoneOTPScreen = ({ route, navigation }) => {
   const handleResend = async () => {
     try {
       setLoading(true);
-      
-      // Resend verification code via Firebase
-      const newConfirmation = await auth().signInWithPhoneNumber(phoneNumber);
-      
-      // Update the confirmation in route params
-      navigation.setParams({ confirmation: newConfirmation });
-      
-      showAlert('Success', 'OTP has been resent', 'success');
+      await signInWithPhoneNumber(phoneNumber);
+      showAlert('Success', 'Verification code resent!', 'success');
       
       // Clear existing code and refocus
       setCode(['', '', '', '', '', '']);

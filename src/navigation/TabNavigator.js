@@ -51,16 +51,16 @@ const TabNavigator = () => {
           const isLikesYou = route.name === "LikesYou";
 
           if (route.name === "Discover") {
-            iconName = focused ? "heart" : "heart-outline";
+            iconName = "albums";
           } else if (route.name === "TopPicks") {
-            iconName = focused ? "flash" : "flash-outline";
+            iconName = "flash";
           } else if (route.name === "ConnectNow") {
-            iconName = focused ? "location" : "location-outline";
+            iconName = "location";
           } else if (route.name === "Messages") {
-            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
+            iconName = "chatbubbles";
             badgeCount = unreadMessagesCount > 0 ? unreadMessagesCount : null;
           } else if (route.name === "LikesYou") {
-            iconName = focused ? "heart" : "heart-outline";
+            iconName = "heart"; // Warning: Duplicate icon with Discover, but preserving as requested
             badgeCount = likesYouCount > 0 ? likesYouCount : null;
           } else if (route.name === "Premium") {
             iconName = focused ? "diamond" : "diamond-outline";
@@ -79,7 +79,7 @@ const TabNavigator = () => {
               >
                 <Ionicons
                   name={iconName}
-                  size={focused ? 28 : 26}
+                  size={focused ? 30 : 28}
                   color={iconColor}
                 />
                 {/* Small dot indicator for LikesYou tab when active */}

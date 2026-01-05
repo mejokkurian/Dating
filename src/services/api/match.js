@@ -17,3 +17,10 @@ export const recordInteraction = async (targetId, action) => {
   });
   return response.data;
 };
+
+export const respondToMatch = async (matchId, action) => {
+  const response = await api.post(`/matches/${matchId}/respond`, {
+    action
+  });
+  return response.data;
+};

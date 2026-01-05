@@ -116,12 +116,25 @@ exports.getPotentialMatches = async (req, res) => {
       ...interactedUserIds
     ])];
     
+    // Get current user's preferences
+    const currentUser = await User.findById(currentUserId).select('preferences gender');
+    const userPreference = currentUser?.preferences; // Who they're looking for
+    
+    // Build gender filter based on preferences
+    let genderFilter = {};
+    if (userPreference && userPreference !== 'Everyone') {
+      // If user has specific preference (e.g., "Male" or "Female"), only show that gender
+      genderFilter = { gender: userPreference };
+    }
+    // If preference is "Everyone" or not set, show all genders (no filter)
+    
     // Get all users except excluded ones who have completed onboarding
     const users = await User.find({
       _id: { $nin: allExcludedIds },
       onboardingCompleted: true,
       displayName: { $exists: true },
-      age: { $exists: true }
+      age: { $exists: true },
+      ...genderFilter // Apply gender filter
     })
     .select('-password')
     .limit(50);

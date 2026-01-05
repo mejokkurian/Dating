@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../../context/AuthContext";
 import ProfileSection from "../profile/components/ProfileSection";
 import { updateUserDocument } from "../../services/api/user";
@@ -368,21 +369,31 @@ const SettingsScreen = ({ navigation }) => {
               </View>
             </View>
           </View>
-          {renderMenuItem(
-            "information-circle-outline",
-            "Account Information",
-            "View your account details",
-            () => {
-              // Navigate to account info
-              navigation.navigate("Profile");
-            },
-            true,
-            null,
-            true
+        </ProfileSection>
+
+        {/* HELP Section */}
+        <ProfileSection icon="help-buoy-outline" title="HELP & SUPPORT">
+           {renderMenuItem(
+            "school-outline",
+            "Reset App Guide",
+            "Show the onboarding tutorial again",
+            async () => {
+               if (userData?._id) {
+                   await AsyncStorage.removeItem(`hasSeenTutorial_${userData._id}`);
+               }
+               // Also remove legacy key for cleanup
+               await AsyncStorage.removeItem('hasSeenTutorial');
+               
+               Alert.alert(
+                 "Guide Reset", 
+                 "The onboarding guide will appear next time you visit the home screen.",
+                 [{ text: "OK" }]
+               );
+            }
           )}
         </ProfileSection>
 
-        {/* LEGAL Section */}
+
         <ProfileSection icon="document-text-outline" title="LEGAL">
           {renderMenuItem(
             "document-text-outline",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState ,} from "react";
 import {
   View,
   Text,
@@ -22,15 +22,20 @@ import SuperLikeModal from "../components/SuperLikeModal";
 import FilterModal from "../components/FilterModal";
 import GradientButton from "../components/GradientButton";
 import DateCallToAction from "../components/DateCallToAction";
-import SuperLikeOverlay from "../components/SuperLikeOverlay";
+import HeartAnimationOverlay from "../components/HeartAnimationOverlay"; // New Overlay
 import CustomAlert from "../components/CustomAlert";
+import NotificationBottomSheet from "../components/NotificationBottomSheet"; // Premium Bottom Sheet
+import DateConfirmationModal from "../components/DateConfirmationModal"; // Premium Modal
+import CoachmarkOverlay from "../components/CoachmarkOverlay"; // Premium Coachmarks
 import theme from "../theme/theme";
+import { useProfileAnimations } from "../hooks/useProfileAnimations"; // Hook
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const MainScreen = ({ navigation, route }) => {
   const { user, userData } = useAuth();
-  const superLikeAnimRef = React.useRef(null);
+  // const superLikeAnimRef = React.useRef(null); // Removed for premium aesthetic
   const swipeY = useSharedValue(0); // Initialize SharedValue
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -42,6 +47,8 @@ const MainScreen = ({ navigation, route }) => {
   const [showSuperLikeModal, setShowSuperLikeModal] = useState(false);
   const [matchProfile, setMatchProfile] = useState(null);
   const [superLikeProfile, setSuperLikeProfile] = useState(null);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedDateOption, setSelectedDateOption] = useState(null);
   const [isPendingMode, setIsPendingMode] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterState, setFilterState] = useState({
@@ -52,13 +59,30 @@ const MainScreen = ({ navigation, route }) => {
     lifestyle: [],
   });
   
-  // Custom Alert State
-  const [customAlert, setCustomAlert] = useState({
+  // Tutorial State
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  
+  // Notification Bottom Sheet State
+  const [notificationState, setNotificationState] = useState({
     visible: false,
     title: '',
     message: '',
-    buttons: [],
+    buttonText: 'OK',
+    type: 'info',
   });
+
+  // Animation Hook
+  const {
+      showLikeAnimation,
+      likeHeartScale,
+      likeParticleOpacity,
+      particles,
+      triggerLikeAnimation,
+      resetAnimations
+  } = useProfileAnimations();
+
+
 
   React.useEffect(() => {
     const loadPendingProfile = async () => {
@@ -143,6 +167,18 @@ const MainScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       await Promise.all([loadVerificationStatus(), loadProfiles()]);
+      
+      // Check for Tutorial
+      if (userData?._id) {
+          const tutorialKey = `hasSeenTutorial_${userData._id}`;
+          const hasSeenTutorial = await AsyncStorage.getItem(tutorialKey);
+          if (!hasSeenTutorial) {
+              setTimeout(() => {
+                  setShowTutorial(true);
+                  setTutorialStep(0);
+              }, 1000); // Small delay to let UI settle
+          }
+      }
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
@@ -188,16 +224,24 @@ const MainScreen = ({ navigation, route }) => {
       setProfiles(normalizedMatches);
     } catch (error) {
       console.error("Error loading profiles:", error);
-      setCustomAlert({
+      setNotificationState({
         visible: true,
         title: 'Error',
-        message: 'Failed to load profiles',
-        buttons: [{ text: 'OK', onPress: () => {} }],
+        message: 'Failed to load profiles. Please check your connection.',
+        type: 'error',
       });
     }
   };
 
   const handleCardPress = (profile) => {
+    // If Tutorial Mode Step 0 (Tap Card), advance to Step 1 (Detailed View)
+    if (showTutorial && tutorialStep === 0) {
+        setTutorialStep(1); 
+        // We pause the "tutorial overlay" while the bottom sheet opens? 
+        // Actually, we can keep the overlay active but update the text to "Now you see details..."
+        // Or we just open the sheet and the Overlay re-renders with the new step.
+    }
+    
     setSelectedProfile(profile);
     setShowBottomSheet(true);
   };
@@ -212,13 +256,15 @@ const MainScreen = ({ navigation, route }) => {
     console.log("Comment:", comment);
 
     // Simulate match
-    setCustomAlert({
+    // Simulate match
+    setNotificationState({
       visible: true,
-      title: '💫 Match Request Sent!',
+      title: 'Match Request Sent!',
       message: comment
-        ? `Your message to ${profile.name}: "${comment}"`
-        : `Match request sent to ${profile.name}!`,
-      buttons: [{ text: 'Great!', onPress: () => {} }],
+        ? `Your message to ${profile.displayName} has been sent.`
+        : `Request sent to ${profile.displayName}!`,
+      buttonText: 'Great!',
+      type: 'success',
     });
 
     setCurrentIndex((prev) => prev + 1);
@@ -240,6 +286,7 @@ const MainScreen = ({ navigation, route }) => {
       }
 
       console.log("Calling recordInteraction with targetId:", targetId);
+      // Temporarily disabled for testing
       await recordInteraction(targetId, "PASS");
     } catch (error) {
       console.error("Error recording reject:", error);
@@ -275,8 +322,14 @@ const MainScreen = ({ navigation, route }) => {
       console.log("Calling recordInteraction with targetId:", targetId);
       const result = await recordInteraction(targetId, "SUPERLIKE");
 
-      // Trigger Animation
-      superLikeAnimRef.current?.triggerAnimation();
+      // Trigger Animation (Premium Heartfullness)
+      triggerLikeAnimation(() => {
+          // After animation (800ms), move to next card
+          setCurrentIndex((prev) => prev + 1);
+          setShowBottomSheet(false);
+      });
+
+      // Check if it's a mutual match
 
       // Check if it's a mutual match
       if (result.match && result.match.isMutual) {
@@ -302,12 +355,6 @@ const MainScreen = ({ navigation, route }) => {
     } catch (error) {
       console.error("Error recording super like:", error);
     }
-
-    // Delay moving to next card so the user sees the "Super Like" animation on THIS card
-    setTimeout(() => {
-       setCurrentIndex((prev) => prev + 1);
-       setShowBottomSheet(false);
-    }, 1200); // 1.2s delay for full Heart -> Star animation
   };
 
   const handleSuperLikePress = (profile) => {
@@ -337,16 +384,14 @@ const MainScreen = ({ navigation, route }) => {
       const targetId = targetProfile._id || targetProfile.id;
       if (!targetId) {
         console.error("Profile ID is missing.");
-        // We already closed the sheet, so we might need to show a silent error or toast
-        // behaving as if 'pass' happened physically but failed logically is acceptable for now
-        // to avoid jarring UI.
         return;
       }
 
       console.log("Calling recordInteraction with targetId:", targetId);
       
-      // Perform API call in background
+      // Temporarily disabled for testing
       const result = await recordInteraction(targetId, "LIKE");
+      // const result = { match: null }; // Simulate no match for testing
 
       // Check if it's a mutual match
       if (result.match && result.match.isMutual) {
@@ -369,8 +414,6 @@ const MainScreen = ({ navigation, route }) => {
                 text: "Keep Swiping",
                 style: "cancel",
                 onPress: () => {
-                   // Advance to next card if we haven't already
-                   // (Depending on whether we want to show the card underneath first)
                    if (isPendingMode) {
                       setIsPendingMode(false);
                       navigation.setParams({ pendingProfile: null });
@@ -385,10 +428,6 @@ const MainScreen = ({ navigation, route }) => {
           );
         }, 300);
       } else {
-        // If not a mutual match, ensure we advance the stack
-        // Small delay to allow the "Slide down" animation to reveal the card properly before switching it?
-        // Actually, if we switch it immediately, the user sees the NEXT card immediately behind the sheet as it slides down.
-        // That is usually desired (instant gratification).
         if (isPendingMode) {
            setIsPendingMode(false);
            navigation.setParams({ pendingProfile: null });
@@ -400,8 +439,6 @@ const MainScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error("Error recording like:", error);
-      // Since we already closed the sheet, we just log the error.
-      // Reopening it would be confusing.
     }
   };
 
@@ -546,6 +583,14 @@ const MainScreen = ({ navigation, route }) => {
         onLike={handleLikeFromSheet}
         onPass={handlePassFromSheet}
         onSuperLike={handleSuperLikePress}
+        // Tutorial Props
+        showTutorial={showTutorial}
+        tutorialStep={tutorialStep}
+        onTutorialNext={() => {
+             // Called when user clicks "Next" inside the sheet (Step 1 -> 2)
+             setShowBottomSheet(false);
+             setTutorialStep(2);
+        }}
       />
 
       {/* Match Comment Modal */}
@@ -574,48 +619,95 @@ const MainScreen = ({ navigation, route }) => {
           // TODO: Apply filters to profile loading
         }}
       />
-      
+
       {/* Date Proposal Drag & Drop Pill */}
       {currentIndex < profiles.length && !showBottomSheet && !isPendingMode && (
          <DateCallToAction 
             swipeAnimatedValue={swipeY} // Passed SharedValue
             onDrop={(resetFunc, dateOption) => {
-               // Handle the drop
-               setCustomAlert({
-                 visible: true,
-                 title: `Propose ${dateOption.label}`,
-                 message: `Send "${dateOption.message}" to ${currentProfile?.displayName || "this user"}?`,
-                 buttons: [
-                   {
-                     text: "Cancel",
-                     style: "cancel",
-                     onPress: () => resetFunc()
-                   },
-                   {
-                     text: "Send Request",
-                     onPress: () => {
-                        handleSendMatch(currentProfile, dateOption.message);
-                        superLikeAnimRef.current?.triggerAnimation();
-                        resetFunc();
-                     }
-                   }
-                 ],
-               });
+               // Open Clean Modal instead of CustomAlert
+               setSelectedDateOption(dateOption);
+               setShowDateModal(true);
+               // Store reset function to call after close/confirm if needed
+               // For simplicity, we can let the pill snap back immediately or handle it here
+               resetFunc();
             }}
          />
       )}
       
-      {/* Super Like Animation Overlay */}
-      <SuperLikeOverlay ref={superLikeAnimRef} />
-      
-      {/* Custom Alert */}
-      <CustomAlert
-        visible={customAlert.visible}
-        title={customAlert.title}
-        message={customAlert.message}
-        buttons={customAlert.buttons}
-        onClose={() => setCustomAlert({ ...customAlert, visible: false })}
+      {/* Date Confirmation Modal (Premium) */}
+      <DateConfirmationModal 
+          visible={showDateModal}
+          dateOption={selectedDateOption}
+          profileName={currentProfile?.displayName || "this user"}
+          onClose={() => setShowDateModal(false)}
+          onConfirm={() => {
+              if (selectedDateOption) {
+                  handleSendMatch(currentProfile, selectedDateOption.message);
+              }
+              setShowDateModal(false);
+          }}
       />
+
+      {/* Coachmark Guide (Premium) */}
+      {/* 
+         If tutorial step is 1 (Sheet View), we DON'T render here. 
+         It's rendered INSIDE ProfileBottomSheet to be on top of the Modal. 
+      */}
+      {(!showBottomSheet || tutorialStep !== 1) && (
+      <CoachmarkOverlay
+        visible={showTutorial}
+        step={tutorialStep}
+        steps={[
+            // Step 0: Card Tap
+            {
+                title: "Welcome to Discovery",
+                message: "Tap on any card to view their full profile, photos, and interests. Swipe up to unmatch!",
+                icon: "finger-print",
+                position: "center"
+            },
+            // Step 1: Inside Sheet (Placeholder here, handled in ProfileBottomSheet)
+            {
+                title: "Make Your Move",
+                message: "Use the buttons below to Match, Super Like, or Pass.",
+                icon: "heart-circle",
+                position: "bottom-sheet"
+            },
+            // Step 2: Instant Date (After Sheet Closes)
+            {
+                title: "Instant Date",
+                message: "Drag the 'Action Pill' anytime to propose an instant coffee or dinner date!",
+                icon: "flash",
+                position: "pill"
+            }
+        ]}
+        onNext={() => {
+            // Manual Next (e.g. from "Got it" button)
+            if (tutorialStep === 0) {
+                // Determine profile to open
+                const targetProfile = profiles.length > 0 ? profiles[currentIndex] : null;
+                if (targetProfile) {
+                    // Update state to open sheet
+                     setTutorialStep(1); 
+                     setSelectedProfile(targetProfile);
+                     setShowBottomSheet(true);
+                }
+            } else if (tutorialStep === 1) {
+                // This shouldn't be hit here if we hide it, but just in case
+                setShowBottomSheet(false);
+                setTutorialStep(2);
+            } else {
+                 setTutorialStep(tutorialStep + 1);
+            }
+        }}
+        onComplete={async () => {
+             setShowTutorial(false);
+             if (userData?._id) {
+                 await AsyncStorage.setItem(`hasSeenTutorial_${userData._id}`, 'true');
+             }
+        }}
+      />
+      )}
       
     </LinearGradient>
   );

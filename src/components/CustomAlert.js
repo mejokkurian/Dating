@@ -20,9 +20,11 @@ const CustomAlert = ({
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const iconScaleAnim = useRef(new Animated.Value(0)).current;
+  const heartPumpAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (visible) {
+      // Initial entrance animations
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
@@ -50,14 +52,33 @@ const CustomAlert = ({
             useNativeDriver: true,
           }),
         ]),
-      ]).start();
+      ]).start(() => {
+        // Start continuous pumping animation after entrance
+        if (title?.includes('Match')) {
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(heartPumpAnim, {
+                toValue: 1.15,
+                duration: 500,
+                useNativeDriver: true,
+              }),
+              Animated.timing(heartPumpAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+              }),
+            ])
+          ).start();
+        }
+      });
     } else {
       scaleAnim.setValue(0.3);
       opacityAnim.setValue(0);
       slideAnim.setValue(50);
       iconScaleAnim.setValue(0);
+      heartPumpAnim.setValue(1);
     }
-  }, [visible]);
+  }, [visible, title]);
 
   if (!visible) return null;
 
@@ -71,14 +92,26 @@ const CustomAlert = ({
   );
 
   const getIconConfig = () => {
-    if (title?.includes('Match') || title?.includes('🎉')) {
-      return { name: 'heart', color: '#FFFFFF', gradient: ['#FF6B9D', '#C44569'], size: 42 };
+    // Check type prop first
+    if (type === 'error') {
+      return { name: 'close-circle', color: '#FFFFFF', gradient: ['#333333', '#000000'], size: 44 };
+    }
+    if (type === 'warning') {
+      return { name: 'alert-circle', color: '#FFFFFF', gradient: ['#FF9800', '#F57C00'], size: 44 };
+    }
+    if (type === 'success') {
+      return { name: 'checkmark-circle', color: '#FFFFFF', gradient: ['#11998e', '#38ef7d'], size: 42 };
+    }
+    
+    // Fallback to title-based detection for backward compatibility
+    if (title?.includes('Match')) {
+      return { name: 'heart', color: '#FFFFFF', gradient: ['#D4AF37', '#F2D06B'], size: 42 };
     }
     if (title?.includes('Super Like') || title?.includes('⭐')) {
       return { name: 'star', color: '#FFFFFF', gradient: ['#FFD700', '#FFA500'], size: 42 };
     }
     if (title?.includes('Error')) {
-      return { name: 'alert-circle', color: '#FFFFFF', gradient: ['#FF5252', '#D32F2F'], size: 44 };
+      return { name: 'close-circle', color: '#FFFFFF', gradient: ['#333333', '#000000'], size: 44 };
     }
     if (title?.includes('Propose') || title?.includes('☕') || title?.includes('🍷')) {
       return { name: 'cafe', color: '#FFFFFF', gradient: ['#F2994A', '#F2C94C'], size: 40 };
@@ -129,7 +162,11 @@ const CustomAlert = ({
                 style={[
                   styles.iconCircle,
                   {
-                    transform: [{ scale: iconScaleAnim }],
+                    transform: [
+                      { 
+                        scale: Animated.multiply(iconScaleAnim, heartPumpAnim)
+                      }
+                    ],
                   },
                 ]}
               >

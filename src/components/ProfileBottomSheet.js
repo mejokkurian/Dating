@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Animated,
   Modal,
   PanResponder,
+  Easing,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -17,10 +18,16 @@ import {
   FontAwesome5,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import GlassCard from "./GlassCard";
 import theme from "../theme/theme";
+import { getInterestIcon } from "../constants/interestIcons";
+import { useProfileAnimations } from "../hooks/useProfileAnimations";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+import CoachmarkOverlay from "./CoachmarkOverlay"; 
+import ProfileContent from "./ProfileContent";
+
+// ...
 
 const ProfileBottomSheet = ({
   visible,
@@ -29,7 +36,13 @@ const ProfileBottomSheet = ({
   onLike,
   onPass,
   onSuperLike,
+  showTutorial, // New Prop
+  tutorialStep, // New Prop
+  onTutorialNext // New Prop
 }) => {
+  // ... existing hooks ...
+
+
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const panY = useRef(new Animated.Value(0)).current;
 
@@ -42,6 +55,22 @@ const ProfileBottomSheet = ({
   const superLikeScale = useRef(new Animated.Value(1)).current;
   const superLikeOpacity = useRef(new Animated.Value(0)).current;
   const superLikeTranslateY = useRef(new Animated.Value(0)).current;
+  
+  // Use reusable animation hook
+  const {
+    showPassAnimation,
+    isPassLoading,
+    passIconScale,
+    passOverlayOpacity,
+    passSpinnerRotate,
+    showLikeAnimation,
+    likeHeartScale,
+    likeParticleOpacity,
+    particles,
+    triggerPassAnimation,
+    triggerLikeAnimation,
+    resetAnimations
+  } = useProfileAnimations();
 
   const panResponder = useRef(
     PanResponder.create({
@@ -86,6 +115,9 @@ const ProfileBottomSheet = ({
       superLikeScale.setValue(0.8);
       superLikeOpacity.setValue(0);
       superLikeTranslateY.setValue(0);
+      
+      // Reset animations using hook
+      resetAnimations();
 
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -115,30 +147,14 @@ const ProfileBottomSheet = ({
 
   if (!profile) return null;
 
-  // Organize photos: primary first, then others
-  const organizePhotos = () => {
-    if (!profile.photos || profile.photos.length === 0) {
-      return [];
-    }
-    const mainIndex = profile.mainPhotoIndex ?? 0;
-    const primaryPhoto = profile.photos[mainIndex] || profile.photos[0];
-    const otherPhotos = profile.photos.filter(
-      (_, index) => index !== mainIndex
-    );
-    return [primaryPhoto, ...otherPhotos];
+
+
+  // Handle Pass with Animation
+  const handlePassPress = () => {
+    triggerPassAnimation(() => {
+        if (onPass) onPass();
+    });
   };
-
-  const organizedPhotos = organizePhotos();
-
-  // Render full-width embedded photo
-  const renderFullWidthPhoto = (photoUri, index) => (
-    <View key={`photo-${index}`} style={styles.embeddedPhotoContainer}>
-      <Image
-        source={{ uri: photoUri || "https://via.placeholder.com/400x600" }}
-        style={styles.embeddedPhoto}
-      />
-    </View>
-  );
 
   const combinedTranslateY = Animated.add(slideAnim, panY);
 
@@ -172,147 +188,12 @@ const ProfileBottomSheet = ({
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Primary Photo */}
-            {organizedPhotos.length > 0 &&
-              renderFullWidthPhoto(organizedPhotos[0], 0)}
-
-            {/* Profile Info */}
-            <View style={styles.content}>
-              {/* Bio */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About</Text>
-                <Text style={styles.bioTextPlain}>
-                  {profile.bio || "No bio available"}
-                </Text>
-              </View>
-
-              {/* Photo 2 */}
-              {organizedPhotos.length > 1 &&
-                renderFullWidthPhoto(organizedPhotos[1], 1)}
-
-              {/* Quick Stats */}
-              <View style={styles.statsRow}>
-                {profile.occupation && (
-                  <GlassCard style={styles.statCard} opacity={0.1}>
-                    <FontAwesome5
-                      name="briefcase"
-                      size={16}
-                      color={theme.colors.text.secondary}
-                    />
-                    <Text style={styles.statText}>{profile.occupation}</Text>
-                  </GlassCard>
-                )}
-                {profile.height && (
-                  <GlassCard style={styles.statCard} opacity={0.1}>
-                    <FontAwesome5
-                      name="ruler-vertical"
-                      size={16}
-                      color={theme.colors.text.secondary}
-                    />
-                    <Text style={styles.statText}>{profile.height} cm</Text>
-                  </GlassCard>
-                )}
-                {profile.education && (
-                  <GlassCard style={styles.statCard} opacity={0.1}>
-                    <FontAwesome5
-                      name="graduation-cap"
-                      size={16}
-                      color={theme.colors.text.secondary}
-                    />
-                    <Text style={styles.statText}>{profile.education}</Text>
-                  </GlassCard>
-                )}
-              </View>
-
-              {/* Photo 3 */}
-              {organizedPhotos.length > 2 &&
-                renderFullWidthPhoto(organizedPhotos[2], 2)}
-
-              {/* Interests */}
-              {profile.interests && profile.interests.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Interests</Text>
-                  <View style={styles.tagsContainer}>
-                    {profile.interests.map((interest, index) => (
-                      <GlassCard key={index} style={styles.tag} opacity={0.1}>
-                        <Text style={styles.tagText}>{interest}</Text>
-                      </GlassCard>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Photo 4 */}
-              {organizedPhotos.length > 3 &&
-                renderFullWidthPhoto(organizedPhotos[3], 3)}
-
-              {/* Lifestyle */}
-              {(profile.drinking || profile.smoking || profile.drugs) && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Lifestyle</Text>
-                  <View style={styles.lifestyleGrid}>
-                    {profile.drinking && (
-                      <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                        <FontAwesome5
-                          name="wine-glass-alt"
-                          size={16}
-                          color={theme.colors.text.secondary}
-                        />
-                        <Text style={styles.lifestyleText}>
-                          Drinks: {profile.drinking}
-                        </Text>
-                      </GlassCard>
-                    )}
-                    {profile.smoking && (
-                      <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                        <FontAwesome5
-                          name="smoking"
-                          size={16}
-                          color={theme.colors.text.secondary}
-                        />
-                        <Text style={styles.lifestyleText}>
-                          Smokes: {profile.smoking}
-                        </Text>
-                      </GlassCard>
-                    )}
-                    {profile.drugs && (
-                      <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                        <FontAwesome5
-                          name="cannabis"
-                          size={16}
-                          color={theme.colors.text.secondary}
-                        />
-                        <Text style={styles.lifestyleText}>
-                          Weed: {profile.drugs}
-                        </Text>
-                      </GlassCard>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Photo 5+ (remaining photos after Lifestyle) */}
-              {organizedPhotos
-                .slice(4)
-                .map((photo, index) => renderFullWidthPhoto(photo, index + 4))}
-
-              {/* Looking For */}
-              {profile.relationshipExpectations && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Looking For</Text>
-                  <Text style={styles.bioTextPlain}>
-                    {profile.relationshipExpectations}
-                  </Text>
-                </View>
-              )}
-
-              <View style={{ height: 200 }} />
-            </View>
+            <ProfileContent profile={profile} />
           </ScrollView>
 
           {/* Action Buttons */}
           <View style={styles.actionBar}>
-            <TouchableOpacity style={styles.actionButton} onPress={onPass}>
+            <TouchableOpacity style={styles.actionButton} onPress={handlePassPress}>
               <View style={[styles.actionButtonCircle, styles.passButton]}>
                 <Ionicons name="close" size={32} color="#000" />
               </View>
@@ -332,74 +213,114 @@ const ProfileBottomSheet = ({
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
-                if (onLike) {
-                  onLike(profile);
-                }
+                // Heartfullness Animation via Hook
+                triggerLikeAnimation(() => {
+                    if (onLike) onLike(profile);
+                });
               }}
-              onPressIn={() => {
-                // Heart feedback animation - Powerful Pop!
-                heartScale.setValue(0.5);
-                heartOpacity.setValue(0);
-                heartTranslateY.setValue(0);
-
-                Animated.parallel([
-                  Animated.spring(heartScale, {
-                    toValue: 1.5,
-                    friction: 3, // Bouncy
-                    tension: 80,
-                    useNativeDriver: true,
-                  }),
-                  Animated.timing(heartOpacity, {
-                     toValue: 1,
-                     duration: 50,
-                     useNativeDriver: true
-                  }),
-                  Animated.timing(heartTranslateY, {
-                    toValue: -80, // Float higher
-                    duration: 500,
-                    useNativeDriver: true,
-                  }),
-                  Animated.sequence([
-                      Animated.delay(250),
-                      Animated.timing(heartOpacity, {
-                          toValue: 0,
-                          duration: 300,
-                          useNativeDriver: true,
-                      })
-                  ])
-                ]).start();
-              }}
+              activeOpacity={0.8}
             >
               <View style={[styles.actionButtonCircle, styles.likeButton]}>
                 <Ionicons name="heart" size={32} color="#FFF" />
               </View>
-              {/* Heart Feedback Icon */}
-              <Animated.View
-                style={[
-                  styles.buttonFeedback,
-                  {
-                    opacity: heartOpacity,
-                    transform: [
-                      { scale: heartScale },
-                      { translateY: heartTranslateY },
-                    ],
-                  },
-                ]}
-                pointerEvents="none"
-              >
-                <Ionicons name="heart" size={60} color="#FF1744" 
-                    style={{ 
-                        shadowColor: '#FF1744', 
-                        shadowOpacity: 0.5, 
-                        shadowRadius: 15,
-                        textShadowColor: '#FF1744',
-                        textShadowRadius: 10
-                    }}
-                />
-              </Animated.View>
             </TouchableOpacity>
           </View>
+          
+
         </Animated.View>
+
+        {/* Pass Animation Overlay */}
+        {showPassAnimation && (
+          <Animated.View
+            style={[
+              styles.passAnimationOverlay,
+              {
+                opacity: passOverlayOpacity,
+              },
+            ]}
+          >
+            <Animated.View
+              style={{
+                transform: [
+                  { scale: passIconScale },
+                ],
+              }}
+            >
+              <View style={styles.passAnimationIcon}>
+                <Ionicons name="close" size={32} color="#000" />
+                {isPassLoading && (
+                  <Animated.View
+                    style={{
+                      position: 'absolute',
+                      transform: [
+                        {
+                          rotate: passSpinnerRotate.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0deg', '360deg'],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <Ionicons name="sync-outline" size={56} color="#666" />
+                  </Animated.View>
+                )}
+              </View>
+            </Animated.View>
+          </Animated.View>
+        )}
+        {/* Like Animation Overlay (Heartfullness) */}
+        {showLikeAnimation && (
+          <View style={styles.likeAnimationOverlay} pointerEvents="none">
+             {/* Particles */}
+             {particles.map((p) => (
+               <Animated.View
+                 key={p.id}
+                 style={[
+                   styles.likeParticle,
+                   {
+                     opacity: Animated.multiply(likeParticleOpacity, p.opacity),
+                     transform: [
+                       { translateX: p.x },
+                       { translateY: p.y },
+                       { scale: p.scale }
+                     ]
+                   }
+                 ]}
+               >
+                 <Ionicons name="heart" size={24} color="#FF3B30" />
+               </Animated.View>
+             ))}
+
+             {/* Main Heart */}
+             <Animated.View
+               style={[
+                 styles.likeMainHeart,
+                 {
+                   transform: [{ scale: likeHeartScale }]
+                 }
+               ]}
+             >
+                <Ionicons name="heart" size={120} color="#FF3B30" style={styles.mainHeartShadow} />
+             </Animated.View>
+          </View>
+        )}
+
+        {/* Internal Coachmark Overlay (Step 1) */}
+        {showTutorial && tutorialStep === 1 && (
+            <CoachmarkOverlay
+                visible={true}
+                step={0} 
+                steps={[{
+                    title: "Make Your Move",
+                    message: "Tap the buttons to Pass, Super Like, or Match.",
+                    icons: ["close", "star", "heart"], // Show all 3 actions
+                    position: "bottom-sheet"
+                }]}
+                onNext={onTutorialNext}
+                onComplete={onTutorialNext}
+            />
+        )}
       </View>
     </Modal>
   );
@@ -482,63 +403,44 @@ const styles = StyleSheet.create({
     marginTop: 4,
     letterSpacing: 0.2,
   },
-  statsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 28,
-  },
-  statCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "rgba(0,0,0,0.03)",
-    borderRadius: 12,
-  },
-  statText: {
-    fontSize: 15,
-    color: theme.colors.text.primary,
-    fontWeight: "500",
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  statsGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  tag: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: "rgba(0,0,0,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
+    gap: 10,
   },
-  tagText: {
-    color: theme.colors.text.primary,
-    fontSize: 15,
-    fontWeight: "500",
+  statIcon: {
+    width: 20,
   },
-  lifestyleGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  interestsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  lifestyleItem: {
-    flexDirection: "row",
-    alignItems: "center",
+  interestItemWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: "45%",
-    backgroundColor: "rgba(0,0,0,0.03)",
-    borderRadius: 12,
   },
-  lifestyleText: {
-    fontSize: 15,
-    color: theme.colors.text.primary,
-    fontWeight: "500",
+  interestIcon: {
+    width: 20,
+  },
+  lifestyleTextContainer: {
+    gap: 12,
+  },
+  lifestyleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  lifestyleIcon: {
+    width: 20,
   },
   actionBar: {
     position: "absolute",
@@ -593,7 +495,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
   likeButton: {
-    backgroundColor: "#000000",
+    backgroundColor: '#D4AF37',
+    shadowColor: '#D4AF37',
   },
   buttonFeedback: {
     position: "absolute",
@@ -603,6 +506,53 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 10,
+  },
+  passAnimationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  passAnimationIcon: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  likeAnimationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  likeMainHeart: {
+    shadowColor: "#FF3B30",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  mainHeartShadow: {
+    textShadowColor: 'rgba(255, 59, 48, 0.5)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 10,
+  },
+  likeParticle: {
+    position: 'absolute',
   },
 });
 

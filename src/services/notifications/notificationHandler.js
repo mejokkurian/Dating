@@ -45,6 +45,11 @@ export const handleNotificationTap = (notification, navigation) => {
         },
       });
     },
+
+    [NOTIFICATION_TYPES.LIKE_REQUEST]: (data, nav) => {
+      // Navigate to Messages screen to show pending matches
+      nav.navigate('Messages');
+    },
   };
 
   const handler = handlers[handlerKey];

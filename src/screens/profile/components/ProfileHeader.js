@@ -5,44 +5,43 @@ import { Ionicons } from "@expo/vector-icons";
 const ProfileHeader = ({ activeTab, onTabChange, onBackPress }) => {
   return (
     <View style={styles.headerContainer}>
-      {/* Back Button Row */}
+      {/* Single Row with Back Button and Tabs */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <View style={{ flex: 1 }} />
-      </View>
-
-      {/* Tab Switcher */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "edit" && styles.tabActive]}
-          onPress={() => onTabChange("edit")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "edit" && styles.tabTextActive,
-            ]}
+        
+        {/* Tab Switcher */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "edit" && styles.tabActive]}
+            onPress={() => onTabChange("edit")}
           >
-            Edit
-          </Text>
-          {activeTab === "edit" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "view" && styles.tabActive]}
-          onPress={() => onTabChange("view")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "view" && styles.tabTextActive,
-            ]}
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "edit" && styles.tabTextActive,
+              ]}
+            >
+              Edit
+            </Text>
+            {activeTab === "edit" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "view" && styles.tabActive]}
+            onPress={() => onTabChange("view")}
           >
-            View
-          </Text>
-          {activeTab === "view" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "view" && styles.tabTextActive,
+              ]}
+            >
+              View
+            </Text>
+            {activeTab === "view" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -51,7 +50,7 @@ const ProfileHeader = ({ activeTab, onTabChange, onBackPress }) => {
 const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: "#FFFFFF",
-    paddingTop: 60,
+    paddingTop: 50, // Reduced from 60 to save space
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     marginBottom: 20,
@@ -60,14 +59,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   backButton: {
     padding: 8,
+    marginRight: 12,
   },
   tabContainer: {
+    flex: 1,
     flexDirection: "row",
-    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },

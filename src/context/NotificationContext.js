@@ -14,6 +14,7 @@ import {
   clearBadge,
   openSettings,
 } from '../services/notifications/pushNotificationService';
+import NotificationBottomSheet from '../components/NotificationBottomSheet'; // Premium UI
 import { handleNotificationTap } from '../services/notifications/notificationHandler';
 import { registerPushToken } from '../services/api/user';
 
@@ -34,6 +35,13 @@ export const NotificationProvider = ({ children, navigationRef }) => {
   const [loading, setLoading] = useState(false);
   const notificationListener = useRef(null);
   const responseListener = useRef(null);
+  
+  // State for Permission Bottom Sheet
+  const [permissionSheet, setPermissionSheet] = useState({
+    visible: false,
+    resolve: null,
+    step: 'request', // 'request' | 'settings'
+  });
 
   /**
    * Register push token with backend
@@ -78,57 +86,14 @@ export const NotificationProvider = ({ children, navigationRef }) => {
       return true;
     }
 
-    // Show explanation alert before requesting - this is IMPORTANT
-    console.log('📢 Showing notification permission alert to user...');
+    // Show explanation Bottom Sheet before requesting (Premium UI)
+    console.log('📢 Showing notification permission sheet to user...');
     return new Promise((resolve) => {
-      Alert.alert(
-        'Enable Notifications',
-        'Stay connected! Get notified when you receive:\n\n• New messages\n• New matches\n• Nearby users\n\nTap "Enable" to allow notifications.',
-        [
-          {
-            text: 'Not Now',
-            style: 'cancel',
-            onPress: () => {
-              console.log('❌ User declined notification permission');
-              setPermissionStatus('denied');
-              resolve(false);
-            },
-          },
-          {
-            text: 'Enable',
-            onPress: async () => {
-              console.log('✅ User tapped Enable - requesting system permission...');
-              try {
-                const permissionResult = await requestPermissions();
-                setPermissionStatus(permissionResult.status);
-                
-                if (permissionResult.granted) {
-                  console.log('✅ System granted notification permission');
-                  resolve(true);
-                } else {
-                  console.warn('❌ System denied notification permission after user accepted');
-                  Alert.alert(
-                    'Permission Required',
-                    'Please enable notifications in your device Settings to receive updates.',
-                    [
-                      { text: 'OK' },
-                      {
-                        text: 'Open Settings',
-                        onPress: () => openSettings(),
-                      },
-                    ]
-                  );
-                  resolve(false);
-                }
-              } catch (error) {
-                console.error('Error requesting permissions:', error);
-                resolve(false);
-              }
-            },
-          },
-        ],
-        { cancelable: false } // Make sure user must respond
-      );
+       setPermissionSheet({
+         visible: true,
+         resolve: resolve,
+         step: 'request',
+       });
     });
   }, []);
 
@@ -392,6 +357,70 @@ export const NotificationProvider = ({ children, navigationRef }) => {
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      
+      {/* Premium Permission Request Sheet */}
+      <NotificationBottomSheet
+        visible={permissionSheet.visible}
+        title={permissionSheet.step === 'settings' ? "Permission Required" : "Enable Notifications"}
+        message={permissionSheet.step === 'settings' 
+          ? "Please enable notifications in your device Settings to receive updates."
+          : "Stay connected! Get notified when you receive updates."
+        }
+        listItems={permissionSheet.step === 'settings' ? null : [
+            { icon: 'chatbubbles', text: 'New messages' },
+            { icon: 'heart', text: 'New matches' },
+            { icon: 'people', text: 'Nearby users' },
+        ]}
+        buttonText={permissionSheet.step === 'settings' ? "Open Settings" : "Enable Notifications"}
+        type={permissionSheet.step === 'settings' ? "error" : "info"}
+        onClose={() => {
+           // Handle 'Not Now' / Dismiss
+           console.log('❌ User dismissed notification permission sheet');
+           setPermissionSheet(prev => ({ ...prev, visible: false }));
+           if (permissionSheet.resolve) {
+             setPermissionStatus('denied');
+             permissionSheet.resolve(false);
+           }
+        }}
+        onButtonPress={async () => {
+             // Handle 'Open Settings' flow
+             if (permissionSheet.step === 'settings') {
+                 console.log('⚙️ User tapped Open Settings');
+                 openSettings();
+                 setPermissionSheet(prev => ({ ...prev, visible: false }));
+                 // We don't resolve yet, we let them go to settings.
+                 // When they return, app state change listener will check.
+                 permissionSheet.resolve(false);
+                 return;
+             }
+
+             // Handle 'Enable' flow
+             console.log('✅ User tapped Enable on Sheet');
+             // Don't close immediately, wait for result
+             
+             if (permissionSheet.resolve) {
+                 try {
+                    const permissionResult = await requestPermissions();
+                    setPermissionStatus(permissionResult.status);
+                    
+                    if (permissionResult.granted) {
+                      console.log('✅ System granted notification permission');
+                      setPermissionSheet(prev => ({ ...prev, visible: false }));
+                      permissionSheet.resolve(true);
+                    } else {
+                      console.warn('❌ System denied notification permission. Showing Settings prompt.');
+                      // Transition to Settings step instead of closing
+                      setPermissionSheet(prev => ({ ...prev, step: 'settings' }));
+                      // Don't resolve yet
+                    }
+                  } catch (error) {
+                    console.error('Error requesting permissions:', error);
+                    setPermissionSheet(prev => ({ ...prev, visible: false }));
+                    permissionSheet.resolve(false);
+                  }
+             }
+        }}
+      />
     </NotificationContext.Provider>
   );
 };

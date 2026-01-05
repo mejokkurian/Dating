@@ -2,7 +2,6 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { sendOTP, verifyOTP } = require('../services/twilioService');
-const admin = require('../config/firebase');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -145,8 +144,8 @@ exports.sendPhoneOTP = async (req, res) => {
       return res.status(400).json({ message: 'Phone number is required' });
     }
 
-    await sendOTP(phoneNumber);
-    res.json({ message: 'OTP sent successfully' });
+    const result = await sendOTP(phoneNumber);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -162,8 +161,13 @@ exports.verifyPhoneOTP = async (req, res) => {
       return res.status(400).json({ message: 'Phone number and code are required' });
     }
 
-    // Verify OTP
-    await verifyOTP(phoneNumber, code);
+    // Verify OTP with Firebase
+    const verificationResult = await verifyOTP(phoneNumber, code);
+    
+    // Check if verification failed
+    if (!verificationResult.success) {
+      return res.status(400).json({ message: verificationResult.error });
+    }
 
     // Check if user exists
     let user = await User.findOne({ phoneNumber });

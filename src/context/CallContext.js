@@ -194,10 +194,6 @@ export const CallProvider = ({ children }) => {
       socketService.removeListener('incoming_call');
       socketService.removeListener('webrtc_offer');
       notificationSubscription.remove();
-      
-      // Clean up native listeners
-      if (nativeAcceptListener) nativeAcceptListener.remove();
-      if (nativeDeclineListener) nativeDeclineListener.remove();
     };
   }, [user?._id]); // Removed callState dependency to avoid listener thrashing
 

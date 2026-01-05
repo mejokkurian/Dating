@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   Dimensions,
   ActivityIndicator,
 } from "react-native";
@@ -25,6 +24,8 @@ import ProfileViewField from "./components/ProfileViewField";
 import TwoColumnRow from "./components/TwoColumnRow";
 import PhotoGrid from "./components/PhotoGrid/PhotoGrid";
 import ReplacePhotoBottomSheet from "./components/PhotoGrid/ReplacePhotoBottomSheet";
+import ProfileContent from "../../components/ProfileContent";
+import CustomAlert from "../../components/CustomAlertRef";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // Card has marginHorizontal: 20 (40px total) + padding: 20 (40px total) = 80px side spacing
@@ -86,6 +87,8 @@ const EditProfileScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState("edit"); // 'edit' or 'view'
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [selectedPhotoPosition, setSelectedPhotoPosition] = useState(null);
+  const alertRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const handleAddPhoto = async (position) => {
     try {
@@ -125,12 +128,11 @@ const EditProfileScreen = ({ navigation }) => {
           }
           setPhotos(newPhotos);
 
-          Alert.alert(
-            "Upload Failed",
-            `Failed to upload photo: ${
-              uploadError.message || "Unknown error"
-            }. Photo was not updated.`
-          );
+          alertRef.current?.show({
+            type: 'error',
+            title: 'Upload Failed',
+            message: `Failed to upload photo: ${uploadError.message || "Unknown error"}. Photo was not updated.`,
+          });
           throw uploadError;
         } finally {
           setUploadingPosition(null);
@@ -191,12 +193,11 @@ const EditProfileScreen = ({ navigation }) => {
           }
           setPhotos(newPhotos);
 
-          Alert.alert(
-            "Upload Failed",
-            `Failed to upload photo: ${
-              uploadError.message || "Unknown error"
-            }. Previous photo was restored.`
-          );
+          alertRef.current?.show({
+            type: 'error',
+            title: 'Upload Failed',
+            message: `Failed to upload photo: ${uploadError.message || "Unknown error"}. Previous photo was restored.`,
+          });
           throw uploadError;
         } finally {
           setUploadingPosition(null);
@@ -245,10 +246,11 @@ const EditProfileScreen = ({ navigation }) => {
       const missingMandatory = mandatoryPhotos.filter((p) => !p).length;
 
       if (missingMandatory > 0) {
-        Alert.alert(
-          "Missing Photos",
-          `Please add ${missingMandatory} mandatory photo(s) before saving.`
-        );
+        alertRef.current?.show({
+          type: 'warning',
+          title: 'Missing Photos',
+          message: `Please add ${missingMandatory} mandatory photo(s) before saving.`,
+        });
         return;
       }
 
@@ -264,11 +266,25 @@ const EditProfileScreen = ({ navigation }) => {
         mainPhotoIndex: 0, // Main photo is always at index 0
       });
 
-      Alert.alert("Success", "Profile updated successfully!");
-      navigation.goBack();
+      alertRef.current?.show({
+        type: 'success',
+        title: 'Success',
+        message: 'Profile updated successfully!',
+        onClose: () => {
+          setActiveTab('view');
+          // Scroll to top when switching to view tab
+          setTimeout(() => {
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+          }, 100);
+        },
+      });
     } catch (error) {
       console.error("Save error:", error);
-      Alert.alert("Error", "Failed to update profile");
+      alertRef.current?.show({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to update profile',
+      });
     } finally {
       setUploading(false);
     }
@@ -300,114 +316,7 @@ const EditProfileScreen = ({ navigation }) => {
     setFormData({ ...formData, interests: newInterests });
   };
 
-  // Render View Mode
-  const renderViewMode = () => {
-    const profileData = getCurrentProfileData();
 
-    return (
-      <>
-        {/* PHOTOS */}
-        {profileData.photos && profileData.photos.length > 0 && (
-          <ProfileSection icon="images-outline" title="PHOTOS">
-            <View style={styles.viewPhotosGrid}>
-              {profileData.photos.map((photo, index) => (
-                <View key={index} style={styles.viewPhotoWrapper}>
-                  <Image source={{ uri: photo }} style={styles.viewPhotoCard} />
-                  {index === 0 && (
-                    <View style={styles.viewMainBadge}>
-                      <Text style={styles.viewMainBadgeText}>Main</Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-            </View>
-          </ProfileSection>
-        )}
-
-        {/* IDENTITY */}
-        <ProfileSection icon="person-outline" title="IDENTITY">
-          <ProfileViewField
-            label="Display Name"
-            value={profileData.displayName}
-          />
-          <ProfileViewField label="Location" value={profileData.location} />
-          <ProfileViewField label="Gender" value={profileData.gender} />
-          <ProfileViewField
-            label="Who would you like to date?"
-            value={profileData.preferences}
-          />
-          <ProfileViewField
-            label="Relationship Goals"
-            value={profileData.budget}
-          />
-          <ProfileViewField
-            label="Relationship Type"
-            value={profileData.relationshipType}
-          />
-        </ProfileSection>
-
-        {/* VIRTUES */}
-        <ProfileSection icon="star-outline" title="VIRTUES">
-          <ProfileViewField label="Occupation" value={profileData.occupation} />
-          {profileData.interests && profileData.interests.length > 0 && (
-            <ProfileViewField label="Interests">
-              <View style={styles.viewTagsContainer}>
-                {profileData.interests.map((interest, index) => (
-                  <View key={index} style={styles.viewTag}>
-                    <Text style={styles.viewTagText}>{interest}</Text>
-                  </View>
-                ))}
-              </View>
-            </ProfileViewField>
-          )}
-          <ProfileViewField
-            label="Education Level"
-            value={profileData.education}
-          />
-          <ProfileViewField
-            label="School/University"
-            value={profileData.schoolUniversity}
-          />
-          <ProfileViewField label="Bio" value={profileData.bio} />
-        </ProfileSection>
-
-        {/* VITALS */}
-        <ProfileSection icon="body-outline" title="VITALS">
-          {(profileData.height || profileData.weight) && (
-            <ProfileViewField label="Height & Weight">
-              <Text style={styles.viewFieldValue}>
-                {profileData.height && `${profileData.height} cm`}
-                {profileData.height && profileData.weight && " • "}
-                {profileData.weight && `${profileData.weight} kg`}
-              </Text>
-            </ProfileViewField>
-          )}
-          <ProfileViewField label="Zodiac Sign" value={profileData.zodiac} />
-          <ProfileViewField label="Ethnicity" value={profileData.ethnicity} />
-          <ProfileViewField label="Children" value={profileData.children} />
-          <ProfileViewField
-            label="Religious Beliefs"
-            value={profileData.religion}
-          />
-          <ProfileViewField
-            label="Political Beliefs"
-            value={profileData.politics}
-          />
-        </ProfileSection>
-
-        {/* VICES */}
-        <ProfileSection icon="warning-outline" title="VICES">
-          <ProfileViewField label="Drinking" value={profileData.drinking} />
-          <ProfileViewField label="Smoking" value={profileData.smoking} />
-          <ProfileViewField label="Weed" value={profileData.drugs} />
-          <ProfileViewField
-            label="Deal-breakers"
-            value={profileData.dealBreakers}
-          />
-        </ProfileSection>
-      </>
-    );
-  };
 
   return (
     <View style={styles.container}>
@@ -742,10 +651,11 @@ const EditProfileScreen = ({ navigation }) => {
         </ScrollView>
       ) : (
         <ScrollView
+          ref={scrollRef}
           style={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          {renderViewMode()}
+          <ProfileContent profile={getCurrentProfileData()} />
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
@@ -761,6 +671,9 @@ const EditProfileScreen = ({ navigation }) => {
         onCameraRoll={handleCameraRoll}
         uploading={uploading}
       />
+
+      {/* Custom Alert */}
+      <CustomAlert ref={alertRef} />
     </View>
   );
 };

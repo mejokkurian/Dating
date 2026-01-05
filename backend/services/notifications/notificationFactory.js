@@ -116,7 +116,56 @@ class NotificationFactory {
       },
     };
   }
+
+  /**
+   * Create a like request notification
+   * @param {Object} user - User who sent the like
+   * @param {string} matchId - Match ID
+   * @param {boolean} isSuperLike - Whether it's a super like
+   * @returns {Object} - Formatted notification payload
+   */
+  static createLikeRequestNotification(user, matchId, isSuperLike = false) {
+    const emoji = isSuperLike ? '⭐' : '💖';
+    const title = isSuperLike ? 'Someone Super Liked You!' : 'Someone Likes You!';
+    const body = `${user.displayName || user.name} ${isSuperLike ? 'super liked' : 'liked'} your profile`;
+
+    return {
+      to: null, // Will be set by service
+      sound: 'default',
+      title: `${emoji} ${title}`,
+      body,
+      data: {
+        type: NOTIFICATION_TYPES.LIKE_REQUEST,
+        matchId,
+        userId: user._id.toString(),
+        userName: user.displayName || user.name,
+        isSuperLike,
+      },
+      badge: 1,
+    };
+  }
+
+  /**
+   * Create a connect now notification
+   * @param {Object} user - User who enabled Connect Now
+   * @returns {Object} - Formatted notification payload
+   */
+  static createConnectNowNotification(user) {
+    return {
+      to: null, // Will be set by service
+      sound: 'default',
+      title: 'Someone Nearby! 👋',
+      body: `${user.displayName || user.name} is now active on Connect Now near you. Tap to say hello!`,
+      data: {
+        type: NOTIFICATION_TYPES.NEARBY_USER,
+        userId: user._id.toString(),
+        userName: user.displayName || user.name,
+      },
+      badge: 1,
+    };
+  }
 }
+
 
 module.exports = NotificationFactory;
 

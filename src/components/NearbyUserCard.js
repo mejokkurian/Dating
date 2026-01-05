@@ -6,10 +6,14 @@ import {
   Image,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import theme from '../theme/theme';
+import { useAuth } from '../context/AuthContext';
 
-const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile }) => {
+const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, onDecline }) => {
+  const { userData } = useAuth();
+  const currentUserId = userData?._id || userData?.id;
+  
   const displayName = user.displayName || user.name || 'Unknown User';
   const mainPhotoIndex = user.mainPhotoIndex ?? 0;
   const profileImage = user.image || (user.photos && user.photos.length > 0 
@@ -18,6 +22,9 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile }) => {
   const hasMatch = user.hasMatch || false;
   const matchStatus = user.matchStatus || null;
   const isActiveMatch = matchStatus === 'active';
+  const isPendingMatch = matchStatus === 'pending';
+  const isIncomingRequest = isPendingMatch && user.initiatorId !== currentUserId;
+  const isOutgoingRequest = isPendingMatch && user.initiatorId === currentUserId;
 
   const handleCardPress = () => {
     if (onViewProfile) {
@@ -60,9 +67,7 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile }) => {
           <Text style={styles.name} numberOfLines={1}>
             {displayName}
           </Text>
-          {user.age && (
-            <Text style={styles.age}>, {user.age}</Text>
-          )}
+          
           {user.distanceDisplay && (
             <View style={styles.distanceContainer}>
               <Ionicons name="location" size={14} color={theme.colors.primary} />
@@ -73,27 +78,48 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile }) => {
 
         {/* Actions */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.sayHelloButton,
-              isActiveMatch && styles.sayHelloButtonMatched
-            ]}
-            onPress={() => {
-              if (onSayHello) {
-                onSayHello(user);
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name={isActiveMatch ? "chatbubble" : "chatbubble-ellipses"} 
-              size={18} 
-              color="#fff" 
-            />
-            <Text style={styles.sayHelloText}>
-              {isActiveMatch ? 'Open Chat' : 'Say Hello'}
-            </Text>
-          </TouchableOpacity>
+          {isIncomingRequest ? (
+            <View style={styles.requestActions}>
+              <TouchableOpacity
+                style={[styles.actionIconButton, styles.declineButton]}
+                onPress={() => onDecline && onDecline(user)}
+              >
+                <Ionicons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionIconButton, styles.acceptButton]}
+                onPress={() => onAccept && onAccept(user)}
+              >
+                <Ionicons name="checkmark" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : isOutgoingRequest ? (
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingText}>Pending...</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.sayHelloButton,
+                isActiveMatch && styles.sayHelloButtonMatched
+              ]}
+              onPress={() => {
+                if (onSayHello) {
+                  onSayHello(user);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={isActiveMatch ? "chatbubble" : "chatbubble-ellipses"} 
+                size={18} 
+                color="#fff" 
+              />
+              <Text style={styles.sayHelloText}>
+                {isActiveMatch ? 'Open Chat' : 'Say Hello'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -203,6 +229,42 @@ const styles = StyleSheet.create({
   sayHelloText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  requestActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+  },
+  declineButton: {
+    backgroundColor: '#FF5252',
+  },
+  pendingBadge: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  pendingText: {
+    fontSize: 12,
+    color: '#666',
     fontWeight: '600',
   },
 });

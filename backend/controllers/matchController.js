@@ -1,7 +1,7 @@
 const axios = require("axios");
 const User = require("../models/User");
 const pushNotificationService = require("../services/pushNotificationService");
-const NotificationFactory = require("../services/notifications/NotificationFactory");
+const NotificationFactory = require("../services/notifications/notificationFactory");
 
 // Matching Engine URL (Django)
 const MATCHING_ENGINE_URL =
@@ -268,6 +268,44 @@ exports.recordInteraction = async (req, res) => {
           user2Liked: !isUser1,
         });
 
+        // Send like request notification to the target user
+        try {
+          console.log(`\n🔔 ========== SENDING LIKE REQUEST NOTIFICATION ==========`);
+          console.log(`👤 Current User (who liked): ${userId}`);
+          console.log(`🎯 Target User (who was liked): ${targetId}`);
+          console.log(`📋 Action: ${action}`);
+          
+          const currentUser = await User.findById(userId);
+          const targetUser = await User.findById(targetId);
+          
+          if (currentUser && targetUser) {
+            console.log(`✅ Current User: ${currentUser.displayName} (${currentUser._id})`);
+            console.log(`✅ Target User: ${targetUser.displayName} (${targetUser._id})`);
+            console.log(`📧 Sending notification TO: ${targetId.toString()}`);
+            
+            const isSuperLike = action === "SUPERLIKE";
+            const notification = NotificationFactory.createLikeRequestNotification(
+              currentUser,
+              match._id.toString(),
+              isSuperLike
+            );
+            
+            console.log(`📨 Notification payload:`, JSON.stringify(notification, null, 2));
+            
+            await pushNotificationService.sendNotification(
+              targetId.toString(),
+              notification
+            );
+            
+            console.log(`✅ ${isSuperLike ? 'Super like' : 'Like'} request notification sent to ${targetUser.displayName}`);
+            console.log(`🔔 ========== END NOTIFICATION SEND ==========\n`);
+          } else {
+            console.error(`❌ User not found - Current: ${!!currentUser}, Target: ${!!targetUser}`);
+          }
+        } catch (notifError) {
+          console.error('Error sending like request notification:', notifError);
+        }
+
         return res.json({
           message: "Interaction recorded",
           match: {
@@ -296,6 +334,7 @@ exports.respondToLike = async (req, res) => {
     const userId = req.user._id;
 
     const Match = require("../models/Match");
+    const Interaction = require("../models/Interaction");
 
     // Find the match
     const match = await Match.findById(matchId);
@@ -313,11 +352,52 @@ exports.respondToLike = async (req, res) => {
     }
 
     if (action === 'accept') {
+      // Record the interaction
+      const targetUserId = isUser1 ? match.user2Id : match.user1Id;
+      await Interaction.create({
+        userId,
+        targetId: targetUserId,
+        action: 'LIKE',
+      });
+      
       // Accept the like - update the match to liked
       if (isUser1) {
         match.user1Liked = true;
       } else {
         match.user2Liked = true;
+      }
+      
+      // Send acceptance notification to the initiator (person who sent the request)
+      try {
+        const currentUser = await User.findById(userId);
+        const initiatorId = match.initiatorId;
+        
+        // Only send if current user is NOT the initiator (they're accepting someone else's request)
+        if (initiatorId && initiatorId.toString() !== userId.toString()) {
+          const initiator = await User.findById(initiatorId);
+          
+          if (currentUser && initiator) {
+            // Create a simple acceptance notification
+            const acceptNotification = {
+              title: '✅ Request Accepted!',
+              body: `${currentUser.displayName} accepted your Connect Now request!`,
+              data: {
+                type: 'connect_now_accepted',
+                matchId: match._id.toString(),
+                userId: currentUser._id.toString(),
+              },
+            };
+            
+            await pushNotificationService.sendNotification(
+              initiatorId.toString(),
+              acceptNotification
+            );
+            
+            console.log(`✅ Accept notification sent to ${initiator.displayName}`);
+          }
+        }
+      } catch (notifError) {
+        console.error('Error sending accept notification:', notifError);
       }
 
       // If both liked, activate the match
@@ -359,6 +439,14 @@ exports.respondToLike = async (req, res) => {
         },
       });
     } else if (action === 'decline') {
+      // Record the interaction before deleting
+      const targetUserId = isUser1 ? match.user2Id : match.user1Id;
+      await Interaction.create({
+        userId,
+        targetId: targetUserId,
+        action: 'PASS',
+      });
+      
       // Decline the like - delete the match
       await Match.findByIdAndDelete(matchId);
 
