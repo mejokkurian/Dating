@@ -2,8 +2,8 @@ import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const SOCKET_URL = "https://dating-5sfs.onrender.com";
-// const SOCKET_URL = "https://dating-5sfs.onrender.com";
-const SOCKET_URL = "http://192.168.1.7:5001";
+const SOCKET_URL = "https://dating-5sfs.onrender.com";
+// const SOCKET_URL = "http://192.168.1.7:5001";
 
 class SocketService {
   constructor() {

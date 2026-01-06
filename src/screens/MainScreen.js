@@ -182,8 +182,8 @@ const MainScreen = ({ navigation, route }) => {
       setLoading(true);
       await Promise.all([loadVerificationStatus(), loadProfiles()]);
       
-      // Check for Tutorial
-      if (userData?._id) {
+      // Check for Tutorial - only show if there are profiles to view
+      if (userData?._id && profiles.length > 0) {
           const tutorialKey = `hasSeenTutorial_${userData._id}`;
           const hasSeenTutorial = await AsyncStorage.getItem(tutorialKey);
           if (!hasSeenTutorial) {
