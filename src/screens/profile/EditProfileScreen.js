@@ -25,7 +25,7 @@ import TwoColumnRow from "./components/TwoColumnRow";
 import PhotoGrid from "./components/PhotoGrid/PhotoGrid";
 import ReplacePhotoBottomSheet from "./components/PhotoGrid/ReplacePhotoBottomSheet";
 import ProfileContent from "../../components/ProfileContent";
-import CustomAlert from "../../components/CustomAlertRef";
+import Toast from "react-native-toast-message";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // Card has marginHorizontal: 20 (40px total) + padding: 20 (40px total) = 80px side spacing
@@ -87,7 +87,6 @@ const EditProfileScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState("edit"); // 'edit' or 'view'
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [selectedPhotoPosition, setSelectedPhotoPosition] = useState(null);
-  const alertRef = useRef(null);
   const scrollRef = useRef(null);
 
   const handleAddPhoto = async (position) => {
@@ -128,10 +127,12 @@ const EditProfileScreen = ({ navigation }) => {
           }
           setPhotos(newPhotos);
 
-          alertRef.current?.show({
+          Toast.show({
             type: 'error',
-            title: 'Upload Failed',
-            message: `Failed to upload photo: ${uploadError.message || "Unknown error"}. Photo was not updated.`,
+            text1: 'Upload Failed',
+            text2: `Failed to upload photo: ${uploadError.message || "Unknown error"}`,
+            position: 'bottom',
+            visibilityTime: 4000,
           });
           throw uploadError;
         } finally {
@@ -193,10 +194,12 @@ const EditProfileScreen = ({ navigation }) => {
           }
           setPhotos(newPhotos);
 
-          alertRef.current?.show({
+          Toast.show({
             type: 'error',
-            title: 'Upload Failed',
-            message: `Failed to upload photo: ${uploadError.message || "Unknown error"}. Previous photo was restored.`,
+            text1: 'Upload Failed',
+            text2: `Failed to upload photo: ${uploadError.message || "Unknown error"}`,
+            position: 'bottom',
+            visibilityTime: 4000,
           });
           throw uploadError;
         } finally {
@@ -246,10 +249,12 @@ const EditProfileScreen = ({ navigation }) => {
       const missingMandatory = mandatoryPhotos.filter((p) => !p).length;
 
       if (missingMandatory > 0) {
-        alertRef.current?.show({
-          type: 'warning',
-          title: 'Missing Photos',
-          message: `Please add ${missingMandatory} mandatory photo(s) before saving.`,
+        Toast.show({
+          type: 'info',
+          text1: 'Missing Photos',
+          text2: `Please add ${missingMandatory} mandatory photo(s) before saving`,
+          position: 'bottom',
+          visibilityTime: 3000,
         });
         return;
       }
@@ -266,24 +271,27 @@ const EditProfileScreen = ({ navigation }) => {
         mainPhotoIndex: 0, // Main photo is always at index 0
       });
 
-      alertRef.current?.show({
+      Toast.show({
         type: 'success',
-        title: 'Success',
-        message: 'Profile updated successfully!',
-        onClose: () => {
-          setActiveTab('view');
-          // Scroll to top when switching to view tab
-          setTimeout(() => {
-            scrollRef.current?.scrollTo({ y: 0, animated: true });
-          }, 100);
-        },
+        text1: 'Success!',
+        text2: 'Profile updated successfully',
+        position: 'bottom',
+        visibilityTime: 2000,
       });
+      
+      // Switch to view tab and scroll to top
+      setActiveTab('view');
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }, 100);
     } catch (error) {
       console.error("Save error:", error);
-      alertRef.current?.show({
+      Toast.show({
         type: 'error',
-        title: 'Error',
-        message: 'Failed to update profile',
+        text1: 'Error',
+        text2: 'Failed to update profile',
+        position: 'bottom',
+        visibilityTime: 3000,
       });
     } finally {
       setUploading(false);
@@ -671,9 +679,6 @@ const EditProfileScreen = ({ navigation }) => {
         onCameraRoll={handleCameraRoll}
         uploading={uploading}
       />
-
-      {/* Custom Alert */}
-      <CustomAlert ref={alertRef} />
     </View>
   );
 };

@@ -94,7 +94,7 @@ exports.getNearbyUsers = async (req, res) => {
         { user1Id: req.user._id },
         { user2Id: req.user._id }
       ]
-    }).select('user1Id user2Id status');
+    }).select('user1Id user2Id status initiatorId');
 
     // Create a map of matched user IDs to their match info
     const matchMap = new Map();
@@ -126,7 +126,7 @@ exports.getNearbyUsers = async (req, res) => {
       userObj.hasMatch = matchInfo !== null;
       userObj.matchStatus = matchInfo ? matchInfo.status : null;
       userObj.matchId = matchInfo ? matchInfo.matchId : null;
-      userObj.initiatorId = matchInfo ? matchInfo.initiatorId : null;
+      userObj.initiatorId = matchInfo ? matchInfo.initiatorId?.toString() : null;
       return userObj;
     });
 
@@ -327,11 +327,9 @@ exports.sendQuickHello = async (req, res) => {
         user2Liked: !isUser1
       });
       await match.save();
-    } else if (match.status === 'pending') {
-      // If match exists but is pending, update to active when sending first message
-      match.status = 'active';
-      await match.save();
     }
+    // Note: We do NOT auto-activate pending matches when sending a message
+    // Match should only become active when BOTH users have liked each other
 
     // Create the message document
     const Message = require('../models/Message');
@@ -352,6 +350,7 @@ exports.sendQuickHello = async (req, res) => {
     // Emit socket event to notify recipient (if they're online)
     const io = req.app.get('io');
     if (io) {
+      // 1. Emit new message event (existing)
       io.to(userId.toString()).emit('new_message', {
         _id: newMessage._id,
         senderId: { _id: senderId },
@@ -362,6 +361,39 @@ exports.sendQuickHello = async (req, res) => {
         createdAt: newMessage.createdAt,
         status: 'sent'
       });
+
+      // 2. Emit nearby_user_entered event to update Connect Now list
+      // We need to fetch the sender's full profile to get location
+      const fullSender = await User.findById(senderId).select('-password -email -phoneNumber');
+      
+      if (recipient.lastLocation && recipient.lastLocation.coordinates && 
+          fullSender && fullSender.lastLocation && fullSender.lastLocation.coordinates) {
+            
+        // Fetch full sender profile for the card
+        
+        if (fullSender) {
+          const [recipientLon, recipientLat] = recipient.lastLocation.coordinates;
+          const [senderLon, senderLat] = fullSender.lastLocation.coordinates;
+          
+          const distance = calculateDistance(
+            recipientLat,
+            recipientLon,
+            senderLat,
+            senderLon
+          );
+
+          const senderObj = fullSender.toObject();
+          senderObj.distance = Math.round(distance);
+          senderObj.hasMatch = true;
+          senderObj.matchStatus = 'pending';
+          senderObj.matchId = match._id;
+          senderObj.initiatorId = senderId.toString();
+
+          io.to(userId.toString()).emit('nearby_user_entered', {
+            user: senderObj
+          });
+        }
+      }
     }
 
     // Send push notification for match creation or activation
@@ -383,6 +415,7 @@ exports.sendQuickHello = async (req, res) => {
       message: 'Quick hello sent',
       matchId: match._id,
       matchStatus: match.status,
+      initiatorId: match.initiatorId,
       messageId: newMessage._id
     });
   } catch (error) {

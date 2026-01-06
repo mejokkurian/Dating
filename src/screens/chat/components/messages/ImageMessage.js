@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const ImageMessage = ({ imageUrl, isViewOnce, viewed, isMine, onPress }) => {
+const ImageMessage = ({ imageUrl, isViewOnce, viewed, isMine, onPress, onLongPress }) => {
   if (isViewOnce) {
     if (viewed) {
       return (
@@ -39,6 +39,7 @@ const ImageMessage = ({ imageUrl, isViewOnce, viewed, isMine, onPress }) => {
     <TouchableOpacity 
       activeOpacity={0.9}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={styles.imageMessageContainer}
     >
       <Image 

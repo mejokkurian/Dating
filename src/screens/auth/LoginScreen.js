@@ -66,10 +66,12 @@ const LoginScreen = ({ navigation }) => {
   const [passwordError, setPasswordError] = useState("");
   const [formError, setFormError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const eyeScale = useRef(new Animated.Value(1)).current;
 
   // Form animation
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -150,6 +152,27 @@ const LoginScreen = ({ navigation }) => {
       return "Password must be at least 6 characters";
     }
     return "";
+  };
+
+  // Toggle password visibility with animation
+  const togglePasswordVisibility = () => {
+    // Bounce animation
+    Animated.sequence([
+      Animated.spring(eyeScale, {
+        toValue: 1.3,
+        friction: 3,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(eyeScale, {
+        toValue: 1,
+        friction: 3,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    setShowPassword(!showPassword);
   };
 
   // Convert Firebase errors to user-friendly messages
@@ -530,19 +553,38 @@ const LoginScreen = ({ navigation }) => {
                       ]}
                       opacity={1}
                     >
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Password"
-                        placeholderTextColor="#8E8E93"
-                        value={password}
-                        onChangeText={(text) => {
-                          setPassword(text);
-                          setPasswordError("");
-                          setFormError("");
-                        }}
-                        secureTextEntry
-                        autoCapitalize="none"
-                      />
+                      <View style={styles.passwordInputContainer}>
+                        <TextInput
+                          style={[styles.input, styles.passwordInput]}
+                          placeholder="Password"
+                          placeholderTextColor="#8E8E93"
+                          value={password}
+                          onChangeText={(text) => {
+                            setPassword(text);
+                            setPasswordError("");
+                            setFormError("");
+                          }}
+                          secureTextEntry={!showPassword}
+                          autoCapitalize="none"
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeButton}
+                          onPress={togglePasswordVisibility}
+                          activeOpacity={0.6}
+                        >
+                          <Animated.View
+                            style={{
+                              transform: [{ scale: eyeScale }],
+                            }}
+                          >
+                            <Ionicons
+                              name={showPassword ? "eye-off" : "eye"}
+                              size={24}
+                              color={showPassword ? "#FF6B9D" : "#D4AF37"}
+                            />
+                          </Animated.View>
+                        </TouchableOpacity>
+                      </View>
                     </GlassCard>
                     {passwordError ? (
                       <Text style={styles.fieldError}>{passwordError}</Text>
@@ -863,6 +905,19 @@ const styles = StyleSheet.create({
   inputCardError: {
     borderWidth: 1,
     borderColor: "rgba(255, 59, 48, 0.5)",
+  },
+  passwordInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  passwordInput: {
+    flex: 1,
+    paddingRight: 50,
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 16,
+    padding: 8,
   },
 });
 

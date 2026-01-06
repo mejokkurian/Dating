@@ -7,6 +7,7 @@ import { CallProvider } from './src/context/CallContext';
 import { BadgeProvider } from './src/context/BadgeContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
+import Toast from 'react-native-toast-message';
 
 // Configure notification handler for foreground notifications
 Notifications.setNotificationHandler({
@@ -67,6 +68,7 @@ export default function App() {
           </BadgeProvider>
         </AuthProvider>
       </GestureHandlerRootView>
+      <Toast />
     </SafeAreaProvider>
   );
 }

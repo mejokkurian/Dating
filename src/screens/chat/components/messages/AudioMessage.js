@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 
-const AudioMessage = ({ audioUrl, duration, isMine }) => {
+const AudioMessage = ({ audioUrl, duration, isMine, onLongPress }) => {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
@@ -121,6 +121,10 @@ const AudioMessage = ({ audioUrl, duration, isMine }) => {
         <TouchableOpacity 
           style={styles.audioWaveformContainer}
           onPress={handleProgressTap}
+          onLongPress={() => {
+            console.log('AudioMessage onLongPress fired');
+            if (onLongPress) onLongPress();
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.audioProgressBackground} />

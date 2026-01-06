@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../theme/theme';
-import GlassCard from './GlassCard';
+import BottomSheet from './BottomSheet';
 
 const QUICK_MESSAGES = [
   'Hey! 👋',
@@ -53,112 +52,100 @@ const QuickHelloModal = ({
   };
 
   return (
-    <Modal
+    <BottomSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      height={650} // Set a fixed comfortable height or use percentage
     >
-      <View style={styles.overlay}>
-        <GlassCard style={styles.modalContent}>
-          <View style={styles.header}>
-            <View style={styles.headerInfo}>
-              <Text style={styles.title}>Say Hello</Text>
-              {user && (
-                <Text style={styles.subtitle}>
-                  to {user.displayName || user.name || 'this user'}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionTitle}>Quick Messages</Text>
-            <View style={styles.quickMessagesContainer}>
-              {QUICK_MESSAGES.map((message, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.quickMessageButton,
-                    selectedMessage === message && styles.quickMessageButtonSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedMessage(message);
-                    setCustomMessage('');
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.quickMessageText,
-                      selectedMessage === message && styles.quickMessageTextSelected,
-                    ]}
-                  >
-                    {message}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Or Write Your Own</Text>
-            <TextInput
-              style={styles.customInput}
-              placeholder="Type your message..."
-              placeholderTextColor="#999"
-              value={customMessage}
-              onChangeText={(text) => {
-                setCustomMessage(text);
-                setSelectedMessage('');
-              }}
-              multiline
-              maxLength={200}
-            />
-            {customMessage.length > 0 && (
-              <Text style={styles.charCount}>
-                {customMessage.length}/200
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.title}>Say Hello</Text>
+            {user && (
+              <Text style={styles.subtitle}>
+                to {user.displayName || user.name || 'this user'}
               </Text>
             )}
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.sendButton,
-                (!selectedMessage && !customMessage.trim()) && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSend}
-              disabled={!selectedMessage && !customMessage.trim()}
-            >
-              <Ionicons name="send" size={18} color="#fff" />
-              <Text style={styles.sendButtonText}>Send</Text>
-            </TouchableOpacity>
           </View>
-        </GlassCard>
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionTitle}>Quick Messages</Text>
+          <View style={styles.quickMessagesContainer}>
+            {QUICK_MESSAGES.map((message, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.quickMessageButton,
+                  selectedMessage === message && styles.quickMessageButtonSelected,
+                ]}
+                onPress={() => {
+                  setSelectedMessage(message);
+                  setCustomMessage('');
+                }}
+              >
+                <Text
+                  style={[
+                    styles.quickMessageText,
+                    selectedMessage === message && styles.quickMessageTextSelected,
+                  ]}
+                >
+                  {message}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Or Write Your Own</Text>
+          <TextInput
+            style={styles.customInput}
+            placeholder="Type your message..."
+            placeholderTextColor="#999"
+            value={customMessage}
+            onChangeText={(text) => {
+              setCustomMessage(text);
+              setSelectedMessage('');
+            }}
+            multiline
+            maxLength={200}
+          />
+          {customMessage.length > 0 && (
+            <Text style={styles.charCount}>
+              {customMessage.length}/200
+            </Text>
+          )}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.sendButton,
+              (!selectedMessage && !customMessage.trim()) && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!selectedMessage && !customMessage.trim()}
+          >
+            <Ionicons name="send" size={18} color="#fff" />
+            <Text style={styles.sendButtonText}>Send</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </Modal>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: '80%',
+    paddingHorizontal: 24,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
@@ -178,9 +165,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
-  },
-  closeButton: {
-    padding: 4,
   },
   content: {
     flex: 1,

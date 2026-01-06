@@ -9,11 +9,10 @@ const MessageActionSheet = ({
   onClose,
   selectedMessage,
   userData,
-  handleReply,
-  handlePin,
-  handleStar,
-  handleDelete,
-  confirmDelete,
+  onReply,
+  onPin,
+  onStar,
+  onDelete,
 }) => {
   if (!visible || !selectedMessage) return null;
 
@@ -99,7 +98,10 @@ const MessageActionSheet = ({
           {/* Reply - Available for all messages */}
           <TouchableOpacity 
             style={styles.whatsappActionItem} 
-            onPress={handleReply}
+            onPress={() => {
+              console.log('Direct Reply Pressed');
+              onReply();
+            }}
             activeOpacity={0.7}
           >
             <Text style={styles.whatsappActionText}>Reply</Text>
@@ -109,7 +111,10 @@ const MessageActionSheet = ({
           {/* Pin - Available for all messages */}
           <TouchableOpacity 
             style={styles.whatsappActionItem} 
-            onPress={handlePin}
+            onPress={() => {
+              console.log('Direct Pin Pressed');
+              onPin();
+            }}
             activeOpacity={0.7}
           >
             <Text style={styles.whatsappActionText}>
@@ -125,7 +130,10 @@ const MessageActionSheet = ({
           {/* Star - Available for all messages */}
           <TouchableOpacity 
             style={styles.whatsappActionItem} 
-            onPress={handleStar}
+            onPress={() => {
+              console.log('Direct Star Pressed');
+              onStar();
+            }}
             activeOpacity={0.7}
           >
             <Text style={styles.whatsappActionText}>
@@ -142,7 +150,10 @@ const MessageActionSheet = ({
           {isMine && (
             <TouchableOpacity 
               style={[styles.whatsappActionItem, styles.lastActionItem]} 
-              onPress={confirmDelete}
+              onPress={() => {
+                console.log('Direct Delete Pressed');
+                onDelete();
+              }}
               activeOpacity={0.7}
             >
               <Text style={[styles.whatsappActionText, { color: '#FF3B30' }]}>Delete</Text>

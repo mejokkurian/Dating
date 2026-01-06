@@ -58,7 +58,7 @@ const ChatInput = ({
             
             {/* Delete Button */}
             <TouchableOpacity 
-              style={styles.deleteButton}
+              style={[styles.deleteButton, { marginLeft: 12 }]}
               onPress={cancelRecording}
             >
               <Ionicons name="trash-outline" size={24} color="#FF4444" />
@@ -66,11 +66,11 @@ const ChatInput = ({
 
             {/* Send Button */}
             <TouchableOpacity 
-              style={styles.sendButton}
+              style={[styles.sendButton, { marginLeft: 12 }]}
               onPress={() => {
                 stopRecording().then((result) => {
                   if (result && handleAudioSend) {
-                    handleAudioSend(result);
+                     handleAudioSend(result);
                   }
                 });
               }}

@@ -170,6 +170,9 @@ const ParallaxProfileCard = ({
       ? data.photos[mainPhotoIndex] || data.photos[0]
       : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500";
 
+ 
+
+
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.container, cardContainerStyle]}>

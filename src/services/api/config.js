@@ -6,9 +6,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // Update this IP address to match your computer's current local IP (find it with: ifconfig | grep "inet " | grep -v 127.0.0.1)
 // Make sure this matches the IP where your backend server is running
 // const BASE_URL = "https://dating-5sfs.onrender.com/api";
-// const BASE_URL = "https://dating-5sfs.onrender.com/api";
+const BASE_URL = "https://dating-5sfs.onrender.com/api";
 // Temporary use local backend with LAN IP for Real Device testing
-const BASE_URL = "http://192.168.1.7:5001/api";
+// const BASE_URL = "http://192.168.1.7:5001/api";
 
 const api = axios.create({
   baseURL: BASE_URL,

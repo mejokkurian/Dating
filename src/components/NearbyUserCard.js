@@ -10,7 +10,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import theme from '../theme/theme';
 import { useAuth } from '../context/AuthContext';
 
-const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, onDecline }) => {
+const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, onDecline, onPendingRequestPress }) => {
   const { userData } = useAuth();
   const currentUserId = userData?._id || userData?.id;
   
@@ -23,11 +23,20 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, on
   const matchStatus = user.matchStatus || null;
   const isActiveMatch = matchStatus === 'active';
   const isPendingMatch = matchStatus === 'pending';
-  const isIncomingRequest = isPendingMatch && user.initiatorId !== currentUserId;
-  const isOutgoingRequest = isPendingMatch && user.initiatorId === currentUserId;
+  
+  // Convert both IDs to strings for comparison to avoid type mismatch
+  const userInitiatorId = user.initiatorId?.toString();
+  const currentUserIdStr = currentUserId?.toString();
 
+  const isIncomingRequest = isPendingMatch && userInitiatorId && userInitiatorId !== currentUserIdStr;
+  const isOutgoingRequest = isPendingMatch && userInitiatorId && userInitiatorId === currentUserIdStr;
+  console.log('isPendingMatch', isPendingMatch);
+  console.log('userInitiatorId', userInitiatorId);
+  console.log('currentUserIdStr', currentUserIdStr);
   const handleCardPress = () => {
-    if (onViewProfile) {
+    if (isOutgoingRequest && onPendingRequestPress) {
+      onPendingRequestPress(user);
+    } else if (onViewProfile) {
       onViewProfile(user);
     } else if (onPress) {
       onPress();
@@ -44,7 +53,11 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, on
         {/* Profile Image */}
         <View style={styles.imageContainer}>
           {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            <Image 
+              key={profileImage} // Force re-render when image URL changes
+              source={{ uri: profileImage }} 
+              style={styles.profileImage} 
+            />
           ) : (
             <View style={[styles.profileImage, styles.placeholderImage]}>
               <Ionicons name="person" size={30} color="#ccc" />

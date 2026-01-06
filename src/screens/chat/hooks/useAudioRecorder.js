@@ -172,12 +172,13 @@ const useAudioRecorder = (userId, onRecordingStateChange) => {
     }
 
     try {
+      const uri = recording.getURI(); // Get URI before unloading
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       
-      const uri = recording.getURI();
-
-
+      if (!uri) {
+        throw new Error('Recording URI is null');
+      }
 
       setRecording(null);
       setRecordingDuration(0);

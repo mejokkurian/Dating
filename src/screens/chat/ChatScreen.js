@@ -131,7 +131,8 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
           <AudioMessage 
             audioUrl={item.audioUrl} 
             duration={item.audioDuration} 
-            isMine={isMine} 
+            isMine={isMine}
+            onLongPress={() => handleLongPress(item)}
           />
         ) : item.messageType === 'image' ? (
           <ImageMessage
@@ -140,10 +141,12 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
             viewed={viewedMessages?.includes(item._id)}
             isMine={isMine}
             onPress={() => onImagePress && onImagePress(item)}
+            onLongPress={() => handleLongPress(item)}
           />
         ) : item.messageType === 'sticker' ? (
           <StickerMessage 
             sticker={item.stickerEmoji || item.stickerId || (item.sticker?.emoji || item.sticker?.url)} 
+            onLongPress={() => handleLongPress(item)}
           />
         ) : item.messageType === 'file' ? (
           <FileMessage
@@ -156,11 +159,13 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
                 Linking.openURL(item.fileUrl).catch(err => console.error('Error opening file:', err));
               }
             }}
+            onLongPress={() => handleLongPress(item)}
           />
         ) : item.messageType === 'call' ? (
           <CallMessage
             message={item}
             isMine={isMine}
+            onLongPress={() => handleLongPress(item)}
           />
           ) : (
             <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText]}>
@@ -601,71 +606,7 @@ const ChatScreen = ({ route, navigation }) => {
     };
   }, [user._id]);
 
-  const handleAudioSend = async (audioData) => {
-    if (!audioData) return;
-    
-    const { uri, duration } = audioData;
-    const tempId = Date.now().toString();
-    
-    // 1. Create optimistic message with local URI
-    const message = {
-      _id: tempId,
-      tempId,
-      content: 'Audio Message',
-      audioUrl: uri, // Use local URI for immediate display
-      audioDuration: duration,
-      senderId: { _id: userData._id },
-      receiverId: user._id,
-      createdAt: new Date().toISOString(),
-      status: 'uploading', // Show spinner
-      messageType: 'audio',
-      isOptimistic: true,
-    };
-
-    setMessages((prev) => [message, ...prev]);
-    scrollToBottom();
-
-    try {
-      // 2. Upload audio
-      const formData = new FormData();
-      formData.append('file', {
-        uri,
-        type: 'audio/m4a',
-        name: `audio_${Date.now()}.m4a`,
-      });
-
-      const response = await api.post('/upload/audio', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const audioUrl = response.data.url;
-
-      // 3. Update message with remote URL and sent status
-      setMessages(prev => prev.map(msg => 
-        msg._id === tempId 
-          ? { ...msg, audioUrl: audioUrl, status: 'sent' } 
-          : msg
-      ));
-
-      // 4. Send via socket
-      await socketService.sendMessage(
-        user._id, 
-        'Audio Message', 
-        tempId, 
-        'audio', 
-        audioUrl, 
-        duration
-      );
-    } catch (error) {
-      console.error('Send audio error:', error);
-      // Mark as failed
-      setMessages(prev => prev.map(msg => 
-        msg._id === tempId 
-          ? { ...msg, status: 'failed' } 
-          : msg
-      ));
-    }
-  };
+  // Unused local handleAudioSend removed - using useFileUpload hook instead
 
   const showHoldToRecordHint = () => {
     setShowHoldHint(true);
@@ -694,18 +635,11 @@ const ChatScreen = ({ route, navigation }) => {
     setAttachmentModalVisible(true);
   };
 
-  const uploadAndSendImage = async () => {
-    if (!selectedImageUri) return;
-
-    const uri = selectedImageUri;
-    const viewOnce = isViewOnce;
-    
-    // Close modal immediately
+  const uploadAndSendImage = async (uri, viewOnce) => {
     setImageModalVisible(false);
     setSelectedImageUri(null);
     setIsViewOnce(false);
-
-    // Use the hook function
+    // Use the hook function directly
     await uploadAndSendImageHook(uri, viewOnce);
   };
 
@@ -713,6 +647,7 @@ const ChatScreen = ({ route, navigation }) => {
   // Handle Image Press
   const handleImagePress = (item) => {
     if (item.isViewOnce) {
+      console.log('handleImagePress item:', item);
       const isMine = item.senderId._id === userData._id;
       
       if (isMine) {
@@ -797,7 +732,7 @@ const ChatScreen = ({ route, navigation }) => {
           <Ionicons name="lock-closed-outline" size={24} color="#999" />
           <Text style={styles.pendingInputText}>
             {isInitiator 
-              ? `Waiting for ${user.name} to like you back`
+              ? `Waiting for ${user.displayName || user.name} to like you back`
               : 'Swipe right on their profile to start chatting'}
           </Text>
         </View>
@@ -807,47 +742,61 @@ const ChatScreen = ({ route, navigation }) => {
           keyboardVerticalOffset={0}
           style={styles.inputWrapper}
         >
-          {/* Reply Preview */}
-          {replyToMessage && (
-            <View style={styles.replyPreview}>
-              <View style={styles.replyBar} />
-              <View style={styles.replyContent}>
-                <Text style={styles.replyName}>
-                  {replyToMessage.senderId._id === userData._id ? 'You' : user.name}
-                </Text>
-                <Text style={styles.replyText} numberOfLines={1}>
-                  {replyToMessage.messageType === 'audio' ? '🎤 Audio Message' : normalizeContent(replyToMessage.content)}
-                </Text>
+          <View>
+            {/* Reply Preview */}
+            {replyToMessage && (
+              <View style={styles.replyPreview}>
+                <View style={styles.replyBar} />
+                <View style={styles.replyContent}>
+                  <Text style={styles.replyName}>
+                    {replyToMessage.senderId._id === userData._id ? 'You' : user.name}
+                  </Text>
+                  <Text style={styles.replyText} numberOfLines={1}>
+                    {replyToMessage.messageType === 'audio' ? '🎤 Audio Message' : normalizeContent(replyToMessage.content)}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setReplyToMessage(null)}>
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setReplyToMessage(null)}>
-                <Ionicons name="close-circle" size={20} color="#999" />
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
 
-          {/* Chat Input */}
-          <ChatInput
-            isRecording={isRecording}
-            recordingDuration={recordingDuration}
-            slideX={slideX}
-            slideXRef={slideXRef}
-            inputText={inputText}
-            handleTyping={handleTyping}
-            handleSend={handleSend}
-            handleAudioSend={uploadAndSendAudio}
-            onAttachmentPress={handleAttachmentPress}
-            pickImage={pickImage}
-            setStickerPickerVisible={setStickerPickerVisible}
-            handleMicPressIn={handleMicPressIn}
-            handleMicMove={handleMicMove}
-            handleMicPressOut={handleMicPressOut}
-            handleRecordingContainerStart={handleRecordingContainerStart}
-            handleRecordingContainerMove={handleRecordingContainerMove}
-            handleRecordingContainerEnd={handleRecordingContainerEnd}
-            cancelRecording={cancelRecording}
-            stopRecording={stopRecording}
-            showHoldToRecordHint={showHoldToRecordHint}
-          />
+            {/* Chat Input */}
+            <ChatInput
+              isRecording={isRecording}
+              recordingDuration={recordingDuration}
+              slideX={slideX}
+              slideXRef={slideXRef}
+              inputText={inputText}
+              handleTyping={handleTyping}
+              handleSend={handleSend}
+              handleAudioSend={(data) => {
+                if (data && data.uri) {
+                  uploadAndSendAudio(data.uri, data.duration);
+                }
+              }}
+              onAttachmentPress={handleAttachmentPress}
+              pickImage={pickImage}
+              setStickerPickerVisible={setStickerPickerVisible}
+              handleMicPressIn={handleMicPressIn}
+              handleMicMove={handleMicMove}
+              handleMicPressOut={handleMicPressOut}
+              handleRecordingContainerStart={handleRecordingContainerStart}
+              handleRecordingContainerMove={handleRecordingContainerMove}
+              handleRecordingContainerEnd={handleRecordingContainerEnd}
+              cancelRecording={cancelRecording}
+              stopRecording={stopRecording}
+              showHoldToRecordHint={showHoldToRecordHint}
+            />
+            
+            {/* Hold to Record Hint - Moved here to stay above keyboard */}
+            {showHoldHint && (
+              <Animated.View style={[styles.holdHintContainer, { opacity: hintOpacity }]}>
+                <Ionicons name="hand-left" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.holdHintText}>Hold mic button to record</Text>
+              </Animated.View>
+            )}
+          </View>
         </KeyboardAvoidingView>
       )}
 
@@ -872,7 +821,7 @@ const ChatScreen = ({ route, navigation }) => {
         visible={imageModalVisible}
         imageUri={selectedImageUri}
         isViewOnce={isViewOnce}
-        onToggleViewOnce={() => setIsViewOnce(!isViewOnce)}
+        onViewOnceToggle={() => setIsViewOnce(!isViewOnce)}
         onClose={() => {
           setImageModalVisible(false);
           setSelectedImageUri(null);
@@ -883,7 +832,7 @@ const ChatScreen = ({ route, navigation }) => {
 
       <ImageViewModal
         visible={imageViewModalVisible}
-        imageUrl={currentViewImage}
+        imageUri={currentViewImage}
         onClose={() => {
           setImageViewModalVisible(false);
           setCurrentViewImage(null);
@@ -892,12 +841,13 @@ const ChatScreen = ({ route, navigation }) => {
 
       <MessageActionSheet
         visible={showActionSheet}
-        message={selectedMessage}
+        selectedMessage={selectedMessage}
         onClose={() => setShowActionSheet(false)}
         onReply={handleReply}
         onPin={handlePin}
         onStar={handleStar}
-        onDelete={handleDelete}
+        onDelete={confirmDelete}
+        userData={userData}
         isMine={selectedMessage?.senderId?._id === userData._id}
       />
 
@@ -913,12 +863,7 @@ const ChatScreen = ({ route, navigation }) => {
       />
 
       {/* Hold to Record Hint - Shows on first tap */}
-      {showHoldHint && (
-        <Animated.View style={[styles.holdHintContainer, { opacity: hintOpacity }]}>
-          <Ionicons name="hand-left" size={20} color="#FFF" style={{ marginRight: 8 }} />
-          <Text style={styles.holdHintText}>Hold mic button to record</Text>
-        </Animated.View>
-      )}
+      {/* Moved inside KeyboardAvoidingView is handled above */}
     </SafeAreaView>
   );
 };

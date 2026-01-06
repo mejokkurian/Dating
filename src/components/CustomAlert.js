@@ -53,18 +53,18 @@ const CustomAlert = ({
           }),
         ]),
       ]).start(() => {
-        // Start continuous pumping animation after entrance
-        if (title?.includes('Match')) {
+        // Start continuous pumping animation after entrance for matches/success
+        if (title?.includes('Match') || type === 'success') {
           Animated.loop(
             Animated.sequence([
               Animated.timing(heartPumpAnim, {
-                toValue: 1.15,
-                duration: 500,
+                toValue: 1.2,
+                duration: 400,
                 useNativeDriver: true,
               }),
               Animated.timing(heartPumpAnim, {
                 toValue: 1,
-                duration: 500,
+                duration: 400,
                 useNativeDriver: true,
               }),
             ])
@@ -100,7 +100,7 @@ const CustomAlert = ({
       return { name: 'alert-circle', color: '#FFFFFF', gradient: ['#FF9800', '#F57C00'], size: 44 };
     }
     if (type === 'success') {
-      return { name: 'checkmark-circle', color: '#FFFFFF', gradient: ['#11998e', '#38ef7d'], size: 42 };
+      return { name: 'heart', color: '#FFFFFF', gradient: ['#D4AF37', '#FFD700'], size: 42 };
     }
     
     // Fallback to title-based detection for backward compatibility

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const FileMessage = ({ fileName, fileSize, fileUrl, isMine, onPress }) => {
+const FileMessage = ({ fileName, fileSize, fileUrl, isMine, onPress, onLongPress }) => {
   const formatFileSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -40,6 +40,7 @@ const FileMessage = ({ fileName, fileSize, fileUrl, isMine, onPress }) => {
     <TouchableOpacity
       style={[styles.container, isMine ? styles.containerMine : styles.containerTheirs]}
       onPress={handlePress}
+      onLongPress={onLongPress}
       activeOpacity={0.7}
     >
       <View style={styles.iconContainer}>

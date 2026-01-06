@@ -22,15 +22,19 @@ import socketService from '../services/socket';
 import NearbyUserCard from '../components/NearbyUserCard';
 import PrivacyConsentModal from '../components/PrivacyConsentModal';
 import QuickHelloModal from '../components/QuickHelloModal';
+import NotificationBottomSheet from '../components/NotificationBottomSheet';
 import theme from '../theme/theme';
 import GlassCard from '../components/GlassCard';
 
 const ConnectNowScreen = ({ navigation }) => {
-  const { userData } = useAuth();
+  const { userData, setUserData } = useAuth();
   const [connectNowEnabled, setConnectNowEnabled] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showQuickHelloModal, setShowQuickHelloModal] = useState(false);
+  const [showHelloSuccessSheet, setShowHelloSuccessSheet] = useState(false);
+  const [successUser, setSuccessUser] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
   const [privacySettings, setPrivacySettings] = useState({
     showExactDistance: true,
     shareLocation: true,
@@ -107,7 +111,7 @@ const ConnectNowScreen = ({ navigation }) => {
   const handleToggleConnectNow = async (enabled) => {
     if (enabled && !connectNowEnabled) {
       // Check if we need to show privacy consent
-      if (!userData?.locationPrivacy) {
+      if (!userData?.locationPrivacy && !hasAcceptedPrivacy) {
         setShowPrivacyModal(true);
         return;
       }
@@ -144,6 +148,17 @@ const ConnectNowScreen = ({ navigation }) => {
         privacySettings.showExactDistance,
         privacySettings.shareLocation
       );
+      
+      // Update local userData context to prevent modal from reopening
+      setHasAcceptedPrivacy(true);
+      setUserData({
+        ...userData,
+        locationPrivacy: {
+          showExactDistance: privacySettings.showExactDistance,
+          shareLocation: privacySettings.shareLocation,
+        },
+      });
+      
       setShowPrivacyModal(false);
       
       // Now enable Connect Now
@@ -195,29 +210,28 @@ const ConnectNowScreen = ({ navigation }) => {
           isInitiator: false,
         });
       } else {
-        // For pending or new matches, show success alert with option to view chat
-        Alert.alert(
-          'Hello Sent!',
-          `Your message has been sent to ${user.displayName || user.name}.`,
-          [
-            {
-              text: 'View Chat',
-              onPress: () => {
-                navigation.navigate('Chat', {
-                  user: user,
-                  matchStatus: matchStatus,
-                  isInitiator: true,
-                });
-              },
-            },
-            { text: 'OK' },
-          ]
-        );
+        // For pending or new matches, show success sheet
+        setSuccessUser(user);
+        setShowHelloSuccessSheet(true);
+        
+        // Update the user in the list to reflect the new status immediately
+        if (response.initiatorId) {
+             refreshNearbyUsers(); 
+        }
       }
     } catch (error) {
       console.error('Error sending quick hello:', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
     }
+  };
+
+  // Handle pending request press (for outgoing requests)
+  const handlePendingRequestPress = (user) => {
+    navigation.navigate('Chat', {
+      user: user,
+      matchStatus: 'pending',
+      isInitiator: true, // Sender of the request
+    });
   };
 
   // Handle view profile
@@ -428,6 +442,7 @@ const ConnectNowScreen = ({ navigation }) => {
                     user={item}
                     onSayHello={() => handleSayHello(item)}
                     onViewProfile={() => handleViewProfile(item)}
+                    onPendingRequestPress={() => handlePendingRequestPress(item)}
                     onAccept={() => handleAcceptMatch(item)}
                     onDecline={() => handleDeclineMatch(item)}
                   />
@@ -481,6 +496,28 @@ const ConnectNowScreen = ({ navigation }) => {
         }}
         onSend={handleSendQuickHello}
         user={selectedUser}
+      />
+
+      {/* Hello Success Sheet */}
+      <NotificationBottomSheet
+        visible={showHelloSuccessSheet}
+        onClose={() => setShowHelloSuccessSheet(false)}
+        type="success"
+        title="Hello Sent!"
+        message={successUser ? `Your message has been sent to ${successUser.displayName || successUser.name}.` : "Your message has been sent."}
+        buttonText="View Chat"
+        onButtonPress={() => {
+          setShowHelloSuccessSheet(false);
+          if (successUser) {
+             navigation.navigate('Chat', {
+              user: successUser,
+              matchStatus: 'pending', // It's pending until accepted
+              isInitiator: true, 
+            });
+          }
+        }}
+        secondaryButtonText="Close"
+        onSecondaryButtonPress={() => setShowHelloSuccessSheet(false)}
       />
     </SafeAreaView>
   );

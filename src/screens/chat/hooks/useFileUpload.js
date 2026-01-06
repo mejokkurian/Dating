@@ -17,9 +17,16 @@ export const useFileUpload = ({
    * Upload and send audio message
    */
   const uploadAndSendAudio = async (uri, duration) => {
+    const tempId = Date.now().toString();
+
+    // Validate URI
+    if (!uri) {
+      console.error('uploadAndSendAudio: URI is missing');
+      return;
+    }
+
     try {
       // Create optimistic message immediately
-      const tempId = Date.now().toString();
       const optimisticMessage = {
         _id: tempId,
         tempId,

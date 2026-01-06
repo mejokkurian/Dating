@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import Animated, { useSharedValue } from "react-native-reanimated"; // Added import
 import { LinearGradient } from "expo-linear-gradient";
@@ -163,6 +164,19 @@ const MainScreen = ({ navigation, route }) => {
     return unsubscribe;
   }, [navigation, isPendingMode]);
 
+  // Refresh profiles when screen comes into focus (e.g., returning from Connect Now)
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Only refresh if not in pending mode and not loading
+      if (!isPendingMode && !loading) {
+        console.log('Screen focused, refreshing profiles...');
+        loadProfiles();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isPendingMode, loading]);
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
@@ -232,6 +246,7 @@ const MainScreen = ({ navigation, route }) => {
       });
     }
   };
+
 
   const handleCardPress = (profile) => {
     // If Tutorial Mode Step 0 (Tap Card), advance to Step 1 (Detailed View)
@@ -540,7 +555,6 @@ const MainScreen = ({ navigation, route }) => {
 
         {/* Filter Bar removed, replaced by Date Pill placement concept */}
 
-
         {/* Card Stack */}
         <View style={styles.cardContainer}>
           {currentIndex < profiles.length ? (
@@ -779,6 +793,12 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     width: 200,
+  },
+  refreshText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#D4AF37',
+    fontWeight: '600',
   },
 });
 

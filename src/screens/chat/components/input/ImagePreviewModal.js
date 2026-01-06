@@ -45,7 +45,10 @@ const ImagePreviewModal = ({
             <Text style={styles.viewOnceLabel}>View Once</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.sendImageButton} onPress={onSend}>
+          <TouchableOpacity 
+            style={styles.sendImageButton} 
+            onPress={() => onSend(imageUri, isViewOnce)}
+          >
             <Ionicons name="send" size={24} color="#FFF" />
           </TouchableOpacity>
         </View>

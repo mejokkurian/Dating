@@ -8,29 +8,36 @@ const useMessageActions = (userData) => {
   const [replyToMessage, setReplyToMessage] = useState(null);
 
   const handleLongPress = useCallback((message) => {
+    console.log('handleLongPress triggered for message:', message._id, message.messageType);
+    
     // Don't show actions for deleted messages or view once images
     const isDeletedForEveryone = message.deletedForEveryone;
     const isDeletedForMe = message.deletedFor?.includes(userData._id);
     
     if (isDeletedForEveryone || isDeletedForMe) {
+      console.log('Message is deleted, ignoring long press');
       return;
     }
     
     if (message.isViewOnce && message.messageType === 'image') {
+      console.log('Message is view once, ignoring long press');
       return;
     }
     
+    console.log('Setting selected message and showing sheet');
     setSelectedMessage(message);
     setShowActionSheet(true);
   }, [userData._id]);
 
   const handleReply = () => {
+    console.log('handleReply triggered', selectedMessage?._id);
     if (!selectedMessage) return;
     setReplyToMessage(selectedMessage);
     setShowActionSheet(false);
   };
 
   const handlePin = () => {
+    console.log('handlePin triggered', selectedMessage?._id);
     if (!selectedMessage) return;
     
     // Toggle pin status
@@ -40,6 +47,7 @@ const useMessageActions = (userData) => {
   };
 
   const handleStar = () => {
+    console.log('handleStar triggered', selectedMessage?._id);
     if (!selectedMessage) return;
     
     // Toggle star status
@@ -50,6 +58,7 @@ const useMessageActions = (userData) => {
   };
 
   const handleDelete = (deleteForEveryone = false) => {
+    console.log('handleDelete triggered', selectedMessage?._id, deleteForEveryone);
     if (!selectedMessage) return;
 
     socketService.deleteMessage(selectedMessage._id, deleteForEveryone);

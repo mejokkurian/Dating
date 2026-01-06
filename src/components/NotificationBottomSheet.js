@@ -14,6 +14,8 @@ const NotificationBottomSheet = ({
   buttonText = "OK",
   onClose,
   onButtonPress, // Optional custom action
+  secondaryButtonText,
+  onSecondaryButtonPress,
   listItems, // Optional list of { icon, text }
   type = 'info' // 'success', 'error', 'info', 'match'
 }) => {
@@ -124,6 +126,17 @@ const NotificationBottomSheet = ({
                         <Text style={styles.buttonText}>{buttonText}</Text>
                     </LinearGradient>
                 </TouchableOpacity>
+
+                {/* Secondary Button */}
+                {onSecondaryButtonPress && (
+                  <TouchableOpacity 
+                    onPress={onSecondaryButtonPress} 
+                    style={styles.secondaryButton}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.secondaryButtonText}>{secondaryButtonText || "Cancel"}</Text>
+                  </TouchableOpacity>
+                )}
             </View>
         </Animated.View>
       </View>
@@ -237,6 +250,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  secondaryButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

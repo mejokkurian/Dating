@@ -51,6 +51,14 @@ const ProfileContent = ({ profile }) => {
             {profile.age && (
               <Text style={styles.ageText}>, {profile.age}</Text>
             )}
+            {profile.gender && (
+              <MaterialCommunityIcons 
+                name={profile.gender === 'Female' ? 'gender-female' : 'gender-male'} 
+                size={20} 
+                color={profile.gender === 'Female' ? '#FF6B9D' : '#4A90E2'} 
+                style={styles.genderIcon}
+              />
+            )}
             {profile.isVerified && (
               <MaterialCommunityIcons 
                 name="check-decagram" 
@@ -366,6 +374,9 @@ const styles = StyleSheet.create({
   },
   interestIcon: {
     width: 20,
+  },
+  genderIcon: {
+    marginLeft: 8,
   },
 });
 
