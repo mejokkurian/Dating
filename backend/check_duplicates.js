@@ -4,7 +4,7 @@ require('dotenv').config({ path: __dirname + '/.env' });
 
 async function checkDuplicates() {
   try {
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mejokkurian06_db_user:Mejokkurian@cluster0.do6pdpz.mongodb.net/test?retryWrites=true&w=majority';
+    const MONGO_URI = process.env.MONGO_URI 
     await mongoose.connect(MONGO_URI);
     console.log('✅ Connected to DB, scanning for duplicates...');
 
