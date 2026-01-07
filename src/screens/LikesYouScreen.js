@@ -12,6 +12,7 @@ const LikesYouScreen = ({ navigation }) => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('likes'); // 'likes' or 'waiting'
 
   useFocusEffect(
     useCallback(() => {
@@ -24,9 +25,9 @@ const LikesYouScreen = ({ navigation }) => {
     try {
       if (matches.length === 0) setLoading(true);
       const data = await getMyMatches();
-      // Filter only likes you (pending matches where you're not the initiator)
-      const likesYou = data.filter(match => match.status === 'pending' && !match.isInitiator);
-      setMatches(likesYou);
+      // Keep all pending matches
+      const pendingMatches = data.filter(match => match.status === 'pending');
+      setMatches(pendingMatches);
     } catch (error) {
       console.error('Load matches error:', error);
     } finally {
@@ -37,16 +38,25 @@ const LikesYouScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMatches();
-    updateBadgeCounts(); // Update badge counts on refresh
+    updateBadgeCounts();
     setRefreshing(false);
   };
 
   const handleMatchPress = (match) => {
-    // Navigate to LikeProfile screen to review the user
-    navigation.navigate('LikeProfile', { 
-      user: match.user,
-      matchId: match.matchId || match._id 
-    });
+    if (activeTab === 'likes') {
+      // Navigate to LikeProfile screen to review the user
+      navigation.navigate('LikeProfile', { 
+        user: match.user,
+        matchId: match.matchId || match._id 
+      });
+    } else {
+        // For waiting tab, maybe show profile or just alert
+        // For now, let's show profile in read-only mode if possible, or just standard view
+        // Using modal or existing screen? Let's use ViewUserProfile if available, or just nothing for now as per previous behavior
+        // Previous behavior in MessagesScreen was: alert('Waiting for them to like you back!');
+        // Let's improve it by showing the profile preview 
+        navigation.navigate('ViewUserProfile', { userId: match.user._id || match.user.id });
+    }
   };
 
   const formatTime = (date) => {
@@ -65,6 +75,17 @@ const LikesYouScreen = ({ navigation }) => {
     if (diffDays < 7) return `${diffDays}d ago`;
     return messageDate.toLocaleDateString();
   };
+
+  // Filter matches based on active tab
+  const displayedMatches = matches.filter(match => {
+    if (activeTab === 'likes') {
+        // Likes You: pending AND !isInitiator
+        return !match.isInitiator;
+    } else {
+        // Waiting: pending AND isInitiator
+        return match.isInitiator;
+    }
+  });
 
   const renderMatchItem = ({ item: match }) => (
     <TouchableOpacity 
@@ -87,13 +108,24 @@ const LikesYouScreen = ({ navigation }) => {
           </Text>
         </View>
         <View style={styles.likesYouContainer}>
-          <Ionicons name="heart" size={14} color="#D4AF37" />
-          <Text style={styles.likesYouText}>Liked you</Text>
+            {activeTab === 'likes' ? (
+                <>
+                    <Ionicons name="heart" size={14} color="#D4AF37" />
+                    <Text style={styles.likesYouText}>Liked you</Text>
+                </>
+            ) : (
+                <>
+                    <Ionicons name="time-outline" size={14} color="#999" />
+                    <Text style={styles.waitingText}>Waiting for response...</Text>
+                </>
+            )}
         </View>
       </View>
-      <View style={styles.heartBadge}>
-        <Ionicons name="heart" size={18} color="#FFFFFF" />
-      </View>
+      {activeTab === 'likes' && (
+        <View style={styles.heartBadge}>
+            <Ionicons name="heart" size={18} color="#FFFFFF" />
+        </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -108,25 +140,73 @@ const LikesYouScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Likes You</Text>
+        <Text style={styles.title}>Activity</Text>
       </View>
 
-      {matches.length === 0 ? (
+      {/* Tab Bar */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'likes' && styles.tabActive]}
+          onPress={() => setActiveTab('likes')}
+        >
+            <View style={styles.tabContent}>
+                <Text style={[styles.tabText, activeTab === 'likes' && styles.tabTextActive]}>
+                    Likes You
+                </Text>
+                {matches.filter(m => !m.isInitiator).length > 0 && (
+                    <View style={styles.tabBadge}>
+                        <Text style={styles.tabBadgeText}>
+                            {matches.filter(m => !m.isInitiator).length}
+                        </Text>
+                    </View>
+                )}
+            </View>
+            {activeTab === 'likes' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'waiting' && styles.tabActive]}
+          onPress={() => setActiveTab('waiting')}
+        >
+             <View style={styles.tabContent}>
+                <Text style={[styles.tabText, activeTab === 'waiting' && styles.tabTextActive]}>
+                    Waiting
+                </Text>
+                {matches.filter(m => m.isInitiator).length > 0 && (
+                    <View style={styles.tabBadge}>
+                        <Text style={styles.tabBadgeText}>
+                            {matches.filter(m => m.isInitiator).length}
+                        </Text>
+                    </View>
+                )}
+            </View>
+            {activeTab === 'waiting' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
+
+      {displayedMatches.length === 0 ? (
         <ScrollView 
           contentContainerStyle={styles.emptyContainer}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          <Ionicons name="heart-outline" size={80} color="#CCC" />
-          <Text style={styles.emptyTitle}>No Likes Yet</Text>
+          <Ionicons 
+            name={activeTab === 'likes' ? "heart-outline" : "hourglass-outline"} 
+            size={80} 
+            color="#CCC" 
+          />
+          <Text style={styles.emptyTitle}>
+            {activeTab === 'likes' ? 'No Likes Yet' : 'No Pending Requests'}
+          </Text>
           <Text style={styles.emptyText}>
-            Keep swiping to get more likes!
+            {activeTab === 'likes' 
+                ? 'Keep swiping to get more likes!' 
+                : 'You haven\'t liked anyone yet. Start swiping!'}
           </Text>
         </ScrollView>
       ) : (
         <FlatList
-          data={matches}
+          data={displayedMatches}
           renderItem={renderMatchItem}
           keyExtractor={(item) => item.matchId || item._id}
           refreshControl={
@@ -153,12 +233,65 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: '800',
     color: '#000000',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9F9F9',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabActive: {
+  },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#999999',
+  },
+  tabTextActive: {
+    color: '#000000',
+    fontWeight: '700',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000000',
+  },
+  tabBadge: {
+    backgroundColor: '#000000',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   emptyContainer: {
     flex: 1,
@@ -223,6 +356,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#757575',
     fontWeight: '500',
+  },
+  waitingText: {
+    fontSize: 13,
+    color: '#999',
+    fontStyle: 'italic',
   },
   heartBadge: {
     width: 32,

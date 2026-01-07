@@ -87,8 +87,8 @@ const AgeVerificationScreen = ({ navigation }) => {
         birthDate: date.toISOString(),
       });
 
-      // Navigate to onboarding with age pre-filled
-      navigation.navigate('Onboarding', { age, birthDate: date });
+      // Navigate to onboarding intro with age pre-filled
+      navigation.navigate('OnboardingIntro', { age, birthDate: date });
     } catch (error) {
       console.error('Error saving age verification:', error);
       showAlert('Error', 'Failed to save verification. Please try again.', 'error');

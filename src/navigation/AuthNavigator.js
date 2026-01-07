@@ -14,9 +14,15 @@ import AgeVerificationScreen from '../screens/auth/AgeVerificationScreen';
 
 // Onboarding
 import OnboardingWizard from '../screens/onboarding/OnboardingWizard';
+import OnboardingIntroScreen from '../screens/onboarding/OnboardingIntroScreen';
 
 // Verification
 import KYCUploadScreen from '../screens/verification/KYCUploadScreen';
+// ... existing imports ...
+
+// ... inside Stack.Navigator ...
+
+
 import VerifyAccountScreen from '../screens/verification/VerifyAccountScreen';
 import PremiumScreen from '../screens/subscription/PremiumScreen';
 
@@ -182,6 +188,7 @@ const AuthNavigator = ({ navigationRef }) => {
           // Onboarding Stack
           <>
             <Stack.Screen name="AgeVerification" component={AgeVerificationScreen} />
+            <Stack.Screen name="OnboardingIntro" component={OnboardingIntroScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Onboarding" component={OnboardingWizard} />
             <Stack.Screen name="KYCUpload" component={KYCUploadScreen} />
             <Stack.Screen name="Premium" component={PremiumScreen} />

@@ -67,7 +67,7 @@ class NotificationFactory {
       title: 'New Match! 💫',
       body: message 
         ? `${user.displayName || user.name}: ${message}`
-        : `${user.displayName || user.name} sent you a message`,
+        : `You Matched with ${user.displayName || user.name}! Say hello!`,
       data: {
         type: NOTIFICATION_TYPES.MATCH,
         matchId,
@@ -75,7 +75,7 @@ class NotificationFactory {
         userName: user.displayName || user.name,
         message: message || null,
       },
-    badge: 1,
+      badge: 1,
     };
   }
 

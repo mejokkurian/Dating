@@ -218,7 +218,9 @@ const OnboardingWizard = ({ route, navigation }) => {
     location: "",
     gender: "",
     preferences: "",
+
     budget: "",
+    bio: "",
   });
   const [photosError, setPhotosError] = useState("");
 
@@ -266,6 +268,14 @@ const OnboardingWizard = ({ route, navigation }) => {
           newErrors.budget = "";
         }
         break;
+      case 8: // Bio
+        if (!formData.bio || !formData.bio.trim()) {
+          newErrors.bio = "Please write something about yourself";
+          isValid = false;
+        } else {
+          newErrors.bio = "";
+        }
+        break;
       case 14: // Photos
         if (!formData.photos || formData.photos.length < MANDATORY_PHOTOS) {
           setPhotosError(
@@ -305,8 +315,10 @@ const OnboardingWizard = ({ route, navigation }) => {
     if (
       currentStep === 1 ||
       currentStep === 2 ||
+
       currentStep === 3 ||
-      currentStep === 4
+      currentStep === 4 ||
+      currentStep === 8
     ) {
       // Trigger validation to show inline errors
       validateStep();
@@ -655,6 +667,7 @@ const OnboardingWizard = ({ route, navigation }) => {
               bio={formData.bio}
               isVisible={formData.visibility.bio}
               currentStep={currentStep}
+              errors={errors}
               onUpdate={(field, value) => updateFormData(field, value)}
               onToggleVisibility={() =>
                 updateFormData("visibility", {
@@ -1887,13 +1900,13 @@ const OnboardingStepEducation = ({
   );
 };
 
-// Step 8: Virtues - Bio
 const OnboardingStepBio = ({
   bio,
   isVisible,
   onUpdate,
   onToggleVisibility,
   currentStep,
+  errors,
 }) => {
   return (
     <View style={styles.stepContainer}>
@@ -1905,7 +1918,7 @@ const OnboardingStepBio = ({
       <AnimatedInputWrapper delay={200} stepKey={currentStep}>
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Bio</Text>
-          <GlassCard style={styles.inputCard} opacity={0.2}>
+          <GlassCard style={[styles.inputCard, errors?.bio && { borderColor: '#FF3B30', borderWidth: 1 }]} opacity={0.2}>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Tell us about yourself..."
@@ -1917,6 +1930,9 @@ const OnboardingStepBio = ({
               textAlignVertical="top"
             />
           </GlassCard>
+          {errors?.bio ? (
+            <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>{errors.bio}</Text>
+          ) : null}
         </View>
       </AnimatedInputWrapper>
 
