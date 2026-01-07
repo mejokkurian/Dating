@@ -1235,10 +1235,15 @@ async function seedUsers() {
     await mongoose.connect(MONGO_URI);
     console.log('✅ Connected.');
 
-    // Clear existing users
-    console.log('🧹 Clearing existing users...');
+    // Clear existing data
+    console.log('🧹 Clearing existing data...');
+    const Match = require('./models/Match');
+    const Interaction = require('./models/Interaction');
+    
     await User.deleteMany({});
-    console.log('✅ User collection cleared.');
+    await Match.deleteMany({});
+    await Interaction.deleteMany({});
+    console.log('✅ User, Match, and Interaction collections cleared.');
 
     // Seed new users
     console.log(`🌱 Seeding ${seedData.length} new users...`);

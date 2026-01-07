@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../theme/theme';
 
-const HomeHeader = ({ isPendingMode, onBack, onProfilePress, onFilterPress }) => {
+const HomeHeader = ({ isPendingMode, onBack, onProfilePress, onFilterPress, onUndo, canUndo }) => {
   return (
     <LinearGradient
       colors={["rgba(255,255,255,0.2)", "transparent"]}
@@ -39,6 +39,20 @@ const HomeHeader = ({ isPendingMode, onBack, onProfilePress, onFilterPress }) =>
       {!isPendingMode && <Text style={styles.headerTitle}>Discover</Text>}
 
       <View style={styles.headerRight}>
+        {/* Undo Button */}
+        {!isPendingMode && canUndo && (
+            <TouchableOpacity
+              style={styles.undoButton}
+              onPress={onUndo}
+            >
+              <Ionicons
+                name="arrow-undo"
+                size={26}
+                color={theme.colors.text.primary}
+              />
+            </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.filterButton}
           onPress={onFilterPress}
@@ -65,12 +79,15 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   headerLeft: {
-    width: 40,
+    width: 60, // Increased width
     alignItems: "flex-start",
   },
   headerRight: {
-    width: 40,
-    alignItems: "flex-end",
+    width: 80, // Increased width to fit 2 buttons
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 12,
   },
   headerTitle: {
     fontSize: 24,
@@ -86,6 +103,10 @@ const styles = StyleSheet.create({
   filterButton: {
     padding: 4,
   },
+  undoButton: {
+    padding: 4,
+  },
 });
+
 
 export default HomeHeader;

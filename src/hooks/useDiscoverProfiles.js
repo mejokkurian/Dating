@@ -120,6 +120,13 @@ export const useDiscoverProfiles = () => {
         };
     }, [navigation, isPendingMode, loading, loadInitialData, loadProfiles]);
 
+    // Undo Last Action (Step Back)
+    const handleUndo = () => {
+        if (currentIndex > 0) {
+            setCurrentIndex((prev) => prev - 1);
+        }
+    };
+
     // Mark Tutorial as Complete
     const completeTutorial = async () => {
         if (userData?._id) {
@@ -142,6 +149,7 @@ export const useDiscoverProfiles = () => {
         showTutorial,
         setShowTutorial,
         completeTutorial,
+        handleUndo,
         loadProfiles,
         loadInitialData
     };

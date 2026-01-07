@@ -13,7 +13,7 @@ require('dotenv').config({ path: __dirname + '/.env' });
 const deleteAllUsers = async () => {
   try {
     console.log('🔌 Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sugar_dating_app', {
+    await mongoose.connect(process.env.MONGODB_URI ||  {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });
