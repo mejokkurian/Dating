@@ -179,6 +179,9 @@ exports.recordInteraction = async (req, res) => {
     const Interaction = require("../models/Interaction");
     const Match = require("../models/Match");
 
+    // Remove any existing interaction for this pair (Supporting Undo/Change of Heart)
+    await Interaction.deleteMany({ userId, targetId });
+
     // Save interaction
     await Interaction.create({
       userId,

@@ -39,6 +39,7 @@ const MainScreen = ({ navigation, route }) => {
       showTutorial,
       setShowTutorial,
       completeTutorial,
+      handleUndo,
       loadProfiles,
   } = useDiscoverProfiles();
 
@@ -143,6 +144,8 @@ const MainScreen = ({ navigation, route }) => {
             }}
             onProfilePress={() => navigation.navigate("Profile")}
             onFilterPress={() => setShowFilterModal(true)}
+            onUndo={handleUndo}
+            canUndo={currentIndex > 0}
         />
 
         {/* Card Stack */}
