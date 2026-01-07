@@ -149,11 +149,9 @@ const ProfileBottomSheet = ({
 
 
 
-  // Handle Pass with Animation
+  // Handle Pass (Let MainScreen handle the animation)
   const handlePassPress = () => {
-    triggerPassAnimation(() => {
-        if (onPass) onPass();
-    });
+    if (onPass) onPass();
   };
 
   const combinedTranslateY = Animated.add(slideAnim, panY);
@@ -213,10 +211,7 @@ const ProfileBottomSheet = ({
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
-                // Heartfullness Animation via Hook
-                triggerLikeAnimation(() => {
-                    if (onLike) onLike(profile);
-                });
+                if (onLike) onLike(profile);
               }}
               activeOpacity={0.8}
             >

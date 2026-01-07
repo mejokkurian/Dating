@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: width * 0.8,
     maxWidth: 340,
-    backgroundColor: 'rgba(25, 25, 25, 0.95)', // Minimal Dark Glass
+    backgroundColor: '#FFFFFF', // White background
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(212, 175, 55, 0.3)', // Subtle Gold Border
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.15, // Lighter shadow for light mode
         shadowRadius: 20,
       },
       android: {
@@ -146,26 +146,26 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   iconShadow: {
-    textShadowColor: 'rgba(212, 175, 55, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
+    textShadowColor: 'rgba(212, 175, 55, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#000000', // Black text
     marginBottom: 12,
     letterSpacing: 0.5,
   },
   message: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(0,0,0,0.7)', // Dark grey text
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 28,
   },
   highlight: {
-    color: '#D4AF37',
+    color: '#D4AF37', // Keep Gold
     fontWeight: '600',
   },
   buttonContainer: {
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButtonText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(0,0,0,0.5)', // Medium grey for cancel
     fontSize: 15,
     fontWeight: '600',
   },
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmButtonText: {
-    color: '#1a1a1a', // Dark text on gold for contrast
+    color: '#1a1a1a', // Dark text on gold
     fontSize: 15,
     fontWeight: 'bold',
     letterSpacing: 0.5,

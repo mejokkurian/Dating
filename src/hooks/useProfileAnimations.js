@@ -44,8 +44,8 @@ export const useProfileAnimations = () => {
       setShowPassAnimation(true);
       setIsPassLoading(true);
 
-      // Small delay to ensure state is set
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Small delay to ensure state is set - Removed to fix flash
+      // await new Promise(resolve => setTimeout(resolve, 10)); // Minimized or removed
 
       // Animate cross icon to center
       await new Promise((resolve) => {
@@ -76,8 +76,22 @@ export const useProfileAnimations = () => {
 
       // Execute callback
       if (onComplete) {
-        onComplete();
+        await onComplete();
       }
+      
+      // Show completed state for a moment (500ms delay)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Close overlay with fade out
+      await new Promise((resolve) => {
+        Animated.timing(passOverlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(resolve);
+      });
+
+      resetAnimations();
     } catch (error) {
       console.error('Pass animation error:', error);
       resetAnimations();

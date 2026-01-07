@@ -123,8 +123,13 @@ exports.getPotentialMatches = async (req, res) => {
     // Build gender filter based on preferences
     let genderFilter = {};
     if (userPreference && userPreference !== 'Everyone') {
+      // Map frontend values to DB enum
+      let targetGender = userPreference;
+      if (targetGender === 'Women') targetGender = 'Female';
+      if (targetGender === 'Men') targetGender = 'Male';
+
       // If user has specific preference (e.g., "Male" or "Female"), only show that gender
-      genderFilter = { gender: userPreference };
+      genderFilter = { gender: targetGender };
     }
     // If preference is "Everyone" or not set, show all genders (no filter)
     

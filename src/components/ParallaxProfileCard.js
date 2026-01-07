@@ -32,6 +32,7 @@ const ParallaxProfileCard = ({
   onCardPress,
   disabled = false,
   swipeAnimatedValue,
+  cardOpacity, // Destructured prop
 }) => {
   // --- Audio Aura Logic ---
   const [sound, setSound] = useState(null);
@@ -133,7 +134,7 @@ const ParallaxProfileCard = ({
         translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 }, (finished) => {
           if (finished) {
             runOnJS(onSwipeUp)(data);
-            translateY.value = 0; 
+            // NOTE: Removed translateY.value = 0 here to prevent snap-back
           }
         });
       } else {
@@ -149,9 +150,7 @@ const ParallaxProfileCard = ({
         { translateY: translateY.value },
         { scale: cardScale.value },
       ],
-      // Simplify opacity to avoid potential issues for now
-      opacity: 1, 
-      // opacity: interpolate(translateY.value, [-SCREEN_HEIGHT/2, 0], [0.5, 1]),
+      opacity: cardOpacity ? cardOpacity.value : 1,
     };
   });
 
@@ -202,7 +201,12 @@ const ParallaxProfileCard = ({
           
           <Animated.View style={[styles.cardInfo, textLayerStyle]}>
              <View style={styles.nameRow}>
-              <Text style={styles.name}>
+              <Text 
+                style={styles.name} 
+                numberOfLines={1} 
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
                 {data.name || data.displayName}, {data.age}
               </Text>
               {data.isVerified && (
@@ -325,6 +329,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
     letterSpacing: 0.5,
+    flexShrink: 1, // Prevent pushing icons off screen
   },
   iconDropShadow: {
     shadowColor: "#000",
@@ -354,7 +359,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 12,
-  },
+    },
   detailTextLocation: {
     fontSize: 14,
     color: "#fff",
