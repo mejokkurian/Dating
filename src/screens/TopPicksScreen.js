@@ -1,46 +1,46 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getTopPicks } from '../services/api/match';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
-const MOCK_PICKS = [
-  {
-    id: '1',
-    name: 'Sophia',
-    age: 24,
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-    matchPercentage: 95,
-    isOnline: true,
-  },
-  {
-    id: '2',
-    name: 'Alexander',
-    age: 29,
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-    matchPercentage: 92,
-    isOnline: false,
-  },
-  {
-    id: '3',
-    name: 'Isabella',
-    age: 26,
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-    matchPercentage: 88,
-    isOnline: true,
-  },
-  {
-    id: '4',
-    name: 'Lucas',
-    age: 31,
-    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400',
-    matchPercentage: 85,
-    isOnline: false,
-  },
-];
 
-const TopPicksScreen = () => {
+
+
+
+import { useFocusEffect } from '@react-navigation/native';
+
+const TopPicksScreen = ({ navigation }) => {
+  const [picks, setPicks] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTopPicks();
+    }, [])
+  );
+
+  const fetchTopPicks = async () => {
+    try {
+      setLoading(true);
+      const data = await getTopPicks();
+      setPicks(data);
+    } catch (error) {
+      console.error('Error fetching top picks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProfilePress = (profile) => {
+    navigation.navigate('TopPickProfile', {
+      user: profile,
+    });
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -49,21 +49,34 @@ const TopPicksScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
-        {MOCK_PICKS.map((profile) => (
-          <TouchableOpacity key={profile.id} style={styles.card}>
-            <Image source={{ uri: profile.image }} style={styles.image} />
-            <View style={styles.matchBadge}>
-              <Ionicons name="flame" size={12} color="#FFFFFF" />
-              <Text style={styles.matchText}>{profile.matchPercentage}% Match</Text>
-            </View>
-            <View style={styles.cardContent}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{profile.name}, {profile.age}</Text>
-                {profile.isOnline && <View style={styles.onlineDot} />}
+        {loading ? (
+             <View style={{ width: '100%', height: 200, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: '#666' }}>Loading picks...</Text>
+             </View>
+        ) : (
+          picks.map((profile) => (
+            <TouchableOpacity 
+              key={profile._id || profile.id} 
+              style={styles.card}
+              onPress={() => handleProfilePress(profile)}
+            >
+              <Image 
+                source={{ uri: (profile.photos && profile.photos.length > 0 ? profile.photos[0] : null) || 'https://via.placeholder.com/400x600' }} 
+                style={styles.image} 
+              />
+              <View style={styles.matchBadge}>
+                <Ionicons name="flame" size={12} color="#FFFFFF" />
+                <Text style={styles.matchText}>{profile.matchPercentage || 95}% Match</Text>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={styles.cardContent}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{profile.displayName || profile.name}, {profile.age}</Text>
+                  {profile.isOnline && <View style={styles.onlineDot} />}
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
         
         <TouchableOpacity style={styles.upgradeCard}>
           <View style={styles.iconContainer}>
@@ -73,6 +86,8 @@ const TopPicksScreen = () => {
           <Text style={styles.upgradeSubtitle}>Upgrade to Premium to unlock unlimited curated matches.</Text>
         </TouchableOpacity>
       </ScrollView>
+
+
     </View>
   );
 };

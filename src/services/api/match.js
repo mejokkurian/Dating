@@ -10,6 +10,11 @@ export const getPotentialMatches = async () => {
   return response.data;
 };
 
+export const getTopPicks = async () => {
+  const response = await api.get('/matches/top-picks');
+  return response.data;
+};
+
 export const recordInteraction = async (targetId, action) => {
   const response = await api.post('/matches/interaction', {
     targetId,
