@@ -281,6 +281,41 @@ const ChatScreen = ({ route, navigation }) => {
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const [showHoldHint, setShowHoldHint] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [isOnline, setIsOnline] = useState(false);
+  
+  // Presence Subscription
+  useEffect(() => {
+    let mounted = true;
+    
+    const setupPresence = async () => {
+      // Connect first if needed
+      if (!socketService.connected) {
+        await socketService.connect();
+      }
+      
+      if (!mounted) return;
+
+      // Subscribe to this user's presence
+      socketService.subscribePresence(user._id);
+      
+      // Listen for status changes
+      socketService.onUserStatusChange((data) => {
+        if (!mounted) return;
+        if (data.userId === user._id) {
+           console.log('User status changed:', data.status);
+           setIsOnline(data.status === 'online');
+        }
+      });
+    };
+
+    setupPresence();
+
+    return () => {
+      mounted = false;
+      socketService.unsubscribePresence(user._id);
+      socketService.removeListener('user_status_change');
+    };
+  }, [user._id]);
   
   // Camera & Image State (must be declared before hooks that use them)
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -699,9 +734,10 @@ const ChatScreen = ({ route, navigation }) => {
       <ChatHeader 
         user={user} 
         matchStatus={matchStatus} 
-        isOtherUserInChat={isOtherUserInChat}
+        isOtherUserInChat={isOtherUserInChat && isOnline}
         isRemoteRecording={isRemoteRecording}
         isTyping={isTyping}
+        isOnline={isOnline}
         navigation={navigation}
         onAudioCall={() => startCall(user, 'audio')}
         onVideoCall={() => startCall(user, 'video')}
