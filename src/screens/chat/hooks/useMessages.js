@@ -243,7 +243,7 @@ const useMessages = (user, userData) => {
         if (userId === user._id) {
           setIsOtherUserInChat(true);
           // Acknowledge presence so they know we are here too
-          socketService.sendPresenceAck(user._id);
+          socketService.ackPresence(user._id);
         }
       });
 

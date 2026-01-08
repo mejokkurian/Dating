@@ -682,9 +682,74 @@ module.exports = (io) => {
       });
     });
 
+    // Presence: Subscribe to user status updates
+    socket.on('subscribe_presence', (data) => {
+      const { userId } = data;
+      if (userId) {
+        socket.join(`presence_${userId}`);
+        
+        // Check current status immediately
+        // The user joins a room named after their ID on connection (line 70)
+        const isOnline = io.sockets.adapter.rooms.get(userId.toString())?.size > 0;
+        
+        socket.emit('user_status_change', {
+          userId,
+          status: isOnline ? 'online' : 'offline',
+          lastActive: new Date() // We could fetch real lastActive from DB if needed
+        });
+      }
+    });
+
+    // Presence: Unsubscribe
+    socket.on('unsubscribe_presence', (data) => {
+      const { userId } = data;
+      if (userId) {
+        socket.leave(`presence_${userId}`);
+      }
+    });
+
+    // Presence: Explicit offline signal
+    socket.on('set_offline', async () => {
+       console.log(`User explicitly set offline: ${socket.userId}`);
+       io.to(`presence_${socket.userId}`).emit('user_status_change', {
+        userId: socket.userId,
+        status: 'offline',
+        lastActive: new Date()
+      });
+      await User.findByIdAndUpdate(socket.userId, { lastActive: new Date() });
+    });
+
     // Handle disconnect
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`User disconnected: ${socket.userId}`);
+      
+      // Check if user has any other active sessions
+      // We wait a brief moment to ensure socket is fully removed from rooms
+      // or check room size directly if possible. 
+      //fetchSockets() returns remaining sockets.
+      try {
+        const sockets = await io.in(socket.userId.toString()).fetchSockets();
+        if (sockets.length === 0) {
+          // User is truly offline (no active sessions)
+           io.to(`presence_${socket.userId}`).emit('user_status_change', {
+            userId: socket.userId,
+            status: 'offline',
+            lastActive: new Date()
+          });
+          
+          // Update lastActive in DB
+          await User.findByIdAndUpdate(socket.userId, { lastActive: new Date() });
+        }
+      } catch (err) {
+        console.error('Error handling disconnect presence:', err);
+      }
+    });
+
+    // Notify subscribers that user is online (on connection)
+    // We do this immediately after they join their personal room
+    io.to(`presence_${socket.userId}`).emit('user_status_change', {
+      userId: socket.userId,
+      status: 'online'
     });
   });
 };

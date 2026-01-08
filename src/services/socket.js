@@ -1,15 +1,42 @@
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from 'react-native';
+
 
 // const SOCKET_URL = "https://dating-5sfs.onrender.com";
 // const SOCKET_URL = "https://dating-5sfs.onrender.com";
 const SOCKET_URL = "http://192.168.1.7:5001";
+
+
 
 class SocketService {
   constructor() {
     this.socket = null;
     this.connected = false;
     this.listenerQueue = [];
+    this.appStateSubscription = null;
+    
+    // Setup AppState listener
+    this.setupAppStateListener();
+  }
+
+  setupAppStateListener() {
+    this.appStateSubscription = AppState.addEventListener('change', nextAppState => {
+      console.log('AppState changed to:', nextAppState);
+      if (nextAppState === 'active') {
+        console.log('App returned to foreground - Reconnecting socket if needed');
+        if (!this.socket || !this.connected) {
+           this.connect();
+        }
+      } else if (nextAppState.match(/inactive|background/)) {
+        console.log('App went to background/inactive - Force disconnecting socket');
+        // Explicitly tell server we are going offline before cutting connection
+        if (this.socket && this.connected) {
+          this.socket.emit('set_offline');
+        }
+        this.disconnect();
+      }
+    });
   }
 
   async connect() {
@@ -62,7 +89,8 @@ class SocketService {
       } finally {
         this.socket = null;
         this.connected = false;
-        this.listenerQueue = [];
+        // Keep listeners in queue so they re-attach on reconnect
+        // this.listenerQueue = []; 
       }
     }
   }
@@ -136,9 +164,14 @@ class SocketService {
 
   // Generic listener handler
   addListener(event, callback) {
-    if (this.socket) {
+    if (this.socket && this.connected) {
       this.socket.on(event, callback);
-    } else {
+    } 
+    // Always add to queue slightly differently to handle re-connections? 
+    // Actually, we should allow adding to queue even if connected if we want persistent listeners 
+    // but the current implementation clears queue after connect. 
+    // Let's just push to queue if not connected.
+    if (!this.connected) {
       this.listenerQueue.push({ event, callback });
     }
   }
@@ -346,14 +379,28 @@ class SocketService {
     this.addListener("connect_now_error", callback);
   }
 
-  // Listen for nearby user entered proximity
-  onNearbyUserEntered(callback) {
-    this.addListener("nearby_user_entered", callback);
-  }
-
   // Listen for nearby user left proximity
   onNearbyUserLeft(callback) {
     this.addListener("nearby_user_left", callback);
+  }
+
+  // ============ Presence System Methods ============
+
+  // Subscribe to a user's presence updates
+  subscribePresence(userId) {
+    if (!this.socket) return;
+    this.socket.emit('subscribe_presence', { userId });
+  }
+
+  // Unsubscribe from a user's presence updates
+  unsubscribePresence(userId) {
+    if (!this.socket) return;
+    this.socket.emit('unsubscribe_presence', { userId });
+  }
+
+  // Listen for presence status changes
+  onUserStatusChange(callback) {
+    this.addListener('user_status_change', callback);
   }
 }
 

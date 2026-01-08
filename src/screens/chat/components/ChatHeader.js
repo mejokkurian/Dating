@@ -10,7 +10,8 @@ const ChatHeader = ({
   isOtherUserInChat,
   onAudioCall,
   onVideoCall,
-  callState
+  callState,
+  isOnline
 }) => {
   return (
     <View style={styles.header}>
@@ -22,8 +23,8 @@ const ChatHeader = ({
       </TouchableOpacity>
       <View style={styles.headerInfo}>
         <Text style={styles.headerName}>{user.name}</Text>
-        <Text style={styles.statusText}>
-          {isRemoteRecording ? 'Recording audio...' : isTyping ? 'Typing...' : isOtherUserInChat ? 'In Chat' : 'Online'}
+        <Text style={[styles.statusText, !isOnline && { color: '#999' }]}>
+          {!isOnline ? 'Offline' : isRemoteRecording ? 'Recording audio...' : isTyping ? 'Typing...' : isOtherUserInChat ? 'In Chat' : 'Online'}
         </Text>
       </View>
       
