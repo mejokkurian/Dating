@@ -168,10 +168,11 @@ const MainScreen = ({ navigation, route }) => {
             />
           ) : (
             <EmptyCardState 
-                onRefresh={() => {
+                onRefresh={async () => {
                     setCurrentIndex(0);
-                    loadProfiles();
+                    await loadProfiles();
                 }}
+                onFilter={() => setShowFilterModal(true)}
             />
           )}
         </View>

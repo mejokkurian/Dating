@@ -1,5 +1,8 @@
 const axios = require("axios");
+const mongoose = require("mongoose");
 const User = require("../models/User");
+const Interaction = require("../models/Interaction");
+const Match = require("../models/Match");
 const pushNotificationService = require("../services/pushNotificationService");
 const NotificationFactory = require("../services/notifications/notificationFactory");
 
@@ -12,17 +15,52 @@ const MATCHING_ENGINE_URL =
 // @access  Private
 exports.getMatches = async (req, res) => {
   try {
+    const currentUserId = req.user._id;
+
+    // 1. Get IDs of users already interacted with (Like/Pass/SuperLike)
+    // Explicitly querying by ObjectId to be safe
+    const interactions = await Interaction.find({ userId: currentUserId }).select("targetId");
+    
+    // Create a Set of strings for efficient lookup and deduplication
+    const excludedIdsSet = new Set(interactions.map(i => i.targetId.toString()));
+
+    // 2. Get IDs of existing matches (pending or active)
+    const existingMatches = await Match.find({
+      $or: [{ user1Id: currentUserId }, { user2Id: currentUserId }]
+    }).select("user1Id user2Id");
+    
+    existingMatches.forEach(m => {
+      if (m.user1Id.toString() !== currentUserId.toString()) excludedIdsSet.add(m.user1Id.toString());
+      if (m.user2Id.toString() !== currentUserId.toString()) excludedIdsSet.add(m.user2Id.toString());
+    });
+
+    const excludedIds = Array.from(excludedIdsSet);
+    
+    console.log(`Debug getMatches: User ${currentUserId}`);
+    console.log(`Debug getMatches: Found ${interactions.length} interactions.`);
+    console.log(`Debug getMatches: Found ${existingMatches.length} existing matches.`);
+    console.log(`Debug getMatches: Total unique excluded IDs: ${excludedIds.length}`);
+
     // Try to get recommendations from Python Matching Engine
     try {
       const response = await axios.get(
         `${MATCHING_ENGINE_URL}/recommendations/`,
         {
-          params: { user_id: req.user._id.toString() },
+          params: { user_id: currentUserId.toString() },
         }
       );
 
       if (response.data && response.data.length > 0) {
-        return res.json(response.data);
+        // Filter result from engine as a safety net
+        const filteredMatches = response.data.filter(
+          user => !excludedIdsSet.has(user._id.toString())
+        );
+        
+        console.log(`Debug getMatches: Engine returned ${response.data.length}, Filtered to ${filteredMatches.length}`);
+
+        if (filteredMatches.length > 0) {
+          return res.json(filteredMatches);
+        }
       }
     } catch (engineError) {
       console.error("Matching Engine Error:", engineError.message);
@@ -30,13 +68,23 @@ exports.getMatches = async (req, res) => {
     }
 
     // Fallback: Basic matching logic
-    console.log("Falling back to basic matching...");
+    console.log("Falling back to basic matching (with filtering)...");
+    
+    // Convert excluded strings back to ObjectIds for the query (optional but good practice)
+    const excludedObjectIds = excludedIds.map(id => new mongoose.Types.ObjectId(id));
+
     const matches = await User.find({
-      _id: { $ne: req.user._id },
+      _id: { 
+        $ne: currentUserId, 
+        $nin: excludedObjectIds 
+      },
     }).limit(50);
+    
+    console.log(`Debug getMatches: DB Query returned ${matches.length} matches.`);
 
     res.json(matches);
   } catch (error) {
+    console.error("Get matches error:", error);
     res.status(500).json({ message: error.message });
   }
 };
