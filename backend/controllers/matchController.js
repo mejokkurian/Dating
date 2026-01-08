@@ -41,6 +41,65 @@ exports.getMatches = async (req, res) => {
   }
 };
 
+// @desc    Get top picks
+// @route   GET /api/matches/top-picks
+// @access  Private
+exports.getTopPicks = async (req, res) => {
+  try {
+    const Interaction = require("../models/Interaction");
+    const Match = require("../models/Match");
+
+    // 1. Get IDs of users already interacted with (Like/Pass/SuperLike)
+    const interactions = await Interaction.find({ userId: req.user._id }).select("targetId");
+    const interactedIds = interactions.map(i => i.targetId.toString());
+
+    // 2. Get IDs of existing matches (pending or active)
+    const matches = await Match.find({
+      $or: [{ user1Id: req.user._id }, { user2Id: req.user._id }]
+    }).select("user1Id user2Id");
+    
+    matches.forEach(m => {
+      if (m.user1Id.toString() !== req.user._id.toString()) interactedIds.push(m.user1Id.toString());
+      if (m.user2Id.toString() !== req.user._id.toString()) interactedIds.push(m.user2Id.toString());
+    });
+
+    const excludedIds = [...new Set(interactedIds)]; // Unique IDs
+
+    // Try to get recommendations from Python Matching Engine
+    try {
+      const response = await axios.get(
+        `${MATCHING_ENGINE_URL}/recommendations/`,
+        {
+          params: { user_id: req.user._id.toString(), limit: 10 },
+        }
+      );
+
+      if (response.data && response.data.length > 0) {
+        // Filter out any that might be in our exclusion list (just in case engine isn't synced)
+        const filteredPicks = response.data.filter(
+          user => !excludedIds.includes(user._id.toString()) && user._id.toString() !== req.user._id.toString()
+        );
+        
+        if (filteredPicks.length > 0) {
+           return res.json(filteredPicks.slice(0, 10));
+        }
+      }
+    } catch (engineError) {
+      console.error("Matching Engine Error (Top Picks):", engineError.message);
+    }
+
+    // Fallback: Return random high rated users, EXCLUDING interacted ones
+    console.log("Falling back to basic matching for Top Picks (with filtering)...");
+    const fallbackMatches = await User.find({
+      _id: { $ne: req.user._id, $nin: excludedIds },
+    }).limit(10);
+
+    res.json(fallbackMatches);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get user's actual matches (people they've matched with)
 // @route   GET /api/matches/my-matches
 // @access  Private

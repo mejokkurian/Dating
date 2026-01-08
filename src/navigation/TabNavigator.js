@@ -1,5 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
 import { View, StyleSheet, Platform, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,7 +9,7 @@ import { useBadge } from "../context/BadgeContext";
 
 // Screens
 import MainScreen from "../screens/MainScreen";
-import TopPicksScreen from "../screens/TopPicksScreen";
+import TopPicksStack from "./TopPicksStack";
 import ConnectNowScreen from "../screens/ConnectNowScreen";
 import MessagesScreen from "../screens/MessagesScreen";
 import LikesYouScreen from "../screens/LikesYouScreen";
@@ -100,7 +101,17 @@ const TabNavigator = () => {
       })}
     >
       <Tab.Screen name="Discover" component={MainScreen} />
-      <Tab.Screen name="TopPicks" component={TopPicksScreen} />
+      <Tab.Screen 
+        name="TopPicks" 
+        component={TopPicksStack}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route);
+          if (routeName === 'TopPickProfile') {
+            return { tabBarStyle: { display: 'none' } };
+          }
+          return {};
+        }}
+      />
       <Tab.Screen name="ConnectNow" component={ConnectNowScreen} />
 
       <Tab.Screen name="LikesYou" component={LikesYouScreen} />

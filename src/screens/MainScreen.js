@@ -14,7 +14,7 @@ import ParallaxProfileCard from "../components/ParallaxProfileCard";
 import ProfileBottomSheet from "../components/ProfileBottomSheet";
 import MatchCommentModal from "../components/MatchCommentModal";
 import SuperLikeModal from "../components/SuperLikeModal";
-import FilterModal from "../components/FilterModal";
+import FilterBottomSheet from "../components/FilterBottomSheet";
 import DateCallToAction from "../components/DateCallToAction";
 import DateConfirmationModal from "../components/DateConfirmationModal";
 import CoachmarkOverlay from "../components/CoachmarkOverlay";
@@ -73,11 +73,17 @@ const MainScreen = ({ navigation, route }) => {
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterState, setFilterState] = useState({
-    distance: null,
-    age: null,
+    distance: 50, // km
+    ageMin: 18,
+    ageMax: 35,
+    heightMin: 140, // cm
     verified: false,
     premium: false,
-    lifestyle: [],
+    education: [],
+    drinking: [],
+    smoking: [],
+    kids: [],
+    religion: [],
   });
 
   const [showDateModal, setShowDateModal] = useState(false);
@@ -212,7 +218,7 @@ const MainScreen = ({ navigation, route }) => {
         onSend={(profile, comment) => handleSuperLike(profile, comment, setShowSuperLikeModal)}
       />
 
-      <FilterModal
+      <FilterBottomSheet
         visible={showFilterModal}
         filterState={filterState}
         onClose={() => setShowFilterModal(false)}

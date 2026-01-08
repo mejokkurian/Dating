@@ -12,37 +12,38 @@ import {
   InputAccessoryView,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../theme/theme';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
   const [comment, setComment] = useState('');
   const [isSending, setIsSending] = useState(false);
   
-  // Animation values
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  // Animation: Slide Up from Bottom
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
     if (visible) {
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Reset position to bottom before sliding up
+      slideAnim.setValue(SCREEN_HEIGHT);
+      
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 60,
+        friction: 9,
+        useNativeDriver: true,
+      }).start();
     } else {
-      scaleAnim.setValue(0.8);
-      opacityAnim.setValue(0);
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible]);
 
@@ -58,18 +59,11 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
 
   const handleClose = () => {
     Keyboard.dismiss();
-    Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
       setComment('');
       onClose();
     });
@@ -83,109 +77,117 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade"
+      animationType="none" // We handle animation manually
       onRequestClose={handleClose}
       statusBarTranslucent={true}
     >
-      <View style={styles.centeredOverlay}>
-        {/* Dark Backdrop */}
+      <View style={styles.overlay}>
+        {/* Backdrop - Tap to close */}
         <TouchableOpacity 
-          style={StyleSheet.absoluteFill} 
+          style={styles.backdrop} 
           activeOpacity={1} 
           onPress={handleClose} 
         >
              <View style={styles.backdropLayer} />
         </TouchableOpacity>
 
-        {/* Modal Card content */}
-        <Animated.View 
-          style={[
-            styles.modalContent,
-            {
-              opacity: opacityAnim,
-              transform: [{ scale: scaleAnim }],
-            },
-          ]}
+        {/* Sliding Sheet */}
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoidingView}
         >
-          <View style={styles.cardInternal}>
-              {/* Header */}
-              <View style={styles.header}>
-                  <Ionicons name="star" size={24} color="#D4AF37" />
-                  <Text style={styles.headerTitle}>Super Like</Text>
-              </View>
+            <Animated.View 
+            style={[
+                styles.bottomSheet,
+                {
+                   transform: [{ translateY: slideAnim }],
+                },
+            ]}
+            >
+            <View style={styles.handleContainer}>
+                <View style={styles.handle} />
+            </View>
 
-              {/* Profile Info */}
-              <View style={styles.profileSection}>
-                  <View style={styles.imageWrapper}>
-                      <Image 
-                      source={{ 
-                          uri: profile.photos && profile.photos.length > 0
-                          ? (profile.photos[profile.mainPhotoIndex ?? 0] || profile.photos[0])
-                          : null
-                      }} 
-                      style={styles.profileImage} 
-                      />
-                      <View style={styles.badgeIcon}>
-                          <Ionicons name="star" size={14} color="#FFF" />
-                      </View>
-                  </View>
-                  <Text style={styles.profileName}>
-                      {profile.name || profile.displayName}, {profile.age}
-                  </Text>
-                  <Text style={styles.profileSubtext}>
-                      Send a message...
-                  </Text>
-              </View>
+            <View style={styles.content}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <Ionicons name="star" size={24} color="#D4AF37" />
+                    <Text style={styles.headerTitle}>Super Like</Text>
+                </View>
 
-              {/* Input */}
-              <View style={styles.inputContainer}>
-                  <TextInput
-                      style={styles.input}
-                      placeholder="Send a message..."
-                      placeholderTextColor="#999"
-                      value={comment}
-                      onChangeText={setComment}
-                      multiline
-                      maxLength={140}
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
-                  />
-              </View>
+                {/* Profile Info */}
+                <View style={styles.profileSection}>
+                    <View style={styles.imageWrapper}>
+                        <Image 
+                        source={{ 
+                            uri: profile.photos && profile.photos.length > 0
+                            ? (profile.photos[profile.mainPhotoIndex ?? 0] || profile.photos[0])
+                            : null
+                        }} 
+                        style={styles.profileImage} 
+                        />
+                        <View style={styles.badgeIcon}>
+                            <Ionicons name="star" size={14} color="#FFF" />
+                        </View>
+                    </View>
+                    <Text style={styles.profileName}>
+                        {profile.name || profile.displayName}, {profile.age}
+                    </Text>
+                    <Text style={styles.profileSubtext}>
+                        Send a message...
+                    </Text>
+                </View>
 
-              {/* Buttons */}
-              <View style={styles.buttonRow}>
-                  <TouchableOpacity 
-                      style={styles.cancelButton} 
-                      onPress={handleClose}
-                  >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
+                {/* Input */}
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Send a message..."
+                        placeholderTextColor="#999"
+                        value={comment}
+                        onChangeText={setComment}
+                        multiline
+                        maxLength={140}
+                        returnKeyType="done"
+                        blurOnSubmit={true}
+                        inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
+                    />
+                </View>
 
-                  <TouchableOpacity 
-                      style={styles.sendButton} 
-                      onPress={handleSend}
-                      disabled={isSending}
-                  >
-                      <LinearGradient
-                          colors={['#FFD700', '#FFA500']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.gradientButton}
-                      >
-                          {isSending ? (
-                              <Text style={styles.sendButtonText}>Sending...</Text>
-                          ) : (
-                              <>
-                                  <Text style={styles.sendButtonText}>Send</Text>
-                                  <Ionicons name="heart" size={18} color="#FFF" style={{ marginLeft: 6 }} />
-                              </>
-                          )}
-                      </LinearGradient>
-                  </TouchableOpacity>
-              </View>
-          </View>
-        </Animated.View>
+                {/* Buttons */}
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity 
+                        style={styles.cancelButton} 
+                        onPress={handleClose}
+                    >
+                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.sendButton} 
+                        onPress={handleSend}
+                        disabled={isSending}
+                    >
+                        <LinearGradient
+                            colors={['#D4AF37', '#F2C94C']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.gradientButton}
+                        >
+                            {isSending ? (
+                                <Text style={styles.sendButtonText}>Sending...</Text>
+                            ) : (
+                                <>
+                                    <Text style={styles.sendButtonText}>Send</Text>
+                                    <Ionicons name="heart" size={18} color="#FFF" style={{ marginLeft: 6 }} />
+                                </>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+            </View>
+            </Animated.View>
+        </KeyboardAvoidingView>
 
         {/* iOS Accessory */}
         {Platform.OS === 'ios' && (
@@ -205,32 +207,47 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
 };
 
 const styles = StyleSheet.create({
-  centeredOverlay: {
+  overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   backdropLayer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
-    width: '90%',
-    maxWidth: 340,
-    alignItems: 'center',
+  keyboardAvoidingView: {
+    width: '100%',
+    justifyContent: 'flex-end',
   },
-  cardInternal: {
+  bottomSheet: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    padding: 24,
-    alignItems: 'center',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 20,
+  },
+  handleContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  handle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 3,
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -257,13 +274,13 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 3,
-    borderColor: '#FFD700',
+    borderColor: '#D4AF37',
   },
   badgeIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#FFD700',
+    backgroundColor: '#D4AF37',
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -346,23 +363,6 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontWeight: '600',
     color: '#007AFF',
-  },
-  likeAnimationOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-    elevation: 9999,
-  },
-  likeMainHeart: {
-    shadowColor: "#FF3B30",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  likeParticle: {
-    position: 'absolute',
   },
 });
 
