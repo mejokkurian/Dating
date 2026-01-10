@@ -1,425 +1,257 @@
-/**
- * Verify Account Screen
- * Allows users to verify their account by taking a selfie
- */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  Alert,
+  Dimensions,
   ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StatusBar,
   Image,
   ScrollView,
 } from "react-native";
-import { CameraView, Camera } from "expo-camera";
-import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  verifyAccountWithSelfie,
-  getImageVerificationStatus,
-} from "../../services/api/verification";
 import { useAuth } from "../../context/AuthContext";
-import CustomAlert from "../../components/CustomAlert";
-import { useCustomAlert } from "../../hooks/useCustomAlert";
-import theme from "../../theme/theme";
+import { verifyAccountWithSelfie } from "../../services/api/verification";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CAMERA_SIZE = SCREEN_WIDTH * 0.8; // Circular/Card frame size
+
+import VerificationFailureBottomSheet from "./components/VerificationFailureBottomSheet";
+import VerificationSuccessBottomSheet from "./components/VerificationSuccessBottomSheet";
+import VerificationSkipBottomSheet from "./components/VerificationSkipBottomSheet";
 
 const VerifyAccountScreen = ({ navigation }) => {
-  const { user } = useAuth();
-  const [hasPermission, setHasPermission] = useState(null);
-  const [cameraType, setCameraType] = useState("front");
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState(null);
-  const cameraRef = useRef(null);
-  const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
-
+  const { onboardingComplete, setOnboardingComplete } = useAuth();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraRef, setCameraRef] = useState(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [photo, setPhoto] = useState(null); // Captured photo object
+  
+  // Bottom Sheet States
+  const [showErrorSheet, setShowErrorSheet] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showSuccessSheet, setShowSuccessSheet] = useState(false);
+  const [showSkipSheet, setShowSkipSheet] = useState(false);
+  
   useEffect(() => {
-    checkPermissions();
-    loadVerificationStatus();
-  }, []);
-
-  const checkPermissions = async () => {
-    try {
-      console.log("🔍 Checking camera permissions...");
-      
-      // Add a timeout to prevent hanging
-      const permissionPromise = (async () => {
-        // First check current permission status using Camera namespace
-        const existingStatus = await Camera.getCameraPermissionsAsync();
-        console.log("📋 Existing camera permission status:", existingStatus.status);
-        
-        if (existingStatus.status === "granted") {
-          console.log("✅ Camera permission already granted");
-          return "granted";
-        }
-        
-        // If not granted, request permission
-        console.log("📢 Requesting camera permission...");
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        console.log("📋 Camera permission status after request:", status);
-        return status;
-      })();
-
-      // Add timeout fallback (10 seconds)
-      const timeoutPromise = new Promise((resolve) => {
-        setTimeout(() => {
-          console.warn("⏱️ Permission check timed out");
-          resolve("timeout");
-        }, 10000);
-      });
-
-      const status = await Promise.race([permissionPromise, timeoutPromise]);
-      
-      if (status === "timeout") {
-        console.error("⏱️ Permission check timed out, defaulting to false");
-        setHasPermission(false);
-        showAlert(
-          "Permission Timeout",
-          "Camera permission check is taking too long. Please check your app permissions in device settings.",
-          "warning"
-        );
-      } else {
-        setHasPermission(status === "granted");
-        console.log(status === "granted" ? "✅ Permission granted" : "❌ Permission denied");
-      }
-    } catch (error) {
-      console.error("❌ Error checking camera permissions:", error);
-      // Set to false on error so UI can still render
-      setHasPermission(false);
-      showAlert(
-        "Permission Error",
-        `Failed to check camera permissions: ${error.message || "Unknown error"}. Please try again.`,
-        "error"
-      );
+    if (!permission) {
+      requestPermission();
     }
-  };
+  }, [permission]);
 
-  const loadVerificationStatus = async () => {
-    try {
-      const status = await getImageVerificationStatus();
-      setVerificationStatus(status);
-    } catch (error) {
-      console.error("Error loading verification status:", error);
-    }
-  };
-
-  const takePicture = async () => {
-    if (!cameraRef.current) return;
-
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: true,
-        skipProcessing: false,
-        isImageMirror: false, // Don't mirror the captured image
-      });
-
-      // Store both URI and base64 for later use
-      setCapturedImage({
-        uri: photo.uri,
-        base64: photo.base64 ? `data:image/jpeg;base64,${photo.base64}` : null,
-      });
-    } catch (error) {
-      console.error("Error taking picture:", error);
-      showAlert("Error", "Failed to capture image. Please try again.", "error");
-    }
-  };
-
-  const pickFromGallery = async () => {
-    try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        showAlert(
-          "Permission Required",
-          "We need access to your photos to select a selfie.",
-          "warning"
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        setCapturedImage({
-          uri: asset.uri,
-          base64: asset.base64
-            ? `data:image/jpeg;base64,${asset.base64}`
-            : null,
+  const handleCapture = async () => {
+    if (cameraRef && !isCapturing) {
+      setIsCapturing(true);
+      try {
+        const photoData = await cameraRef.takePictureAsync({
+          quality: 0.7,
+          base64: true,
         });
+        setPhoto(photoData);
+      } catch (error) {
+        Alert.alert("Error", "Failed to take photo");
+      } finally {
+        setIsCapturing(false);
       }
-    } catch (error) {
-      console.error("Error picking image:", error);
-      showAlert("Error", "Failed to select image. Please try again.", "error");
     }
   };
 
-  const uploadAndVerify = async () => {
-    if (!capturedImage) {
-      showAlert("Error", "Please take or select a selfie first.", "error");
-      return;
-    }
+  const handleRetake = () => {
+    setPhoto(null);
+    setShowErrorSheet(false);
+  };
 
+  const handleSubmit = async () => {
+    if (!photo || !photo.base64) return;
+
+    setVerifying(true);
     try {
-      setUploading(true);
-
-      // Use base64 if available, otherwise convert from URI
-      let base64Image;
-      if (capturedImage.base64) {
-        // Base64 already available from camera/gallery
-        base64Image = capturedImage.base64;
+      const response = await verifyAccountWithSelfie(photo.base64);
+      
+      if (response && response.success) {
+        setShowSuccessSheet(true);
       } else {
-        // Fallback: convert URI to base64 using FileSystem
-        const { uri } = capturedImage;
-        const response = await fetch(uri);
-        const blob = await response.blob();
-
-        // Convert blob to base64
-        base64Image = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve(reader.result);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }
-
-      // Call verification API
-      const result = await verifyAccountWithSelfie(base64Image);
-
-      if (result.verified) {
-        showAlert(
-          "Verification Successful!",
-          `Your account has been verified with ${result.confidence.toFixed(
-            1
-          )}% confidence.`,
-          "success"
-        );
-
-        // Navigate back to Settings after a delay (Settings screen will reload status on focus)
-        setTimeout(() => {
-          // Navigate back to Settings (which will then navigate to Profile)
-          navigation.navigate("Settings");
-        }, 2000);
-      } else {
-        showAlert(
-          "Verification Failed",
-          result.message ||
-            `Verification failed. Confidence: ${result.confidence?.toFixed(
-              1
-            )}%. Please ensure your face is clearly visible and matches your profile photos.`,
-          "error"
-        );
+        // Show Bottom Sheet for logical failures (e.g. no match)
+        setErrorMessage(response?.message || "Could not verify your identity.");
+        setShowErrorSheet(true);
       }
     } catch (error) {
-      console.error("Verification error:", error);
-      showAlert(
-        "Verification Error",
-        error.message || "Failed to verify account. Please try again.",
-        "error"
-      );
+        console.error("Verification Error:", error);
+        // Show Bottom Sheet for exceptions/errors
+        setErrorMessage(error.message || "An error occurred during verification.");
+        setShowErrorSheet(true);
     } finally {
-      setUploading(false);
+      setVerifying(false);
     }
   };
 
-  const retakePicture = () => {
-    setCapturedImage(null);
+  const handleCompletion = () => {
+    setShowSuccessSheet(false);
+    
+    if (!onboardingComplete) {
+      // Just update state. AuthNavigator will automatically switch stacks to Main App.
+      setOnboardingComplete(true);
+    } else {
+      // For existing users, navigate to the Main Tab, then Discover screen
+      // depending on your nesting, "MainTab" is the stack screen name, "Discover" is the tab name
+      navigation.navigate("MainTab", { screen: "Discover" });
+    }
   };
 
-  if (hasPermission === null) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Checking permissions...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const handleSkipPress = () => {
+    setShowSkipSheet(true);
+  };
 
-  if (hasPermission === false) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => {
-              // Navigate back to Settings (which will then navigate to Profile)
-              navigation.navigate("Settings");
-            }}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Verify Account</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="camera-outline" size={64} color="#999" />
-          <Text style={styles.errorTitle}>Camera Access Required</Text>
-          <Text style={styles.errorText}>
-            Please enable camera permissions in your device settings to verify
-            your account.
-          </Text>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => {
-              Alert.alert(
-                "Open Settings",
-                "Please enable camera permissions in your device settings.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Open Settings",
-                    onPress: async () => {
-                      await checkPermissions();
-                    },
-                  },
-                ]
-              );
-            }}
-          >
-            <Text style={styles.settingsButtonText}>Request Permission</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+  const handleSkipConfirm = () => {
+    setShowSkipSheet(false);
+    handleCompletion();
+  };
+
+  const checklistItems = [
+    { text: "Your face is clearly visible", icon: "person-outline" },
+    { text: "Good lighting, no shadows", icon: "sunny-outline" },
+    { text: "Clear, uncluttered background", icon: "image-outline" },
+    { text: "No other people in the photo", icon: "people-outline" },
+    { text: "Face matches your profile photos", icon: "id-card-outline" },
+  ];
+
+  if (!permission || !permission.granted) {
+     return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.permissionContainer}>
+                <Ionicons name="camera-outline" size={60} color="#666" />
+                <Text style={styles.permissionText}>Camera permission is needed for verification.</Text>
+                <TouchableOpacity style={styles.button} onPress={requestPermission}>
+                    <Text style={styles.buttonText}>Grant Permission</Text>
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
+     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomAlert
-        {...alertConfig}
-        onConfirm={handleConfirm}
-        onClose={hideAlert}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F0F0" />
+      
+      {/* Top Navigation */}
+      <View style={styles.topNav}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => {
-            // Navigate back to Settings (which will then navigate to Profile)
-            navigation.navigate("Settings");
-          }}
-          style={styles.backButton}
+        <TouchableOpacity 
+            style={styles.skipButton} 
+            onPress={handleSkipPress}
         >
-          <Ionicons name="arrow-back" size={24} color="#000" />
+            <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verify Account</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
+      {/* Large Header Matching TopPicks */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Verify Account</Text>
+        <Text style={styles.subtitle}>Take a clear selfie to verify your identity.</Text>
+      </View>
+
+      {/* Content - ScrollView to prevent overlaps */}
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Instructions */}
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsTitle}>Take a Selfie</Text>
-          <Text style={styles.instructionsText}>
-            Take a clear selfie of yourself to verify your account. Make sure:
-          </Text>
-          <View style={styles.instructionsList}>
-            <View style={styles.instructionItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.instructionText}>
-                Your face is clearly visible
-              </Text>
+        
+        {/* Helper Text Section */}
+        {!photo && (
+            <View style={styles.checklist}>
+                {checklistItems.map((item, index) => (
+                    <View key={index} style={styles.checklistItem}>
+                        <View style={styles.iconContainer}>
+                            <Ionicons name={item.icon} size={18} color="#000" />
+                        </View>
+                        <Text style={styles.checklistText}>{item.text}</Text>
+                    </View>
+                ))}
             </View>
-            <View style={styles.instructionItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.instructionText}>Good lighting, no shadows</Text>
+        )}
+
+        {/* Camera/Photo Section */}
+        <View style={styles.cameraSection}>
+            <View style={styles.cameraContainer}>
+                {photo ? (
+                    <Image 
+                        source={{ uri: photo.uri }} 
+                        style={styles.previewImage} 
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <CameraView
+                        style={styles.camera}
+                        facing="front"
+                        ref={(ref) => setCameraRef(ref)}
+                    >
+                        {/* Overlay Capture Button */}
+                        <View style={styles.cameraOverlay}>
+                             <TouchableOpacity 
+                                style={styles.overlayCaptureBtn} 
+                                onPress={handleCapture}
+                                activeOpacity={0.7}
+                             >
+                                <View style={styles.overlayCaptureInner} />
+                             </TouchableOpacity>
+                        </View>
+                    </CameraView>
+                )}
             </View>
-            <View style={styles.instructionItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.instructionText}>
-                Clear, uncluttered background
-              </Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.instructionText}>
-                No other people in the photo
-              </Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-              <Text style={styles.instructionText}>
-                Face matches your profile photos
-              </Text>
-            </View>
-          </View>
         </View>
 
-        {/* Camera or Preview */}
-        {!capturedImage ? (
-          <View style={styles.cameraContainer}>
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing={cameraType}
-              mode="picture"
-              ratio="1:1"
-              mirror={false}
-            >
-              <View style={styles.cameraOverlay}>
-                <View style={styles.captureButtonContainer}>
-                  <TouchableOpacity
-                    style={styles.captureButton}
-                    onPress={takePicture}
-                  >
-                    <View style={styles.captureButtonInner} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </CameraView>
-          </View>
-        ) : (
-          <View style={styles.previewContainer}>
-            <Image
-              source={{ uri: capturedImage.uri || capturedImage }}
-              style={styles.previewImage}
-            />
-            <View style={styles.previewActions}>
-              <TouchableOpacity
-                style={styles.retakeButton}
-                onPress={retakePicture}
-              >
-                <Ionicons name="refresh" size={20} color="#000" />
-                <Text style={styles.retakeButtonText}>Retake</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.verifyButton,
-                  uploading && styles.verifyButtonDisabled,
-                ]}
-                onPress={uploadAndVerify}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                    <Text style={styles.verifyButtonText}>Verify</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </ScrollView>
+
+      {/* Actions - Sticky Footer (Only show for Retake/Submit) */}
+      {photo && (
+        <View style={styles.actionContainer}>
+            <View style={styles.actionButtons}>
+                <TouchableOpacity 
+                    style={styles.verifyButton} 
+                    onPress={handleSubmit}
+                    disabled={verifying}
+                >
+                    {verifying ? (
+                        <ActivityIndicator color="#FFF" />
+                    ) : (
+                        <Text style={styles.verifyText}>Verify</Text>
+                    )}
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
+                    <Text style={styles.retakeText}>Retake Photo</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+      )}
+
+      {/* Error Bottom Sheet */}
+      <VerificationFailureBottomSheet 
+        visible={showErrorSheet}
+        onClose={() => setShowErrorSheet(false)}
+        error={errorMessage}
+        onRetake={handleRetake}
+      />
+
+      {/* Success Bottom Sheet */}
+      <VerificationSuccessBottomSheet 
+        visible={showSuccessSheet}
+        onClose={handleCompletion}
+        onContinue={handleCompletion}
+      />
+
+       {/* Skip Confirmation Bottom Sheet */}
+       <VerificationSkipBottomSheet 
+        visible={showSkipSheet}
+        onClose={() => setShowSkipSheet(false)}
+        onIgnore={handleSkipConfirm}
+        onVerify={() => setShowSkipSheet(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -427,192 +259,181 @@ const VerifyAccountScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F0F0F0",
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  permissionText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  topNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingVertical: 5, // Reduced from 10
+    zIndex: 10,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+    marginBottom: 5, // Reduced from 10
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 4, // Reduced from 8
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666666',
+    lineHeight: 22,
   },
   backButton: {
-    padding: 4,
+    padding: 5,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#000",
+  skipButton: {
+    padding: 5,
+    paddingHorizontal: 10,
   },
-  headerSpacer: {
-    width: 32,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#666",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  settingsButton: {
-    backgroundColor: "#000",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  settingsButtonText: {
-    color: "#FFF",
+  skipText: {
     fontSize: 16,
     fontWeight: "600",
-  },
-  instructionsContainer: {
-    marginBottom: 24,
-  },
-  instructionsTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 12,
-  },
-  instructionsText: {
-    fontSize: 14,
     color: "#666",
-    marginBottom: 16,
-    lineHeight: 20,
   },
-  instructionsList: {
-    gap: 12,
+  content: {
+    padding: 20,
+    paddingTop: 0, // Reduced from 10
+    paddingBottom: 40,
   },
-  instructionItem: {
+  // Replaced infoSection with simple view if needed, or just removed
+  checklist: {
+    gap: 16,
+    marginBottom: 30, // Added margin since container padding is removed
+    marginTop: 10,
+  },
+  checklistItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  instructionText: {
-    fontSize: 14,
-    color: "#000",
-    flex: 1,
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checklistText: {
+    fontSize: 15,
+    color: "#333",
+    fontWeight: "500",
+  },
+  cameraSection: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 30,
+    marginTop: 10,
   },
   cameraContainer: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
+    width: CAMERA_SIZE,
+    height: CAMERA_SIZE * 1.2,
+    borderRadius: 24,
     overflow: "hidden",
-    backgroundColor: "#000",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 5,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   camera: {
     flex: 1,
   },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  actionContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40, // Extra padding for safety
+  },
+  actionButtons: {
+    width: '100%',
+    gap: 12,
+  },
   cameraOverlay: {
     flex: 1,
-    backgroundColor: "transparent",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 32,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 20,
   },
-  captureButtonContainer: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+  overlayCaptureBtn: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 4,
-    borderColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#FFF",
-  },
-  previewContainer: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#000",
-    marginBottom: 24,
-  },
-  previewImage: {
-    width: "100%",
-    height: "100%",
-  },
-  previewActions: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  overlayCaptureInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFF',
   },
   retakeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF",
+    width: '100%',
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    gap: 8,
+    alignItems: 'center',
   },
-  retakeButtonText: {
-    color: "#000",
-    fontSize: 16,
+  retakeText: {
+    color: '#666',
     fontWeight: "600",
+    fontSize: 15,
   },
   verifyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#000",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    gap: 8,
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  verifyButtonDisabled: {
-    opacity: 0.6,
-  },
-  verifyButtonText: {
-    color: "#FFF",
+  verifyText: {
+    color: '#FFF',
+    fontWeight: "700",
     fontSize: 16,
-    fontWeight: "600",
   },
+  button: {
+      backgroundColor: '#000',
+      paddingVertical: 14,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+  },
+  buttonText: {
+      color: '#FFF',
+      fontWeight: '600',
+      fontSize: 16,
+  }
 });
 
 export default VerifyAccountScreen;

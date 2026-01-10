@@ -41,6 +41,7 @@ const MainScreen = ({ navigation, route }) => {
       completeTutorial,
       handleUndo,
       loadProfiles,
+      loadInitialData,
   } = useDiscoverProfiles();
 
   // --- 2. Interactions & Animation Hook ---
@@ -170,7 +171,7 @@ const MainScreen = ({ navigation, route }) => {
             <EmptyCardState 
                 onRefresh={async () => {
                     setCurrentIndex(0);
-                    await loadProfiles();
+                    await loadInitialData();
                 }}
                 onFilter={() => setShowFilterModal(true)}
             />

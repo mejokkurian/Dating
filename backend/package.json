@@ -8,6 +8,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.965.0",
     "axios": "^1.13.2",
     "bad-words": "^4.0.0",
     "bcryptjs": "^2.4.3",

@@ -91,7 +91,14 @@ export const useCardInteractions = (
         triggerLikeAnimation(null); 
 
         // 3. Record Interaction (Optimistic)
-        // await recordInteraction(profile.id, "LIKE");
+        try {
+            const targetId = profile?._id || profile?.id;
+            if (targetId) {
+                recordInteraction(targetId, "LIKE");
+            }
+        } catch (error) {
+            console.error("Error recording like:", error);
+        }
 
         // 4. Wait for heart animation to play out (matching Super Like feel)
         await new Promise(resolve => setTimeout(resolve, 3200));

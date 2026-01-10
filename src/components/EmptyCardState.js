@@ -1,28 +1,62 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import GradientButton from './GradientButton';
 import theme from '../theme/theme';
 
 const { width } = Dimensions.get('window');
-const AnimatedIcon = Animated.createAnimatedComponent(MaterialCommunityIcons);
 
 const EmptyCardState = ({ onRefresh, onFilter }) => {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current; // 0 = Idle, 1 = Refreshing
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
+    
+    // Animate to Refreshing State
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
 
     // Call the original onRefresh and wait for it
     if (onRefresh) {
       await onRefresh();
     }
     
-    setIsRefreshing(false);
+    // Animate back to Idle State
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+        setIsRefreshing(false);
+    });
   };
+
+  const idleOpacity = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const refreshOpacity = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const idleScale = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.8],
+  });
+
+  const refreshScale = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 1],
+  });
 
   return (
     <View style={styles.container}>
@@ -32,18 +66,21 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
           colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.05)']}
           style={styles.iconBackground}
         >
-          {isRefreshing ? (
-             <View style={styles.animationContainer}>
-               {/* Fixed Person Icon - Static during refresh */}
-               <MaterialCommunityIcons 
-                 name="account" 
-                 size={60} 
-                 color={theme.colors.primary} 
-               />
-             </View>
-          ) : (
+          {/* Idle Icon (Account Search) */}
+          <Animated.View style={[
+             styles.iconWrapper, 
+             { opacity: idleOpacity, transform: [{ scale: idleScale }] }
+          ]}>
             <MaterialCommunityIcons name="account-search-outline" size={80} color={theme.colors.primary} />
-          )}
+          </Animated.View>
+
+          {/* Refreshing Icon (Person) */}
+          <Animated.View style={[
+             styles.iconWrapper, 
+             { opacity: refreshOpacity, transform: [{ scale: refreshScale }] }
+          ]}>
+            <MaterialCommunityIcons name="account" size={60} color={theme.colors.primary} />
+          </Animated.View>
         </LinearGradient>
       </View>
 
@@ -114,6 +151,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  iconWrapper: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,

@@ -92,3 +92,11 @@ export const registerPushToken = async (token, deviceId = null) => {
     throw error;
   }
 };
+export const deleteUserAccount = async (userId) => {
+  try {
+    const response = await api.delete('/users/profile');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

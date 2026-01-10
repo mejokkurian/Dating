@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../../context/AuthContext";
 import ProfileSection from "../profile/components/ProfileSection";
-import { updateUserDocument } from "../../services/api/user";
+import { updateUserDocument, deleteUserAccount } from "../../services/api/user";
 import DeleteAccountBottomSheet from "./components/DeleteAccountBottomSheet";
 
 const SettingsScreen = ({ navigation }) => {
@@ -138,21 +138,11 @@ const SettingsScreen = ({ navigation }) => {
   const handleConfirmDelete = async () => {
     try {
       setDeleting(true);
-      // TODO: Implement delete account API call
-      // const response = await deleteUserAccount(userData?._id);
+      await deleteUserAccount(userData?._id);
       
-      // For now, show placeholder
       setShowDeleteSheet(false);
-      Alert.alert(
-        "Delete Account",
-        "Account deletion feature will be implemented soon. Please contact support for account deletion.",
-        [
-          {
-            text: "OK",
-            onPress: () => setDeleting(false),
-          },
-        ]
-      );
+      await logout(); // Logout handles navigation to Auth
+      
     } catch (error) {
       console.error("Error deleting account:", error);
       Alert.alert(

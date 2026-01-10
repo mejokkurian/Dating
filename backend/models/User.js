@@ -50,10 +50,13 @@ const userSchema = new mongoose.Schema({
   subscriptionPurchaseDate: { type: Date },
   subscriptionProductId: { type: String }, // Store IAP product ID
   isVerified: { type: Boolean, default: false },
-  verificationMethod: { type: String, enum: ['kyc', 'image', null], default: null },
+  verificationMethod: { type: String, enum: ['kyc', 'image', 'aws-rekognition', 'manual', null], default: null },
   verificationDate: { type: Date },
   isVisibleToOthers: { type: Boolean, default: true }, // Profile visibility in discovery
   lastActive: { type: Date, default: Date.now },
+  
+  // Matchmaking Scores
+  popularityRating: { type: Number, default: 0, index: true }, // Incremented on Like
   
   // Location & Connect Now
   connectNowEnabled: { type: Boolean, default: false },

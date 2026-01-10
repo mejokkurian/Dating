@@ -1,14 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { signOut } from '../../services/api/auth';
+import { deleteUserAccount } from '../../services/api/user';
+
+import DeleteAccountBottomSheet from '../settings/components/DeleteAccountBottomSheet';
 
 const { width } = Dimensions.get('window');
 
 const UserProfileScreen = ({ navigation }) => {
   const { userData, user, logout } = useAuth();
+  const [showDeleteSheet, setShowDeleteSheet] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const handleLogout = async () => {
     try {
@@ -19,6 +24,19 @@ const UserProfileScreen = ({ navigation }) => {
     }
   };
 
+  const handleConfirmDelete = async () => {
+    try {
+      setDeleting(true);
+      await deleteUserAccount(user._id);
+      setShowDeleteSheet(false);
+      await handleLogout();
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      Alert.alert("Error", "Failed to delete account");
+      setDeleting(false);
+    }
+  };
+
   const profileData = userData || {
     displayName: user?.email?.split('@')[0] || 'User',
     age: 0,
@@ -26,7 +44,9 @@ const UserProfileScreen = ({ navigation }) => {
     isVerified: false,
     isPremium: false,
   };
+// ... (rest of the file remains similar until the return statement)
 
+  // Helper function to render menu items...
   const renderMenuItem = (icon, title, subtitle, onPress, showChevron = true, isLast = false) => (
     <TouchableOpacity 
       style={[styles.menuItem, isLast && styles.menuItemLast]} 
@@ -78,7 +98,7 @@ const UserProfileScreen = ({ navigation }) => {
                     imageUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500';
                   }
                   
-                  console.log('Profile image URL:', imageUrl);
+                  // console.log('Profile image URL:', imageUrl);
                   return imageUrl;
                 })() 
               }}
@@ -149,15 +169,27 @@ const UserProfileScreen = ({ navigation }) => {
           {renderMenuItem('lock-closed-outline', 'Privacy Policy', null, () => {}, true, true)}
         </View>
 
-        <TouchableOpacity style={styles.deleteAccountButton}>
+        <TouchableOpacity 
+            style={styles.deleteAccountButton} 
+            onPress={() => setShowDeleteSheet(true)}
+        >
           <Text style={styles.deleteAccountText}>Delete Account</Text>
         </TouchableOpacity>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Delete Account Confirmation Bottom Sheet */}
+      <DeleteAccountBottomSheet
+        visible={showDeleteSheet}
+        onClose={() => setShowDeleteSheet(false)}
+        onConfirm={handleConfirmDelete}
+        loading={deleting}
+      />
     </SafeAreaView>
   );
 };
+// ... styles ...
 
 const styles = StyleSheet.create({
   container: {

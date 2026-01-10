@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Dimensions,
+  Image,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +28,11 @@ import QuickHelloModal from '../components/QuickHelloModal';
 import NotificationBottomSheet from '../components/NotificationBottomSheet';
 import theme from '../theme/theme';
 import GlassCard from '../components/GlassCard';
+import MapView, { Marker, Callout } from 'react-native-maps';
+import ConnectNowGuideBottomSheet from '../components/ConnectNowGuideBottomSheet';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width, height } = Dimensions.get('window');
 
 const ConnectNowScreen = ({ navigation }) => {
   const { userData, setUserData } = useAuth();
@@ -41,6 +49,36 @@ const ConnectNowScreen = ({ navigation }) => {
   });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('nearby'); // 'nearby' or 'requests'
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [showGuideSheet, setShowGuideSheet] = useState(false);
+
+  // Check if first time viewing Connect Now
+  useEffect(() => {
+    const checkFirstTime = async () => {
+      try {
+        const hasSeenGuide = await AsyncStorage.getItem('hasSeenConnectNowGuide');
+        if (hasSeenGuide !== 'true') {
+          // Add a small delay for smoother UX
+          setTimeout(() => {
+            setShowGuideSheet(true);
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Error checking first time status:', error);
+      }
+    };
+    
+    checkFirstTime();
+  }, []);
+
+  const handleGuideClose = async () => {
+      setShowGuideSheet(false);
+      try {
+          await AsyncStorage.setItem('hasSeenConnectNowGuide', 'true');
+      } catch (error) {
+          console.error('Error saving guide status:', error);
+      }
+  };
 
   // Location tracking hook
   const {
@@ -70,6 +108,8 @@ const ConnectNowScreen = ({ navigation }) => {
       return hasPendingRequest;
     }
   });
+
+
 
   // Count users for badges
   const nearbyCount = nearbyUsers.filter(u => u.matchStatus !== 'pending').length;
@@ -254,7 +294,7 @@ const ConnectNowScreen = ({ navigation }) => {
         user: user,
         matchStatus: 'active',
         isInitiator: false,
-      });
+        });
       
       // Refresh list to update status
       refreshNearbyUsers();
@@ -282,203 +322,257 @@ const ConnectNowScreen = ({ navigation }) => {
     }
   };
 
+  const mapRef = useRef(null);
+
+  // Focus map on current location initially
+  useEffect(() => {
+    if (viewMode === 'map' && location && mapRef.current) {
+        mapRef.current.animateToRegion({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+        }, 1000);
+    }
+  }, [viewMode, location]);
+
+
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <View>
+        <Text style={styles.screenTitle}>Connect Now</Text>
+        <Text style={styles.screenSubtitle}>Nearby Connections</Text>
+      </View>
+      <View style={styles.headerRight}>
+        {/* Connection Toggle */}
+        <View style={styles.toggleWrapper}>
+            {loading ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
+            ) : (
+                <Text style={[
+                    styles.toggleLabel, 
+                    { color: connectNowEnabled ? theme.colors.success : '#666' }
+                ]}>
+                    {connectNowEnabled ? 'Active' : 'Offline'}
+                </Text>
+            )}
+            <Switch
+                value={connectNowEnabled}
+                onValueChange={handleToggleConnectNow}
+                disabled={loading}
+                trackColor={{ false: '#e0e0e0', true: theme.colors.primary }}
+                thumbColor="#fff"
+                ios_backgroundColor="#e0e0e0"
+                style={{ transform: [{ scale: 0.8 }] }}
+            />
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderViewToggle = () => (
+     <View style={styles.viewToggleContainer}>
+        <View style={styles.segmentedControl}>
+            <TouchableOpacity 
+                style={[styles.segmentOption, viewMode === 'list' && styles.segmentActive]}
+                onPress={() => setViewMode('list')}
+            >
+                <Ionicons name="list" size={18} color={viewMode === 'list' ? '#fff' : '#666'} />
+                <Text style={[styles.segmentText, viewMode === 'list' && styles.segmentTextActive]}>List</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+                style={[styles.segmentOption, viewMode === 'map' && styles.segmentActive]}
+                onPress={() => setViewMode('map')}
+            >
+                <Ionicons name="map" size={18} color={viewMode === 'map' ? '#fff' : '#666'} />
+                <Text style={[styles.segmentText, viewMode === 'map' && styles.segmentTextActive]}>Map</Text>
+            </TouchableOpacity>
+        </View>
+
+        {/* Tab Filter if in List Mode */}
+        {viewMode === 'list' && (
+            <View style={styles.tabFilterContainer}>
+                 <TouchableOpacity 
+                    style={[styles.filterTab, activeTab === 'nearby' && styles.filterTabActive]}
+                    onPress={() => setActiveTab('nearby')}
+                 >
+                    <Text style={[styles.filterText, activeTab === 'nearby' && styles.filterTextActive]}>Nearby ({nearbyCount})</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity 
+                    style={[styles.filterTab, activeTab === 'requests' && styles.filterTabActive]}
+                    onPress={() => setActiveTab('requests')}
+                 >
+                    <Text style={[styles.filterText, activeTab === 'requests' && styles.filterTextActive]}>Requests ({requestsCount})</Text>
+                 </TouchableOpacity>
+            </View>
+        )}
+     </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-    
-  {/* Main Heading */}
-  <View style={styles.mainHeader}>
-          <Text style={styles.mainTitle}>Connect Now</Text>
-          <Text style={styles.mainSubtitle}>
-          Local people ready to connect in your area
-          </Text>
-        </View>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={nearbyUsersLoading}
-            onRefresh={refreshNearbyUsers}
-          />
-        }
-      >
+      {renderHeader()}
       
+      {connectNowEnabled ? (
+          <>
+            {renderViewToggle()}
 
-        {/* Connect Now Toggle Card */}
-        <GlassCard style={styles.toggleCard}>
-          <View style={styles.toggleContainer}>
-            <View style={styles.toggleInfo}>
-              <Ionicons
-                name="location"
-                size={24}
-                color={connectNowEnabled ? theme.colors.primary : '#999'}
-              />
-              <View style={styles.toggleTextContainer}>
-                <Text style={styles.toggleTitle}>Connect Now</Text>
-                <Text style={styles.toggleDescription}>
-                  {connectNowEnabled
-                    ? 'Find people nearby'
-                    : 'Enable to find people nearby who want to connect'}
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={connectNowEnabled}
-              onValueChange={handleToggleConnectNow}
-              disabled={loading}
-              trackColor={{ false: '#ccc', true: theme.colors.primary }}
-              thumbColor="#fff"
-            />
-          </View>
+            {viewMode === 'map' ? (
+                 <View style={styles.mapContainer}>
+                    {location ? (
+                        <MapView
+                            ref={mapRef}
+                            style={styles.map}
+                            initialRegion={{
+                                latitude: location.latitude,
+                                longitude: location.longitude,
+                                latitudeDelta: 0.05,
+                                longitudeDelta: 0.05,
+                            }}
+                            showsUserLocation={false}
+                            loadingEnabled={true}
+                        >
+                            {/* Current User Marker */}
+                            {location && userData && (
+                                <Marker
+                                    coordinate={{
+                                        latitude: location.latitude,
+                                        longitude: location.longitude,
+                                    }}
+                                    title="Me"
+                                    zIndex={999}
+                                >
+                                    <View style={styles.markerContainer}>
+                                        <View style={[styles.markerContent, { borderColor: theme.colors.primary, borderWidth: 2 }]}>
+                                            <Image 
+                                                source={{ uri: userData.photos && userData.photos[0] ? userData.photos[0] : 'https://via.placeholder.com/150' }} 
+                                                style={styles.markerImage} 
+                                            />
+                                            <Text style={styles.markerName}>Me</Text>
+                                        </View>
+                                        <View style={styles.markerArrow} />
+                                    </View>
+                                </Marker>
+                            )}
 
-          {connectNowEnabled && (
-            <View style={styles.statusContainer}>
-              {location ? (
-                <View style={styles.statusRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.statusText}>Location services active</Text>
-                </View>
-              ) : (
-                <View style={styles.statusRow}>
-                  <Ionicons name="warning" size={16} color="#FF9800" />
-                  <Text style={styles.statusText}>Getting location...</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {locationError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{locationError}</Text>
-            </View>
-          )}
-        </GlassCard>
-
-        {/* Tab Navigation */}
-        {connectNowEnabled && (
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'nearby' && styles.activeTab]}
-              onPress={() => setActiveTab('nearby')}
-            >
-              <Ionicons 
-                name="people" 
-                size={20} 
-                color={activeTab === 'nearby' ? theme.colors.primary : '#666'} 
-              />
-              <Text style={[styles.tabText, activeTab === 'nearby' && styles.activeTabText]}>
-                Nearby
-              </Text>
-              {nearbyCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{nearbyCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
-              onPress={() => setActiveTab('requests')}
-            >
-              <Ionicons 
-                name="mail" 
-                size={20} 
-                color={activeTab === 'requests' ? theme.colors.primary : '#666'} 
-              />
-              <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
-                Requests
-              </Text>
-              {requestsCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{requestsCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Nearby Users Section */}
-        {connectNowEnabled && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {activeTab === 'nearby' ? 'Nearby Users' : 'Pending Requests'}
-              </Text>
-              {nearbyUsersFiltered.length > 0 && (
-                <Text style={styles.sectionCount}>
-                  {nearbyUsersFiltered.length} {activeTab === 'nearby' ? 'nearby' : 'requests'}
-                </Text>
-              )}
-            </View>
-
-            {nearbyUsersLoading && nearbyUsers.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={styles.loadingText}>Finding people nearby...</Text>
-              </View>
-            ) : nearbyUsersFiltered.length === 0 ? (
-              <GlassCard style={styles.emptyCard}>
-                <Ionicons 
-                  name={activeTab === 'nearby' ? "location-outline" : "mail-outline"} 
-                  size={48} 
-                  color="#ccc" 
-                />
-                <Text style={styles.emptyTitle}>
-                  {activeTab === 'nearby' ? 'No one nearby' : 'No pending requests'}
-                </Text>
-                <Text style={styles.emptyDescription}>
-                  {activeTab === 'nearby' 
-                    ? "We'll notify you when compatible people are within 1km"
-                    : "Requests you send or receive will appear here"}
-                </Text>
-              </GlassCard>
+                            {nearbyUsersFiltered.map(user => {
+                                const locationData = user.lastLocation || user.location;
+                                if (locationData && locationData.coordinates) {
+                                  return (
+                                    <Marker
+                                        key={user._id}
+                                        coordinate={{
+                                            latitude: locationData.coordinates[1],
+                                            longitude: locationData.coordinates[0],
+                                        }}
+                                        title={user.displayName || user.name}
+                                        description={user.distanceDisplay ? `${user.distanceDisplay} away` : ''}
+                                        onCalloutPress={() => handleViewProfile(user)}
+                                    >
+                                        <View style={styles.markerContainer}>
+                                            <View style={styles.markerContent}>
+                                                <Image 
+                                                    source={{ uri: user.image || (user.photos && user.photos[0]) }} 
+                                                    style={styles.markerImage} 
+                                                />
+                                                <Text style={styles.markerName} numberOfLines={1}>
+                                                    {user.displayName || user.name}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.markerArrow} />
+                                        </View>
+                                    </Marker>
+                                  );
+                                }
+                                return null;
+                            })}
+                        </MapView>
+                    ) : (
+                        <View style={styles.centered}>
+                             <ActivityIndicator size="large" color={theme.colors.primary} />
+                             <Text style={{marginTop: 10, color: '#666'}}>Locating you...</Text>
+                        </View>
+                    )}
+                    
+                    {/* Floating Overlay for count */}
+                    <View style={styles.mapOverlay}>
+                        <GlassCard style={styles.mapOverlayCard}>
+                           <Text style={styles.mapOverlayText}>{nearbyUsersFiltered.length} people found</Text>
+                        </GlassCard>
+                    </View>
+                 </View>
             ) : (
-              <FlatList
-                data={nearbyUsersFiltered}
-                keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                  <NearbyUserCard
-                    user={item}
-                    onSayHello={() => handleSayHello(item)}
-                    onViewProfile={() => handleViewProfile(item)}
-                    onPendingRequestPress={() => handlePendingRequestPress(item)}
-                    onAccept={() => handleAcceptMatch(item)}
-                    onDecline={() => handleDeclineMatch(item)}
-                  />
-                )}
-                scrollEnabled={false}
-                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-              />
+                /* List View */
+                <View style={styles.listContainer}>
+                    {nearbyUsersLoading && nearbyUsers.length === 0 ? (
+                        <View style={styles.loadingContainer}>
+                             <ActivityIndicator size="large" color={theme.colors.primary} />
+                             <Text style={styles.loadingText}>Searching area...</Text>
+                        </View>
+                    ) : nearbyUsersFiltered.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                             <Ionicons 
+                                name={activeTab === 'nearby' ? "people-outline" : "mail-unread-outline"} 
+                                size={64} 
+                                color="#ddd" 
+                             />
+                             <Text style={styles.emptyTitle}>
+                                {activeTab === 'nearby' ? "No one around yet" : "No pending requests"}
+                             </Text>
+                             <Text style={styles.emptySub}>
+                                {activeTab === 'nearby' 
+                                    ? "Stay tuned! We'll notify you when someone comes nearby." 
+                                    : "You're all caught up with requests."}
+                             </Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={nearbyUsersFiltered}
+                            keyExtractor={(item) => item._id}
+                            renderItem={({ item }) => (
+                                <NearbyUserCard
+                                    user={item}
+                                    onSayHello={() => handleSayHello(item)}
+                                    onViewProfile={() => handleViewProfile(item)}
+                                    onPendingRequestPress={() => handlePendingRequestPress(item)}
+                                    onAccept={() => handleAcceptMatch(item)}
+                                    onDecline={() => handleDeclineMatch(item)}
+                                />
+                            )}
+                            contentContainerStyle={styles.listContent}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={nearbyUsersLoading}
+                                    onRefresh={refreshNearbyUsers}
+                                    tintColor={theme.colors.primary}
+                                />
+                            }
+                        />
+                    )}
+                </View>
             )}
-
-            {nearbyUsersError && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{nearbyUsersError}</Text>
+          </>
+      ) : (
+          /* Offline State */
+          <View style={styles.offlineContainer}>
+              <View style={[styles.offlineIconCircle, { backgroundColor: '#f5f5f5' }]}>
+                 <Ionicons name="navigate-circle" size={80} color={theme.colors.primary} />
               </View>
-            )}
+              <Text style={styles.offlineTitle}>Enable Connect Now</Text>
+              <Text style={styles.offlineDesc}>
+                  Discover matches around you in real-time. Turn on visibility to see who's nearby and let them find you.
+              </Text>
+              
+              <TouchableOpacity 
+                style={styles.enableButton}
+                onPress={() => handleToggleConnectNow(true)}
+              >
+                  <Text style={styles.enableButtonText}>Start Discovering</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </TouchableOpacity>
           </View>
-        )}
-
-        {/* Info Section */}
-        {!connectNowEnabled && (
-          <GlassCard style={styles.infoCard}>
-            <Ionicons name="information-circle" size={32} color={theme.colors.primary} />
-            <Text style={styles.infoTitle}>How It Works</Text>
-            <Text style={styles.infoText}>
-              When enabled, Connect Now helps you discover compatible people within 1km of your
-              location. Both you and the other person need to have Connect Now enabled to see
-              each other.
-            </Text>
-            <Text style={styles.infoText}>
-              Your location is only shared when Connect Now is active, and you can disable it
-              anytime.
-            </Text>
-          </GlassCard>
-        )}
-      </ScrollView>
-
-      {/* Privacy Consent Modal */}
+      )}
+      {/* Modals */}
       <PrivacyConsentModal
         visible={showPrivacyModal}
         onClose={() => setShowPrivacyModal(false)}
@@ -487,7 +581,6 @@ const ConnectNowScreen = ({ navigation }) => {
         onPrivacySettingsChange={handlePrivacySettingsChange}
       />
 
-      {/* Quick Hello Modal */}
       <QuickHelloModal
         visible={showQuickHelloModal}
         onClose={() => {
@@ -498,7 +591,6 @@ const ConnectNowScreen = ({ navigation }) => {
         user={selectedUser}
       />
 
-      {/* Hello Success Sheet */}
       <NotificationBottomSheet
         visible={showHelloSuccessSheet}
         onClose={() => setShowHelloSuccessSheet(false)}
@@ -511,13 +603,18 @@ const ConnectNowScreen = ({ navigation }) => {
           if (successUser) {
              navigation.navigate('Chat', {
               user: successUser,
-              matchStatus: 'pending', // It's pending until accepted
+              matchStatus: 'pending',
               isInitiator: true, 
             });
           }
         }}
         secondaryButtonText="Close"
         onSecondaryButtonPress={() => setShowHelloSuccessSheet(false)}
+      />
+
+      <ConnectNowGuideBottomSheet 
+        visible={showGuideSheet}
+        onClose={handleGuideClose}
       />
     </SafeAreaView>
   );
@@ -526,214 +623,266 @@ const ConnectNowScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#fff',
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-   
-    borderBottomColor: '#F2F2F7',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
   },
-  headerTitle: {
+  screenTitle: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '800', // Extra Bold
     color: '#000',
+    letterSpacing: -0.5,
   },
-  settingsButton: {
-    padding: 4,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100, // Increased to account for bottom tab bar
-  },
-  mainHeader: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  mainTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  mainSubtitle: {
-    fontSize: 16,
-    color: '#666666',
-    lineHeight: 22,
-  },
-  toggleCard: {
-    marginBottom: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    marginHorizontal: 16,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  toggleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 20,
-  },
-  toggleTextContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  toggleTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 4,
-  },
-  toggleDescription: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-  },
-  statusContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusText: {
+  screenSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#888',
+    marginTop: 2,
+    fontWeight: '500',
   },
-  errorContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
+  headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
   },
-  errorText: {
-    fontSize: 13,
-    color: '#C62828',
+  toggleWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#f9f9f9',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#eee',
   },
-  section: {
-    marginBottom: 24,
+  toggleLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginRight: 6,
+      marginLeft: 4,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 16,
+  viewToggleContainer: {
+     paddingTop: 15,
+     paddingBottom: 10,
+     paddingHorizontal: 20,
+     backgroundColor: '#fff',
+     zIndex: 10,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000',
+  segmentedControl: {
+      flexDirection: 'row',
+      backgroundColor: '#f0f0f0',
+      borderRadius: 12,
+      padding: 4,
   },
-  sectionCount: {
-    fontSize: 14,
-    color: '#666',
+  segmentOption: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      borderRadius: 10,
+      gap: 6,
+  },
+  segmentActive: {
+      backgroundColor: '#000',
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+  },
+  segmentText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#666',
+  },
+  segmentTextActive: {
+      color: '#fff',
+  },
+  tabFilterContainer: {
+      flexDirection: 'row',
+      marginTop: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee',
+  },
+  filterTab: {
+      marginRight: 25,
+      paddingBottom: 10,
+  },
+  filterTabActive: {
+      borderBottomWidth: 2,
+      borderBottomColor: '#000',
+  },
+  filterText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#999',
+  },
+  filterTextActive: {
+      color: '#000',
+  },
+  mapContainer: {
+      flex: 1,
+      overflow: 'hidden',
+  },
+  map: {
+      width: '100%',
+      height: '100%',
+  },
+  markerContainer: {
+      alignItems: 'center',
+  },
+  markerContent: {
+      alignItems: 'center',
+      backgroundColor: '#fff',
+      padding: 4,
+      borderRadius: 12,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+  },
+  markerImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: theme.colors.primary,
+  },
+  markerName: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#000',
+      marginTop: 4,
+      maxWidth: 80,
+  },
+  markerArrow: {
+      width: 0,
+      height: 0,
+      backgroundColor: 'transparent',
+      borderStyle: 'solid',
+      borderLeftWidth: 6,
+      borderRightWidth: 6,
+      borderTopWidth: 8,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderTopColor: '#fff', 
+      marginTop: -2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+  },
+  mapOverlay: {
+      position: 'absolute',
+      top: 20,
+      alignSelf: 'center',
+  },
+  mapOverlayCard: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  mapOverlayText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#000',
+  },
+  centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+  },
+  listContainer: {
+      flex: 1,
+      backgroundColor: '#f8f8f8',
+  },
+  listContent: {
+      paddingBottom: 20,
+      paddingTop: 10,
   },
   loadingContainer: {
-    alignItems: 'center',
-    padding: 40,
+      paddingTop: 50,
+      alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#666',
+      marginTop: 12,
+      color: '#888',
+      fontSize: 14,
   },
-  emptyCard: {
-    padding: 40,
-    alignItems: 'center',
-    marginHorizontal: 16,
+  emptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 40,
+      paddingBottom: 100,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
-    marginTop: 16,
-    marginBottom: 8,
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#333',
+      marginTop: 20,
+      marginBottom: 8,
   },
-  emptyDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
+  emptySub: {
+      fontSize: 14,
+      color: '#888',
+      textAlign: 'center',
+      lineHeight: 20,
   },
-  infoCard: {
-    padding: 24,
-    alignItems: 'center',
-    marginHorizontal: 16,
+  offlineContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 30,
+      backgroundColor: '#fff',
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
-    marginTop: 16,
-    marginBottom: 12,
+  offlineIconCircle: {
+      width: 140,
+      height: 140,
+      borderRadius: 70,
+      backgroundColor: '#f5f5f5',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 30,
   },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    textAlign: 'center',
-    marginBottom: 12,
+  offlineTitle: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: '#000',
+      marginBottom: 10,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 4,
+  offlineDesc: {
+      fontSize: 15,
+      color: '#666',
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 40,
   },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 6,
+  enableButton: {
+      flexDirection: 'row',
+      backgroundColor: '#000',
+      paddingHorizontal: 32,
+      paddingVertical: 16,
+      borderRadius: 30,
+      alignItems: 'center',
+      gap: 10,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 6,
   },
-  activeTab: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  activeTabText: {
-    color: theme.colors.primary,
-  },
-  badge: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
+  enableButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '700',
   },
 });
 

@@ -27,6 +27,16 @@ exports.updateProfile = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user) {
+      // DEBUG: Log incoming profile update
+      if (req.body.photos || req.body.mainPhotoIndex !== undefined) {
+          console.log(`DEBUG: UpdateProfile for ${user.displayName}`);
+          if (req.body.mainPhotoIndex !== undefined) console.log(`   mainPhotoIndex: ${req.body.mainPhotoIndex}`);
+          if (req.body.photos) {
+              console.log(`   Photos Count: ${req.body.photos.length}`);
+              console.log(`   First Photo: ${req.body.photos[0] ? req.body.photos[0].substring(0, 40) + '...' : 'null'}`);
+          }
+      }
+
       // Update fields
       Object.keys(req.body).forEach(key => {
         user[key] = req.body[key];
@@ -115,6 +125,12 @@ exports.getPotentialMatches = async (req, res) => {
       ...excludedUserIds, 
       ...interactedUserIds
     ])];
+    
+    console.log(`DEBUG: CurrentUser: ${currentUserId}`);
+    console.log(`DEBUG: Interactions Found: ${interactions.length}`);
+    console.log(`DEBUG: Existing Matches Found: ${existingMatches.length}`);
+    console.log(`DEBUG: Excluded IDs Count: ${allExcludedIds.length}`);
+    console.log(`DEBUG: Excluded IDs: ${JSON.stringify(allExcludedIds)}`);
     
     // Get current user's preferences
     const currentUser = await User.findById(currentUserId).select('preferences gender');
@@ -282,5 +298,27 @@ exports.sendTestNotification = async (req, res) => {
       message: 'Server error while sending test notification',
       error: error.message 
     });
+  }
+};
+// @desc    Delete user account
+// @route   DELETE /api/users/profile
+// @access  Private
+exports.deleteAccount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+      // Optional: Delete related data (matches, interactions, etc.) here if needed
+      // For now, just delete the user document
+      await User.findByIdAndDelete(req.user._id);
+      
+      console.log(`User deleted: ${req.user._id}`);
+      res.json({ message: 'User deleted successfully' });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: error.message });
   }
 };

@@ -504,10 +504,10 @@ const OnboardingWizard = ({ route, navigation }) => {
       });
       console.log("User document created");
 
-      // Navigate to Premium screen (Onboarding completion happens there)
+      // Navigate to VerifyAccount screen (Standard flow now requires verification after photos)
       navigation.reset({
         index: 0,
-        routes: [{ name: "Premium" }],
+        routes: [{ name: "VerifyAccount" }],
       });
     } catch (error) {
       console.error("Onboarding completion error:", error);

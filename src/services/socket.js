@@ -4,8 +4,7 @@ import { AppState } from 'react-native';
 
 
 // const SOCKET_URL = "https://dating-5sfs.onrender.com";
-// const SOCKET_URL = "https://dating-5sfs.onrender.com";
-const SOCKET_URL = "http://192.168.1.7:5001";
+const SOCKET_URL = "http://192.168.1.8:5001";
 
 
 
@@ -377,6 +376,11 @@ class SocketService {
   // Listen for Connect Now errors
   onConnectNowError(callback) {
     this.addListener("connect_now_error", callback);
+  }
+
+  // Listen for nearby user entered proximity
+  onNearbyUserEntered(callback) {
+    this.addListener("nearby_user_entered", callback);
   }
 
   // Listen for nearby user left proximity

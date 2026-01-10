@@ -171,7 +171,7 @@ const DeleteAccountBottomSheet = ({ visible, onClose, onConfirm, loading }) => {
                 placeholderTextColor="#999"
                 autoCapitalize="characters"
                 autoCorrect={false}
-                autoFocus={true}
+                autoFocus={false}
               />
               {error && (
                 <Text style={styles.errorText}>{error}</Text>
@@ -225,13 +225,14 @@ const styles = StyleSheet.create({
   bottomSheet: {
     height: BOTTOM_SHEET_HEIGHT,
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24, // Rounded all corners for floating card look
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
+    marginBottom: Platform.OS === 'ios' ? 34 : 20, // Add bottom margin to float it
+    marginHorizontal: 10, // Slight horizontal margin
   },
   handleContainer: {
     alignItems: "center",

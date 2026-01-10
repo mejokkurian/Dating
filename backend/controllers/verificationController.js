@@ -8,7 +8,166 @@ const path = require('path');
 const verifications = new Map(); // In-memory store for now, should use MongoDB collection
 
 // Python verification service URL
-const VERIFICATION_SERVICE_URL = process.env.VERIFICATION_SERVICE_URL || 'http://localhost:8001';
+const { RekognitionClient, CompareFacesCommand } = require("@aws-sdk/client-rekognition");
+
+// Initialize AWS Client
+console.log("DEBUG: AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? process.env.AWS_ACCESS_KEY_ID.substring(0, 5) + "..." : "MISSING");
+console.log("DEBUG: AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY ? "EXISTS" : "MISSING");
+console.log("DEBUG: AWS_REGION:", process.env.AWS_REGION);
+
+// Ensure region is set
+const awsRegion = process.env.AWS_REGION || "us-east-1";
+
+const rekognition = new RekognitionClient({
+  region: awsRegion,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// @desc    Verify account with selfie image (AWS Rekognition)
+// @route   POST /api/verification/image-verify
+// @access  Private
+exports.verifyAccountWithSelfie = async (req, res) => {
+  try {
+    // 1. Auth Check
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = req.user._id;
+
+    // 2. Get Selfie Image (Base64 or File)
+    let selfieBuffer;
+    if (req.body.image) {
+       // Handle Base64
+       let base64String = req.body.image;
+       if (base64String.includes(',')) base64String = base64String.split(',')[1];
+       selfieBuffer = Buffer.from(base64String, 'base64');
+    } else if (req.files?.image) {
+       // Handle File Upload
+       selfieBuffer = req.files.image.data;
+    } else {
+       return res.status(400).json({ success: false, message: 'Selfie image is required' });
+    }
+
+    // 3. Get User's Profile Photo
+    const user = await User.findById(userId).select('photos mainPhotoIndex');
+    if (!user || !user.photos || user.photos.length === 0) {
+       return res.status(400).json({ success: false, message: 'No profile photos found to compare against.' });
+    }
+    
+    // Use main photo or first photo (Validate index bounds)
+    let targetIndex = user.mainPhotoIndex || 0;
+    if (targetIndex < 0 || targetIndex >= user.photos.length) {
+        targetIndex = 0;
+    }
+    const profilePhotoUrl = user.photos[targetIndex];
+    
+    console.log(`DEBUG: Verifying against Photo Index: ${targetIndex}, URL: ${profilePhotoUrl ? profilePhotoUrl.substring(0, 30) + '...' : 'Invalid'}`);
+
+    // Maximum 5 seconds timeout for fetching image
+    const imageController = new AbortController();
+    const timeoutId = setTimeout(() => imageController.abort(), 5000);
+
+    // 4. Fetch Profile Photo as Buffer (AWS needs bytes if not in S3)
+    let profilePhotoBuffer;
+    try {
+        const imageResponse = await axios.get(profilePhotoUrl, { 
+            responseType: 'arraybuffer',
+            signal: imageController.signal
+        });
+        clearTimeout(timeoutId);
+        profilePhotoBuffer = Buffer.from(imageResponse.data);
+    } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("Failed to download profile photo:", err.message);
+        return res.status(400).json({ success: false, message: 'Failed to retrieve your profile photo. Please try later.' });
+    }
+
+    // 5. Call AWS Rekognition
+    const command = new CompareFacesCommand({
+      SourceImage: { Bytes: profilePhotoBuffer },
+      TargetImage: { Bytes: selfieBuffer },
+      SimilarityThreshold: 85 // Strictness
+    });
+
+    try {
+        const data = await rekognition.send(command);
+        const matches = data.FaceMatches;
+
+        // Check for Match
+        if (matches && matches.length > 0) {
+            const bestMatch = matches.reduce((prev, current) => (prev.Similarity > current.Similarity) ? prev : current);
+            
+            console.log(`✅ AWS Verification Success: ${bestMatch.Similarity}% match for user ${userId}`);
+
+            if (bestMatch.Similarity >= 85) {
+                // Update User
+                await User.findByIdAndUpdate(userId, {
+                    isVerified: true,
+                    verificationMethod: 'aws-rekognition',
+                    verificationDate: new Date(),
+                    verificationStatus: 'approved'
+                });
+
+                return res.json({
+                    success: true,
+                    verified: true,
+                    confidence: bestMatch.Similarity,
+                    message: "Identity verified successfully!"
+                });
+            }
+        }
+
+        // No match found
+        console.log(`❌ AWS Verification Failed for user ${userId}`);
+        return res.json({
+            success: false,
+            verified: false,
+            message: "Verification failed. Face did not match profile photo."
+        });
+
+    } catch (awsError) {
+        console.error("AWS Rekognition Error:", awsError);
+        // Handle common AWS errors (e.g., ImageTooLarge, InvalidImageFormat)
+        return res.status(500).json({ 
+            success: false, 
+            message: "Use a clear, singular face.", 
+            error: awsError.name 
+        });
+    }
+
+  } catch (error) {
+    console.error('Image verification error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get verification status
+// @route   GET /api/verification/status
+// @access  Private
+exports.getVerificationStatusEndpoint = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    const user = await User.findById(userId).select('isVerified verificationMethod verificationDate verificationStatus photos');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      isVerified: user.isVerified || false,
+      verificationMethod: user.verificationMethod || null,
+      verificationDate: user.verificationDate || null,
+      verificationStatus: user.verificationStatus || null,
+      hasProfilePhotos: user.photos && user.photos.length > 0
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // @desc    Create verification request
 // @route   POST /api/verification
@@ -50,7 +209,7 @@ exports.createVerification = async (req, res) => {
   }
 };
 
-// @desc    Get verification status
+// @desc    Get verification status (by User ID param)
 // @route   GET /api/verification/:userId
 // @access  Private
 exports.getVerificationStatus = async (req, res) => {
@@ -116,180 +275,6 @@ exports.updateVerificationStatus = async (req, res) => {
     res.json({
       message: 'Verification status updated successfully',
       verification
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Verify account with selfie image
-// @route   POST /api/verification/image-verify
-// @access  Private
-exports.verifyAccountWithSelfie = async (req, res) => {
-  try {
-    // Validate user authentication
-    if (!req.user || !req.user._id) {
-      console.error('Image verification error: User not authenticated');
-      return res.status(401).json({ 
-        success: false,
-        verified: false,
-        message: 'User not authenticated',
-        error: 'AUTHENTICATION_REQUIRED'
-      });
-    }
-
-    const userId = req.user._id;
-    console.log(`Image verification request from user: ${userId}`);
-    
-    // Check if image is provided
-    if (!req.body.image && !req.files?.image) {
-      console.error('Image verification error: No image provided');
-      return res.status(400).json({ 
-        success: false,
-        verified: false,
-        message: 'Selfie image is required',
-        error: 'IMAGE_REQUIRED'
-      });
-    }
-
-    let imageBase64;
-    
-    // Handle base64 image from request body
-    if (req.body.image) {
-      imageBase64 = req.body.image;
-      // Remove data URL prefix if present
-      if (imageBase64.includes(',')) {
-        imageBase64 = imageBase64.split(',')[1];
-      }
-      console.log('Image received as base64 string, length:', imageBase64.length);
-    }
-    // Handle file upload
-    else if (req.files?.image) {
-      const imageFile = req.files.image;
-      imageBase64 = imageFile.data.toString('base64');
-      console.log('Image received as file upload, size:', imageFile.size);
-    } else {
-      console.error('Image verification error: Invalid image format');
-      return res.status(400).json({ 
-        success: false,
-        verified: false,
-        message: 'Invalid image format',
-        error: 'INVALID_IMAGE_FORMAT'
-      });
-    }
-
-    // Check if user has profile photos
-    console.log(`Checking profile photos for user: ${userId}`);
-    const user = await User.findById(userId).select('photos');
-    if (!user) {
-      console.error(`Image verification error: User ${userId} not found`);
-      return res.status(404).json({ 
-        success: false,
-        verified: false,
-        message: 'User not found',
-        error: 'USER_NOT_FOUND'
-      });
-    }
-    if (!user.photos || user.photos.length === 0) {
-      console.log(`Image verification error: User ${userId} has no profile photos`);
-      return res.status(400).json({ 
-        success: false,
-        verified: false,
-        message: 'Please upload at least one profile photo before verifying your account',
-        error: 'NO_PROFILE_PHOTOS'
-      });
-    }
-    console.log(`User has ${user.photos.length} profile photo(s)`);
-
-    try {
-      // Call Python verification service
-      const response = await axios.post(`${VERIFICATION_SERVICE_URL}/api/verify-face`, {
-        userId: userId.toString(),
-        selfieImageBase64: imageBase64
-      }, {
-        timeout: 30000 // 30 second timeout
-      });
-
-      const verificationResult = response.data;
-
-      // Update user verification status if verified
-      if (verificationResult.verified) {
-        const updateData = {
-          isVerified: true,
-          verificationMethod: 'image',
-          verificationDate: new Date(),
-          verificationStatus: 'approved'
-        };
-        await User.findByIdAndUpdate(userId, updateData);
-      }
-
-      res.json({
-        success: verificationResult.verified,
-        verified: verificationResult.verified,
-        confidence: verificationResult.confidence,
-        message: verificationResult.message,
-        details: {
-          facesFoundInSelfie: verificationResult.faces_found_in_selfie,
-          profilePhotosCompared: verificationResult.profile_photos_compared,
-          bestMatchConfidence: verificationResult.best_match_confidence,
-          threshold: verificationResult.threshold
-        }
-      });
-
-    } catch (serviceError) {
-      console.error('Verification service error:', serviceError.response?.data || serviceError.message);
-      
-      // Handle service errors
-      if (serviceError.response) {
-        // Service returned an error response
-        const errorData = serviceError.response.data;
-        return res.status(serviceError.response.status || 500).json({
-          success: false,
-          verified: false,
-          message: errorData.message || 'Face verification failed',
-          error: errorData.error || 'VERIFICATION_SERVICE_ERROR'
-        });
-      } else {
-        // Network or other error
-        return res.status(503).json({
-          success: false,
-          verified: false,
-          message: 'Verification service is unavailable. Please try again later.',
-          error: 'SERVICE_UNAVAILABLE'
-        });
-      }
-    }
-
-  } catch (error) {
-    console.error('Image verification error:', error);
-    res.status(500).json({ 
-      success: false,
-      verified: false,
-      message: error.message || 'Failed to verify account',
-      error: 'INTERNAL_ERROR'
-    });
-  }
-};
-
-// @desc    Get verification status
-// @route   GET /api/verification/status
-// @access  Private
-exports.getVerificationStatusEndpoint = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    
-    const user = await User.findById(userId).select('isVerified verificationMethod verificationDate verificationStatus photos');
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json({
-      isVerified: user.isVerified || false,
-      verificationMethod: user.verificationMethod || null,
-      verificationDate: user.verificationDate || null,
-      verificationStatus: user.verificationStatus || null,
-      hasProfilePhotos: user.photos && user.photos.length > 0
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

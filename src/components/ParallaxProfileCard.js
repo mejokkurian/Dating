@@ -115,6 +115,8 @@ const ParallaxProfileCard = ({
   // --- Gesture Logic ---
   const panGesture = Gesture.Pan()
     .enabled(!disabled)
+    .activeOffsetY([-10, 10]) // Activate when vertical movement > 10
+    .failOffsetX([-20, 20])   // Fail if horizontal movement > 20
     .onBegin(() => {
       // scale down slightly
     })

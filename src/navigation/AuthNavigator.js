@@ -191,6 +191,7 @@ const AuthNavigator = ({ navigationRef }) => {
             <Stack.Screen name="OnboardingIntro" component={OnboardingIntroScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Onboarding" component={OnboardingWizard} />
             <Stack.Screen name="KYCUpload" component={KYCUploadScreen} />
+            <Stack.Screen name="VerifyAccount" component={VerifyAccountScreen} />
             <Stack.Screen name="Premium" component={PremiumScreen} />
           </>
         ) : (

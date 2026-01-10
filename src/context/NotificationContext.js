@@ -367,9 +367,10 @@ export const NotificationProvider = ({ children, navigationRef }) => {
           : "Stay connected! Get notified when you receive updates."
         }
         listItems={permissionSheet.step === 'settings' ? null : [
-            { icon: 'chatbubbles', text: 'New messages' },
-            { icon: 'heart', text: 'New matches' },
-            { icon: 'people', text: 'Nearby users' },
+            { icon: 'chatbubbles', text: 'Instant Message Alerts' },
+            { icon: 'heart', text: 'New Match Connections' },
+            { icon: 'people', text: 'Nearby People Updates' },
+            { icon: 'star', text: 'See Who Likes You' },
         ]}
         buttonText={permissionSheet.step === 'settings' ? "Open Settings" : "Enable Notifications"}
         type={permissionSheet.step === 'settings' ? "error" : "info"}

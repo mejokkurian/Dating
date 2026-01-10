@@ -17,7 +17,8 @@ const NotificationBottomSheet = ({
   secondaryButtonText,
   onSecondaryButtonPress,
   listItems, // Optional list of { icon, text }
-  type = 'info' // 'success', 'error', 'info', 'match'
+  type = 'info', // 'success', 'error', 'info', 'match'
+  centerList = false
 }) => {
   const slideAnim = useRef(new Animated.Value(height)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -103,11 +104,11 @@ const NotificationBottomSheet = ({
                 {listItems ? (
                   <View style={styles.listContainer}>
                     {listItems.map((item, index) => (
-                      <View key={index} style={styles.listItem}>
-                        <View style={styles.listIconContainer}>
+                      <View key={index} style={[styles.listItem, centerList && styles.listItemCentered]}>
+                        <View style={[styles.listIconContainer, centerList && styles.listIconCentered]}>
                            <Ionicons name={item.icon} size={20} color="#D4AF37" />
                         </View>
-                        <Text style={styles.listItemText}>{item.text}</Text>
+                        <Text style={[styles.listItemText, centerList && styles.listItemTextCentered]}>{item.text}</Text>
                       </View>
                     ))}
                   </View>
@@ -213,8 +214,8 @@ const styles = StyleSheet.create({
   },
   listItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start', // Align to top for multi-line text
+    marginBottom: 16,
   },
   listIconContainer: {
     width: 36,
@@ -224,11 +225,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    marginTop: 2, // Align with first line of text
   },
   listItemText: {
     fontSize: 16,
     color: '#444444',
     fontWeight: '500',
+    flex: 1, // Allow text to wrap
+    lineHeight: 22,
+  },
+  listItemCentered: {
+      flexDirection: 'column',
+      alignItems: 'center',
+      marginBottom: 24,
+  },
+  listIconCentered: {
+      marginRight: 0,
+      marginBottom: 8,
+      marginTop: 0,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+  },
+  listItemTextCentered: {
+      textAlign: 'center',
+      flex: 0,
+      paddingHorizontal: 20,
   },
   buttonContainer: {
     width: '100%',
