@@ -8,7 +8,12 @@ const path = require('path');
 const verifications = new Map(); // In-memory store for now, should use MongoDB collection
 
 // Python verification service URL
-const { RekognitionClient, CompareFacesCommand } = require("@aws-sdk/client-rekognition");
+const { 
+    RekognitionClient, 
+    CompareFacesCommand,
+    CreateFaceLivenessSessionCommand,
+    GetFaceLivenessSessionResultsCommand
+} = require("@aws-sdk/client-rekognition");
 
 // Initialize AWS Client
 console.log("DEBUG: AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? process.env.AWS_ACCESS_KEY_ID.substring(0, 5) + "..." : "MISSING");
@@ -26,7 +31,137 @@ const rekognition = new RekognitionClient({
   },
 });
 
-// @desc    Verify account with selfie image (AWS Rekognition)
+// @desc    Create Liveness Session
+// @route   POST /api/verification/liveness/session
+// @access  Private
+exports.createLivenessSession = async (req, res) => {
+    try {
+        const command = new CreateFaceLivenessSessionCommand({
+             // ClientRequestToken is optional but good for idempotency
+             ClientRequestToken: `${req.user._id}-${Date.now()}`
+        });
+
+        const response = await rekognition.send(command);
+        
+        res.json({
+            success: true,
+            sessionId: response.SessionId
+        });
+    } catch (error) {
+        console.error("Error creating liveness session:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: `Failed to create liveness session: ${error.message}`,
+            errorName: error.name,
+            stack: error.stack
+        });
+    }
+};
+
+// @desc    Get Liveness Results & Verify
+// @route   GET /api/verification/liveness/results/:sessionId
+// @access  Private
+// @desc    Get Liveness Results & Verify
+// @route   GET /api/verification/liveness/results/:sessionId
+// @access  Private
+exports.getLivenessSessionResults = async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const userId = req.user._id;
+
+        const command = new GetFaceLivenessSessionResultsCommand({
+            SessionId: sessionId
+        });
+
+        const response = await rekognition.send(command);
+        
+        // 1. Security Check 1: Is it a real human? (Liveness Check)
+        // User requested > 90% confidence
+        const isLive = response.Status === "SUCCEEDED" && response.Confidence >= 90;
+        
+        if (!isLive) {
+             console.log(`❌ Liveness Failed for user ${userId}. Confidence: ${response.Confidence}`);
+             return res.json({
+                 success: false,
+                 verified: false,
+                 message: "Liveness check failed. Please try again."
+             });
+        }
+
+        // 2. Security Check 2: Is it the RIGHT human? (Face Match)
+        if (response.ReferenceImage) {
+             const user = await User.findById(userId).select('photos mainPhotoIndex');
+             if (!user || (!user.photos?.length && !user.profilePhotoKey)) {
+                 return res.status(400).json({ success: false, message: 'No profile photo to match against.' });
+             }
+
+             const targetIndex = user.mainPhotoIndex || 0;
+             const profilePhotoUrl = user.photos[targetIndex];
+             
+             // Prepare Source Image (The Live Reference)
+             let sourceImage = {};
+             if (response.ReferenceImage.Bytes) {
+                 sourceImage = { Bytes: Buffer.from(response.ReferenceImage.Bytes) };
+             } else if (response.ReferenceImage.S3Object) {
+                 sourceImage = { S3Object: response.ReferenceImage.S3Object };
+             } else {
+                 return res.json({ success: false, message: "Liveness succeeded but no reference image captured." });
+             }
+
+             // Prepare Target Image (The Stored Profile Photo)
+             // Ideally use S3 Object if you store keys, but here we fetch the URL as bytes
+             let targetImage = {};
+             try {
+                const imageResponse = await axios.get(profilePhotoUrl, { responseType: 'arraybuffer' });
+                targetImage = { Bytes: Buffer.from(imageResponse.data) };
+             } catch (err) {
+                 return res.status(400).json({ success: false, message: 'Failed to retrieve profile photo.' });
+             }
+
+             // Call AWS Rekognition CompareFaces
+             const compareCommand = new CompareFacesCommand({
+                SourceImage: sourceImage,
+                TargetImage: targetImage,
+                SimilarityThreshold: 95 // STRICT Security Match
+             });
+
+             const compareData = await rekognition.send(compareCommand);
+             const matches = compareData.FaceMatches;
+             
+             if (matches && matches.length > 0 && matches[0].Similarity >= 95) {
+                 // Success!
+                 await User.findByIdAndUpdate(userId, {
+                    isVerified: true,
+                    verificationMethod: 'aws-liveness',
+                    verificationDate: new Date(),
+                    verificationStatus: 'approved'
+                 });
+
+                 return res.json({
+                     success: true,
+                     verified: true,
+                     confidence: matches[0].Similarity,
+                     message: "Identity verified successfully with Liveness!"
+                 });
+             } else {
+                 console.log(`❌ Face Match Failed for user ${userId}. Best Match: ${matches?.[0]?.Similarity || 0}%`);
+                 return res.json({
+                     success: false,
+                     verified: false,
+                     message: "Identity verification failed. Face does not match profile photo."
+                 });
+             }
+        }
+
+        res.json({ success: false, message: "No reference image available from Liveness session." });
+
+    } catch (error) {
+        console.error("Error getting liveness results:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Verify account with selfie image (Legacy/Simple)
 // @route   POST /api/verification/image-verify
 // @access  Private
 exports.verifyAccountWithSelfie = async (req, res) => {

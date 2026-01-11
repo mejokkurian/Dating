@@ -16,6 +16,11 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
+import com.amplifyframework.core.Amplify
+import com.amplifyframework.auth.cognito.AWSCognitoAuthPlugin
+import com.amplifyframework.AmplifyException
+import android.util.Log
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
@@ -24,7 +29,7 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
+              add(LivenessPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
@@ -40,6 +45,17 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    
+    try {
+        // 1. Add the Auth Plugin (REQUIRED for Liveness)
+        Amplify.addPlugin(AWSCognitoAuthPlugin())
+        // 2. Configure Amplify (reads from res/raw/amplifyconfiguration.json)
+        Amplify.configure(applicationContext)
+        Log.i("Amplify", "Initialized Amplify")
+    } catch (error: AmplifyException) {
+        Log.e("Amplify", "Could not initialize Amplify", error)
+    }
+
     DefaultNewArchitectureEntryPoint.releaseLevel = try {
       ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())
     } catch (e: IllegalArgumentException) {

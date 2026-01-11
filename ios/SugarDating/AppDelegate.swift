@@ -2,6 +2,8 @@ import Expo
 
 import React
 import ReactAppDependencyProvider
+import Amplify
+import AWSCognitoAuthPlugin
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -14,6 +16,13 @@ public class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    do {
+      try Amplify.add(plugin: AWSCognitoAuthPlugin())
+      try Amplify.configure()
+      print("Amplify initialized")
+    } catch {
+      print("Failed to initialize Amplify: \(error)")
+    }
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
