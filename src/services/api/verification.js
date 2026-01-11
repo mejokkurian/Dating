@@ -82,3 +82,34 @@ export const getImageVerificationStatus = async () => {
     );
   }
 };
+
+/**
+ * Create AWS Liveness Session
+ * @returns {Promise<Object>} - { success: true, sessionId: string }
+ */
+export const createLivenessSession = async () => {
+  try {
+    const response = await api.post("/verification/liveness/session");
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || "Failed to create liveness session"
+    );
+  }
+};
+
+/**
+ * Get Liveness Results
+ * @param {string} sessionId
+ * @returns {Promise<Object>} - Verification Result
+ */
+export const getLivenessSessionResults = async (sessionId) => {
+  try {
+    const response = await api.get(`/verification/liveness/results/${sessionId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || "Failed to get liveness results"
+    );
+  }
+};

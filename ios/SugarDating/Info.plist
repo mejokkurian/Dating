@@ -47,7 +47,11 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>2</string>
+	<string>3</string>
+	<key>INIntentsSupported</key>
+	<array>
+		<string>Intent</string>
+	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -60,7 +64,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>The app accesses your camera to take ID verification photos.</string>
+	<string>We need your camera to verify you are a real person.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app uses your location to help you discover compatible people nearby when you enable Connect Now.</string>
 	<key>NSLocationAlwaysUsageDescription</key>

@@ -11,6 +11,11 @@
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		51564611E657330B8F8544F6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8497BFD3F0A6CCD9DDDBDD4F /* PrivacyInfo.xcprivacy */; };
 		610F647259063BFEDCC3D380 /* libPods-SugarDating.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E879961C6107B98150E05E06 /* libPods-SugarDating.a */; };
+		8B2A6A832F12638800AB3FD1 /* FaceLiveness in Frameworks */ = {isa = PBXBuildFile; productRef = 8B2A6A822F12638800AB3FD1 /* FaceLiveness */; };
+		8B2A6A852F12929800AB3FD1 /* FaceLiveness in Frameworks */ = {isa = PBXBuildFile; productRef = 8B2A6A842F12929800AB3FD1 /* FaceLiveness */; };
+		8BB8E3DA2F1373D000561EF2 /* LivenessModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B2A6A862F12959A00AB3FD1 /* LivenessModule.m */; };
+		8BB8E3DB2F1373DF00561EF2 /* LivenessModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2A6A872F1295A500AB3FD1 /* LivenessModule.swift */; };
+		8BB8E3DD2F13765D00561EF2 /* amplifyconfiguration.json in Resources */ = {isa = PBXBuildFile; fileRef = 8BB8E3DC2F13765D00561EF2 /* amplifyconfiguration.json */; };
 		B2CB8C4100864C019DE32D4D /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5BC2A6085D6440D7AC828A19 /* GoogleService-Info.plist */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		EC4008E03FC408650E952514 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14377B37D39397F3C4E2A7B8 /* ExpoModulesProvider.swift */; };
@@ -24,6 +29,9 @@
 		14377B37D39397F3C4E2A7B8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SugarDating/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		5BC2A6085D6440D7AC828A19 /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "SugarDating/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		8497BFD3F0A6CCD9DDDBDD4F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = SugarDating/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		8B2A6A862F12959A00AB3FD1 /* LivenessModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LivenessModule.m; sourceTree = "<group>"; };
+		8B2A6A872F1295A500AB3FD1 /* LivenessModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivenessModule.swift; sourceTree = "<group>"; };
+		8BB8E3DC2F13765D00561EF2 /* amplifyconfiguration.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = amplifyconfiguration.json; sourceTree = "<group>"; };
 		A02DA2E4E1022344A79B68E3 /* Pods-SugarDating.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SugarDating.debug.xcconfig"; path = "Target Support Files/Pods-SugarDating/Pods-SugarDating.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SugarDating/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
@@ -39,7 +47,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8B2A6A832F12638800AB3FD1 /* FaceLiveness in Frameworks */,
 				610F647259063BFEDCC3D380 /* libPods-SugarDating.a in Frameworks */,
+				8B2A6A852F12929800AB3FD1 /* FaceLiveness in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -80,12 +90,15 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				8B2A6A872F1295A500AB3FD1 /* LivenessModule.swift */,
 				13B07FAE1A68108700A75B9A /* SugarDating */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				ED3CCFB46681A049C10DD226 /* Pods */,
 				849D85097ACD9F249623A647 /* ExpoModulesProviders */,
+				8B2A6A862F12959A00AB3FD1 /* LivenessModule.m */,
+				8BB8E3DC2F13765D00561EF2 /* amplifyconfiguration.json */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -181,6 +194,9 @@
 				Base,
 			);
 			mainGroup = 83CBB9F61A601CBA00E9B192;
+			packageReferences = (
+				8B2A6A812F12638800AB3FD1 /* XCRemoteSwiftPackageReference "amplify-ui-swift-liveness" */,
+			);
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -196,6 +212,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
+				8BB8E3DD2F13765D00561EF2 /* amplifyconfiguration.json in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				B2CB8C4100864C019DE32D4D /* GoogleService-Info.plist in Resources */,
@@ -263,6 +280,7 @@
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/expo-dev-launcher/EXDevLauncher.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/expo-dev-menu/EXDevMenu.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/react-native-maps/ReactNativeMapsPrivacy.bundle",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
@@ -277,6 +295,7 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXDevLauncher.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXDevMenu.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ReactNativeMapsPrivacy.bundle",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -338,7 +357,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8BB8E3DA2F1373D000561EF2 /* LivenessModule.m in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				8BB8E3DB2F1373DF00561EF2 /* LivenessModule.swift in Sources */,
 				EC4008E03FC408650E952514 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -580,6 +601,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8B2A6A812F12638800AB3FD1 /* XCRemoteSwiftPackageReference "amplify-ui-swift-liveness" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/aws-amplify/amplify-ui-swift-liveness";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.4.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8B2A6A822F12638800AB3FD1 /* FaceLiveness */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8B2A6A812F12638800AB3FD1 /* XCRemoteSwiftPackageReference "amplify-ui-swift-liveness" */;
+			productName = FaceLiveness;
+		};
+		8B2A6A842F12929800AB3FD1 /* FaceLiveness */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8B2A6A812F12638800AB3FD1 /* XCRemoteSwiftPackageReference "amplify-ui-swift-liveness" */;
+			productName = FaceLiveness;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
 }
