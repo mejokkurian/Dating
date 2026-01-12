@@ -159,3 +159,26 @@ try {
 | **"Call must be made on main thread"** | Crash in iOS UI dismissal. | Wrap `rootViewController.dismiss` in `DispatchQueue.main.async` in `LivenessModule.swift`. |
 | **"FaceLivenessDetectionError error 1"** | AWS Access Denied. | Add `rekognition:StartFaceLivenessSession` policy to the **Google/Guest Role** in IAM Console. |
 | **"Missing package product 'FaceLiveness'"** | SPM Package stuck. | Xcode -> File -> Packages -> **Reset Package Caches**. Then Clean Build Folder. |
+---
+
+## 6. Project Maintenance & Regeneration
+
+**Important:** Your project now contains custom native code (`LivenessModule.swift` and `LivenessModule.kt`) in the `ios` and `android` folders.
+
+### 6.1. Do Not Delete `ios` / `android`
+You should **COMMIT** these folders to Git.
+If you delete them and run `npx expo prebuild` again, **YOU WILL LOSE** the Liveness configuration.
+
+### 6.2. How to Regenerate (Start Fresh)
+If you must delete these folders (e.g., major SDK upgrade), you must **manually re-apply** the changes:
+
+1.  **Run Prebuild**: `npx expo prebuild`.
+2.  **Restore Helper Files**: Copy back `LivenessModule.swift`/`.m` and `LivenessModule.kt`/`LivenessPackage.kt` from your backup (or Git history).
+3.  **Restore Config**: Copy back `amplifyconfiguration.json`.
+4.  **Re-Edit Entry Points**:
+    - Add Amplify initialization lines to `ios/SugarDating/AppDelegate.swift`.
+    - Add Amplify initialization lines to `android/app/src/main/java/com/sugardating/app/MainApplication.kt`.
+5.  **Re-Link in Xcode**:
+    - Open `ios/SugarDating.xcworkspace`.
+    - Add `FaceLiveness` package dependency.
+    - Check "Target Membership" for `LivenessModule` and `amplifyconfiguration.json`.
