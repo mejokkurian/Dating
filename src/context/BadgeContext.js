@@ -62,16 +62,38 @@ export const BadgeProvider = ({ children }) => {
     }, 30000); // Refresh every 30 seconds
 
     // Listen for real-time updates via socket
-    const handleNewMessage = () => {
+    // Listen for real-time updates via socket
+    const handleRefresh = () => {
       updateBadgeCounts();
+    };
+
+    const handleNewMessage = (message) => {
+      updateBadgeCounts();
+      
+      // Global delivery acknowledgment:
+      // If we receive a message and we are the recipient, acknowledge it as delivered immediately
+      // This ensures 2 ticks appear even if user is not on the specific chat screen
+      if (message && message._id && user) {
+          const senderId = message.senderId._id || message.senderId;
+          // Check if we are the recipient (sender is not us)
+          if (senderId && senderId.toString() !== user._id.toString()) {
+               console.log(`Global Ack: Delivering message ${message._id} from ${senderId}`);
+               socketService.ackDelivered(message._id, senderId.toString());
+          }
+      }
     };
 
     socketService.connect();
     socketService.onNewMessage(handleNewMessage);
+    socketService.onNewMatch(handleRefresh);
+    socketService.onInteraction(handleRefresh);
+    // Add specific listeners if your socket service emits them
 
     return () => {
       clearInterval(interval);
       socketService.removeListener('new_message');
+      socketService.removeListener('new_match');
+      socketService.removeListener('interaction');
     };
   }, [user, updateBadgeCounts]);
 

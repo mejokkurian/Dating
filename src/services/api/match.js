@@ -15,11 +15,10 @@ export const getTopPicks = async () => {
   return response.data;
 };
 
-export const recordInteraction = async (targetId, action) => {
-  const response = await api.post('/matches/interaction', {
-    targetId,
-    action
-  });
+export const recordInteraction = async (targetId, action, comment = null) => {
+  const payload = { targetId, action };
+  if (comment) payload.comment = comment;
+  const response = await api.post('/matches/interaction', payload);
   return response.data;
 };
 

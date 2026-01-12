@@ -31,7 +31,7 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
       
       if (result.match && result.match.isMutual) {
         // Navigate to chat immediately
-        navigation.replace('Chat', {
+        navigation.push('Chat', {
           user: profileData,
           matchStatus: 'active',
           isInitiator: false

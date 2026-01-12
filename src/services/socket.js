@@ -13,6 +13,7 @@ class SocketService {
     this.socket = null;
     this.connected = false;
     this.listenerQueue = [];
+    this.activeListeners = []; // Keep track of all active listeners to re-attach on reconnect
     this.appStateSubscription = null;
     
     // Setup AppState listener
@@ -57,10 +58,22 @@ class SocketService {
         console.log("Socket connected");
         this.connected = true;
 
-        // Process queued listeners
+        // Process queued listeners (legacy queue)
         while (this.listenerQueue.length > 0) {
           const { event, callback } = this.listenerQueue.shift();
           this.socket.on(event, callback);
+          // Also add to activeListeners if not already there (for persistence)
+          this.activeListeners.push({ event, callback });
+        }
+        
+        // Re-attach all persistent listeners
+        if (this.activeListeners.length > 0) {
+            console.log(`Re-attaching ${this.activeListeners.length} active listeners`);
+            this.activeListeners.forEach(({ event, callback }) => {
+                // Remove existing listener for this event/callback combo to prevent duplicates if socket.io kept them
+                this.socket.off(event, callback); 
+                this.socket.on(event, callback);
+            });
         }
       });
 
@@ -80,16 +93,16 @@ class SocketService {
   disconnect() {
     if (this.socket) {
       try {
-        // Remove all listeners before disconnecting
-        this.socket.removeAllListeners();
-        this.socket.disconnect();
+        // We don't remove listeners from our registry, just from the socket instance
+        if (this.socket) {
+             this.socket.disconnect();
+        }
       } catch (error) {
         console.warn("Error disconnecting socket:", error);
       } finally {
         this.socket = null;
         this.connected = false;
-        // Keep listeners in queue so they re-attach on reconnect
-        // this.listenerQueue = []; 
+        // Keep listeners in queue/registry so they re-attach on reconnect
       }
     }
   }
@@ -163,16 +176,12 @@ class SocketService {
 
   // Generic listener handler
   addListener(event, callback) {
+    // Add to persistent registry
+    this.activeListeners.push({ event, callback });
+    
     if (this.socket && this.connected) {
       this.socket.on(event, callback);
     } 
-    // Always add to queue slightly differently to handle re-connections? 
-    // Actually, we should allow adding to queue even if connected if we want persistent listeners 
-    // but the current implementation clears queue after connect. 
-    // Let's just push to queue if not connected.
-    if (!this.connected) {
-      this.listenerQueue.push({ event, callback });
-    }
   }
 
   // Listen for new messages
@@ -273,11 +282,16 @@ class SocketService {
         console.warn("Error removing listener:", error);
       }
     }
+    // Remove from registry
+    this.activeListeners = this.activeListeners.filter(
+      (item) => item.event !== eventName
+    );
     // Also remove from queue if present
     this.listenerQueue = this.listenerQueue.filter(
       (item) => item.event !== eventName
     );
   }
+
 
   // Remove all listeners (useful for cleanup)
   removeAllListeners() {
@@ -289,6 +303,7 @@ class SocketService {
       }
     }
     this.listenerQueue = [];
+    this.activeListeners = [];
   }
 
   // ============ WebRTC Methods ============
@@ -405,6 +420,15 @@ class SocketService {
   // Listen for presence status changes
   onUserStatusChange(callback) {
     this.addListener('user_status_change', callback);
+  }
+  // Listen for new match
+  onNewMatch(callback) {
+    this.addListener("new_match", callback);
+  }
+
+  // Listen for generic interaction
+  onInteraction(callback) {
+    this.addListener("interaction", callback);
   }
 }
 

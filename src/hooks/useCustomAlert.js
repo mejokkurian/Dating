@@ -7,15 +7,17 @@ export const useCustomAlert = () => {
     message: '',
     type: 'error',
     onConfirm: null,
+    buttons: null,
   });
 
-  const showAlert = (title, message, type = 'error', onConfirm = null) => {
+  const showAlert = (title, message, type = 'error', onConfirm = null, buttons = null) => {
     setAlertConfig({
       visible: true,
       title,
       message,
       type,
       onConfirm,
+      buttons,
     });
   };
 

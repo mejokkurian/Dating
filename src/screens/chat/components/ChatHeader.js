@@ -15,14 +15,30 @@ const ChatHeader = ({
 }) => {
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <TouchableOpacity 
+        onPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            // If we cant go back (e.g. came from replace), default to the Messages tab
+            // We use reset/navigate to ensure we land on the main tabs structure
+            navigation.navigate('MainTab', { screen: 'Messages' });
+          }
+        }} 
+        style={styles.backButton}
+      >
         <Ionicons name="chevron-back" size={28} color="#000" />
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('ViewUserProfile', { userId: user._id, user })}>
-        <Image source={{ uri: user.image }} style={styles.avatar} />
+        <Image 
+          source={{ 
+            uri: user.image || (user.photos && user.photos.length > 0 ? (user.photos[user.mainPhotoIndex || 0] || user.photos[0]) : 'https://via.placeholder.com/40' ) 
+          }} 
+          style={styles.avatar} 
+        />
       </TouchableOpacity>
       <View style={styles.headerInfo}>
-        <Text style={styles.headerName}>{user.name}</Text>
+        <Text style={styles.headerName}>{user.displayName || user.name || 'User'}</Text>
         <Text style={[styles.statusText, !isOnline && { color: '#999' }]}>
           {!isOnline ? 'Offline' : isRemoteRecording ? 'Recording audio...' : isTyping ? 'Typing...' : isOtherUserInChat ? 'In Chat' : 'Online'}
         </Text>

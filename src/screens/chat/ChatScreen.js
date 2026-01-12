@@ -17,6 +17,11 @@ import socketService from '../../services/socket';
 import { useAuth } from '../../context/AuthContext';
 import { useCall } from '../../context/CallContext';
 import api from '../../services/api/config';
+import { reportUser, blockUser, respondToMatch } from '../../services/api/match';
+import CustomAlert from '../../components/CustomAlert';
+import DeclineConfirmationSheet from '../../components/DeclineConfirmationSheet';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { useBadge } from '../../context/BadgeContext';
 import StickerPicker from './components/StickerPicker';
 import StickerMessage from './components/StickerMessage';
 import AudioMessage from './components/messages/AudioMessage';
@@ -192,7 +197,7 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
                 <Ionicons name="alert-circle" size={10} color="#FF4444" style={{ marginLeft: 4 }} />
               ) : (
                 <Ionicons 
-                  name={item.status === 'read' ? "checkmark-done" : "checkmark"} 
+                  name={(item.status === 'read' || item.status === 'delivered') ? "checkmark-done" : "checkmark"} 
                   size={12} 
                   color={item.status === 'read' ? "#34C759" : "rgba(255,255,255,0.5)"} 
                   style={{ marginLeft: 4 }}
@@ -220,10 +225,28 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
 });
 
 const ChatScreen = ({ route, navigation }) => {
-  const { user, matchStatus, isInitiator } = route.params;
+  // Use state for match status to allow updating it locally upon acceptance
+  const { user, matchStatus: initialMatchStatus, isInitiator, isSuperLike, superLikeMessage } = route.params;
+  const [matchStatus, setMatchStatus] = useState(initialMatchStatus);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [declineSheetVisible, setDeclineSheetVisible] = useState(false);
+  const { alertConfig, showAlert, hideAlert } = useCustomAlert();
+  const { updateBadgeCounts } = useBadge();
   const { userData } = useAuth();
   const { startCall, callState } = useCall();
   const isMine = userData._id === user._id;
+  const insets = useSafeAreaInsets();
+
+  // Debug: Log user object to verify structure
+  useEffect(() => {
+    console.log('ChatScreen mounted with user:', JSON.stringify({
+      _id: user._id,
+      name: user.name,
+      displayName: user.displayName,
+      hasPhotos: !!user.photos,
+      photoCount: user.photos?.length
+    }));
+  }, [user._id]);
 
   // Messages & Socket Hook
   const {
@@ -295,10 +318,8 @@ const ChatScreen = ({ route, navigation }) => {
       
       if (!mounted) return;
 
-      // Subscribe to this user's presence
-      socketService.subscribePresence(user._id);
-      
-      // Listen for status changes
+      // IMPORTANT: Set up listener BEFORE subscribing
+      // The backend sends an immediate status update upon subscription
       socketService.onUserStatusChange((data) => {
         if (!mounted) return;
         if (data.userId === user._id) {
@@ -306,6 +327,9 @@ const ChatScreen = ({ route, navigation }) => {
            setIsOnline(data.status === 'online');
         }
       });
+
+      // Now subscribe to this user's presence
+      socketService.subscribePresence(user._id);
     };
 
     setupPresence();
@@ -316,6 +340,19 @@ const ChatScreen = ({ route, navigation }) => {
       socketService.removeListener('user_status_change');
     };
   }, [user._id]);
+
+  // Refresh badges on mount and unmount to ensure counts are accurate
+  useEffect(() => {
+      // Small delay to allow mark as read to propagate
+      const timer = setTimeout(() => {
+          updateBadgeCounts();
+      }, 1000);
+      
+      return () => {
+          clearTimeout(timer);
+          updateBadgeCounts();
+      };
+  }, [updateBadgeCounts]);
   
   // Camera & Image State (must be declared before hooks that use them)
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -622,6 +659,51 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleMatchResponse = async (action, isConfirmed = false) => {
+      // If action is decline and we haven't confirmed yet, show sheet
+      if (action === 'decline' && !isConfirmed) {
+          setDeclineSheetVisible(true);
+          return;
+      }
+      
+      // If we are confirming decline (called from sheet) or accepting
+      try {
+          const matchId = route.params.matchId; 
+          if (!matchId) {
+             showAlert('Error', 'Match ID not found', 'error');
+             return;
+          }
+
+          if (action === 'accept') setIsAccepting(true);
+
+          await respondToMatch(matchId, action);
+          
+          if (action === 'accept') {
+              setMatchStatus('active');
+              // Update route params to reflect active status immediately
+              navigation.setParams({ matchStatus: 'active' });
+              
+              showAlert(
+                  'Connected!',
+                  `You are now connected with ${user.displayName || user.name}. Start chatting!`,
+                  'success',
+                  null
+              );
+          } else {
+              if (navigation.canGoBack()) {
+                  navigation.goBack();
+              } else {
+                  navigation.navigate('MainTab', { screen: 'Messages' });
+              }
+          }
+      } catch (error) {
+          console.error("Match Response Error:", error);
+          showAlert("Error", "Failed to update match status", 'error');
+      } finally {
+        setIsAccepting(false);
+      }
+  };
+
   // Listen for server-side message errors (profanity detected)
   useEffect(() => {
     const handleMessageError = (error) => {
@@ -763,14 +845,76 @@ const ChatScreen = ({ route, navigation }) => {
         ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color="#D4AF37" /> : null}
       />
 
-      {matchStatus === 'pending' ? (
-        <View style={styles.pendingInputContainer}>
-          <Ionicons name="lock-closed-outline" size={24} color="#999" />
-          <Text style={styles.pendingInputText}>
-            {isInitiator 
-              ? `Waiting for ${user.displayName || user.name} to like you back`
-              : 'Swipe right on their profile to start chatting'}
-          </Text>
+      {/* Show pending UI if status is pending OR if it's a super like request we haven't answered yet */}
+      {(matchStatus === 'pending' || (isSuperLike && !isInitiator && matchStatus !== 'active')) ? (
+        <View style={[styles.pendingInputContainer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+          {isInitiator ? (
+             <>
+               <Ionicons name="lock-closed-outline" size={24} color="#999" />
+               <Text style={styles.pendingInputText}>
+                 Waiting for {user.displayName || user.name} to like you back
+               </Text>
+             </>
+          ) : (
+            <View style={{ alignItems: 'center', width: '100%', paddingHorizontal: 20 }}>
+               {/* Super Like Message Header if applicable */}
+               {route.params.isSuperLike && (
+                   <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                           <Ionicons name="star" size={24} color="#D4AF37" />
+                           <Text style={{ color: '#D4AF37', fontWeight: 'bold', marginLeft: 6, fontSize: 18 }}>Super Like!</Text>
+                       </View>
+                       
+                       {superLikeMessage && (
+                           <View style={{ 
+                               backgroundColor: '#FFF9E6', 
+                               padding: 16, 
+                               borderRadius: 16, 
+                               borderWidth: 1, 
+                               borderColor: '#D4AF37',
+                               width: '100%',
+                               marginTop: 8
+                           }}>
+                               <Text style={{ 
+                                   fontSize: 16, 
+                                   color: '#000', 
+                                   fontStyle: 'italic', 
+                                   textAlign: 'center',
+                                   lineHeight: 22
+                               }}>
+                                   "{superLikeMessage}"
+                               </Text>
+                           </View>
+                       )}
+                   </View>
+               )}
+               
+               <Text style={[styles.pendingInputText, { marginBottom: 24, textAlign: 'center' }]}>
+                 {user.displayName || user.name} wants to connect with you.
+               </Text>
+               
+               <View style={{ flexDirection: 'row', gap: 16, width: '100%' }}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, backgroundColor: '#F0F0F0', padding: 14, borderRadius: 24, alignItems: 'center' }}
+                    onPress={() => handleMatchResponse('decline')}
+                  >
+                     <Text style={{ color: 'black', fontWeight: '600' }}>Decline</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={{ flex: 1, backgroundColor: '#D4AF37', padding: 14, borderRadius: 24, alignItems: 'center' }}
+                    onPress={() => handleMatchResponse('accept')}
+                    disabled={isAccepting}
+                  >
+                     {isAccepting ? (
+                       <ActivityIndicator size="small" color="#FFF" />
+                     ) : (
+                       <Text style={{ color: '#FFF', fontWeight: '700' }}>Accept</Text>
+                     )}
+                  </TouchableOpacity>
+               </View>
+            </View>
+          )}
         </View>
       ) : (
         <KeyboardAvoidingView
@@ -900,6 +1044,28 @@ const ChatScreen = ({ route, navigation }) => {
 
       {/* Hold to Record Hint - Shows on first tap */}
       {/* Moved inside KeyboardAvoidingView is handled above */}
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={hideAlert}
+        buttons={[
+            {
+                text: 'OK',
+                onPress: hideAlert
+            }
+        ]}
+      />
+      <DeclineConfirmationSheet
+        isVisible={declineSheetVisible}
+        onClose={() => setDeclineSheetVisible(false)}
+        onConfirm={() => {
+            setDeclineSheetVisible(false);
+            handleMatchResponse('decline', true); 
+        }}
+      />
     </SafeAreaView>
   );
 };

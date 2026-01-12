@@ -235,6 +235,16 @@ exports.recordInteraction = async (req, res) => {
           }
         }
         await match.save();
+        const io = req.app.get('io');
+        if (io) {
+            // Unify event names: 'interaction' triggers badge refresh
+            io.to(targetId.toString()).emit('interaction', { type: 'MATCH', from: userId });
+            io.to(userId.toString()).emit('interaction', { type: 'MATCH', from: targetId });
+            
+            // New match specific event
+            io.to(targetId.toString()).emit('new_match', { matchId: match._id });
+            io.to(userId.toString()).emit('new_match', { matchId: match._id });
+        }
         return res.json({ message: "Interaction recorded", match: { id: match._id, status: match.status, isMutual: match.status === "active" } });
       } else {
         // Create Pending Match
@@ -243,27 +253,75 @@ exports.recordInteraction = async (req, res) => {
           user1Liked: isUser1, user2Liked: !isUser1
         });
 
-        // Send Like Request Notification
-        try {
-           const currentUser = await User.findById(userId);
-           if (currentUser) {
-             const isSuperLike = action === "SUPERLIKE";
-             const notification = NotificationFactory.createLikeRequestNotification(currentUser, match._id.toString(), isSuperLike);
-             await pushNotificationService.sendNotification(targetId.toString(), notification);
-           }
-        } catch (e) {
-            console.error("Like Notif Error:", e);
+    // Send Like Request Notification
+    try {
+      const currentUser = await User.findById(userId);
+      if (currentUser) {
+        const isSuperLike = action === "SUPERLIKE";
+        
+        // Handle Super Like Message
+        if (isSuperLike && req.body.comment) { // Check for comment in body
+             const Message = require("../models/Message"); // Lazy load
+             const conversationId = match.getConversationId();
+             
+             console.log(`recordInteraction: Saving Super Like Message. ConvID: ${conversationId}, Content: ${req.body.comment}`);
+
+             const msg = await Message.create({
+                 conversationId,
+                 senderId: userId,
+                 receiverId: targetId,
+                 content: req.body.comment,
+                 messageType: 'text',
+                 status: 'sent',
+                 createdAt: new Date() 
+             });
+             
+             console.log(`recordInteraction: Message Saved with ID: ${msg._id}`);
+
+             // Update match lastMessageAt so it sorts correctly
+             match.lastMessageAt = new Date();
+             await match.save();
         }
 
-        return res.json({ message: "Interaction recorded", match: { id: match._id, status: "pending", isMutual: false } });
+        const notification = NotificationFactory.createLikeRequestNotification(currentUser, match._id.toString(), isSuperLike);
+        await pushNotificationService.sendNotification(targetId.toString(), notification);
       }
+    } catch (e) {
+      console.error("Like Notif Error:", e);
     }
 
-    res.json({ message: "Interaction recorded" });
-  } catch (error) {
-    console.error("Interaction Error:", error);
-    res.status(500).json({ message: error.message });
+    // Send Socket Event to Target User if connected
+    const io = req.app.get('io');
+    if (io) {
+        // Emit generic interaction event to force badge refresh
+        io.to(targetId.toString()).emit('interaction', {
+            type: action,
+            from: userId
+        });
+        
+        // If it's a match, emit new_match
+        if (match.status === 'active') {
+             io.to(targetId.toString()).emit('new_match', {
+                 matchId: match._id,
+                 partnerId: userId
+             });
+             // Also notify current user
+             io.to(userId.toString()).emit('new_match', {
+                 matchId: match._id,
+                 partnerId: targetId
+             });
+        }
+    }
+
+    return res.json({ message: "Interaction recorded", match: { id: match._id, status: "pending", isMutual: false } });
   }
+}
+
+res.json({ message: "Interaction recorded" });
+} catch (error) {
+console.error("Interaction Error:", error);
+res.status(500).json({ message: error.message });
+}
 };
 
 
@@ -275,10 +333,13 @@ exports.getMyMatches = async (req, res) => {
     const Message = require("../models/Message");
 
     // Find all matches where user is either user1 or user2 (including pending)
-    const matches = await Match.find({
+    const matchesQuery = {
       $or: [{ user1Id: req.user._id }, { user2Id: req.user._id }],
-      status: "active", // Only active matches
-    })
+      status: { $in: ['active', 'pending'] }, // Return both active and pending
+    };
+    console.log(`getMyMatches: Querying for user ${req.user._id} with criteria:`, JSON.stringify(matchesQuery));
+
+    const matches = await Match.find(matchesQuery)
       .populate(
         "user1Id",
         "displayName photos age bio occupation location height interests relationshipExpectations isVerified isPremium gender education drinking smoking drugs"
@@ -288,6 +349,8 @@ exports.getMyMatches = async (req, res) => {
         "displayName photos age bio occupation location height interests relationshipExpectations isVerified isPremium gender education drinking smoking drugs"
       )
       .sort({ lastMessageAt: -1, createdAt: -1 });
+
+    console.log(`getMyMatches: Found ${matches.length} matches raw.`);
 
     // Format the response
     const matchesWithLastMessage = await Promise.all(
@@ -314,19 +377,48 @@ exports.getMyMatches = async (req, res) => {
         // Determine matching initiator
         const isInitiator = match.initiatorId && match.initiatorId.toString() === req.user._id.toString();
 
+        // Check if it was a Super Like (check Interaction)
+        // If we are the receiver (!isInitiator), checking if THEY super liked us
+        // If we are initiator, check if WE super liked them
+        const interactionInitiatorId = isInitiator ? req.user._id : otherUser._id;
+        const interactionTargetId = isInitiator ? otherUser._id : req.user._id;
+        
+        const interaction = await Interaction.findOne({ 
+            userId: interactionInitiatorId, 
+            targetId: interactionTargetId,
+            action: 'SUPERLIKE' 
+        });
+        const isSuperLike = !!interaction;
+
+        console.log(`Match ${match._id}: isInitiator=${isInitiator}, isSuperLike=${isSuperLike}, LastMsg: ${lastMessage ? lastMessage.content : 'NULL'}`);
+
         return {
           matchId: match._id,
           conversationId,
           status: match.status,
           isInitiator,
+          isSuperLike, // Return isSuperLike flag
           user: {
             _id: otherUser._id,
+            name: otherUser.displayName, // Add name field for compatibility
             displayName: otherUser.displayName,
             age: otherUser.age,
             photos: otherUser.photos || [],
+            mainPhotoIndex: otherUser.mainPhotoIndex || 0,
             image: otherUser.photos && otherUser.photos.length > 0 ? otherUser.photos[0] : null,
             isVerified: otherUser.isVerified,
-            isPremium: otherUser.isPremium
+            isPremium: otherUser.isPremium,
+            bio: otherUser.bio,
+            occupation: otherUser.occupation,
+            location: otherUser.location,
+            height: otherUser.height,
+            interests: otherUser.interests,
+            relationshipExpectations: otherUser.relationshipExpectations,
+            gender: otherUser.gender,
+            education: otherUser.education,
+            drinking: otherUser.drinking,
+            smoking: otherUser.smoking,
+            drugs: otherUser.drugs
           },
           lastMessage: lastMessage
             ? {
