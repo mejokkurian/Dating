@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#000000',
+    backgroundColor: '#D4AF37',
   },
   theirMessage: {
     alignSelf: 'flex-start',
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#000',
+    backgroundColor: '#D4AF37',
     justifyContent: 'center',
     alignItems: 'center',
   },

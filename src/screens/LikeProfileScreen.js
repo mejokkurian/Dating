@@ -125,7 +125,30 @@ const LikeProfileScreen = ({ route, navigation }) => {
         "It's a Match!",
         `You and ${user.name || user.displayName} liked each other!`,
         'success',
-        null
+        null,
+        [
+          {
+            text: 'Keep Browsing',
+            style: 'cancel',
+            onPress: () => {
+              hideAlert();
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Discover');
+              }
+            },
+          },
+          {
+            text: 'Send Message',
+            onPress: () => {
+              hideAlert();
+              // Use push to always create a fresh chat instance
+              // This ensures each chat has its own state and prevents mixing users
+              navigation.push('Chat', { user });
+            },
+          },
+        ]
       );
     } catch (error) {
       console.error('Match error:', error);
@@ -178,7 +201,11 @@ const LikeProfileScreen = ({ route, navigation }) => {
       await Promise.all([animationPromise, apiPromise]);
 
       // Navigate back
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Discover');
+      }
     } catch (error) {
       console.error('Pass error:', error);
       setLoading(false);
@@ -211,7 +238,13 @@ const LikeProfileScreen = ({ route, navigation }) => {
       <SafeAreaView style={styles.header} edges={['top']}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Discover');
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={28} color="#000" />
         </TouchableOpacity>
@@ -506,23 +539,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
         message={alertConfig.message}
         type={alertConfig.type}
         onClose={hideAlert}
-        buttons={[
-          {
-            text: 'Keep Browsing',
-            style: 'cancel',
-            onPress: () => {
-              hideAlert();
-              navigation.navigate('Discover');
-            },
-          },
-          {
-            text: 'Send Message',
-            onPress: () => {
-              hideAlert();
-              navigation.navigate('Messages');
-            },
-          },
-        ]}
+        buttons={alertConfig.buttons}
       />
       
       {/* Pass Animation Overlay */}

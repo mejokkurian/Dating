@@ -347,7 +347,7 @@ const ConnectNowScreen = ({ navigation }) => {
         {/* Connection Toggle */}
         <View style={styles.toggleWrapper}>
             {loading ? (
-                <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color="#D4AF37" style={{ marginRight: 8 }} />
             ) : (
                 <Text style={[
                     styles.toggleLabel, 
@@ -360,7 +360,7 @@ const ConnectNowScreen = ({ navigation }) => {
                 value={connectNowEnabled}
                 onValueChange={handleToggleConnectNow}
                 disabled={loading}
-                trackColor={{ false: '#e0e0e0', true: theme.colors.primary }}
+                trackColor={{ false: '#e0e0e0', true: '#D4AF37' }}
                 thumbColor="#fff"
                 ios_backgroundColor="#e0e0e0"
                 style={{ transform: [{ scale: 0.8 }] }}
@@ -443,7 +443,7 @@ const ConnectNowScreen = ({ navigation }) => {
                                     zIndex={999}
                                 >
                                     <View style={styles.markerContainer}>
-                                        <View style={[styles.markerContent, { borderColor: theme.colors.primary, borderWidth: 2 }]}>
+                                        <View style={[styles.markerContent, { borderColor: '#D4AF37', borderWidth: 2 }]}>
                                             <Image 
                                                 source={{ uri: userData.photos && userData.photos[0] ? userData.photos[0] : 'https://via.placeholder.com/150' }} 
                                                 style={styles.markerImage} 
@@ -489,7 +489,7 @@ const ConnectNowScreen = ({ navigation }) => {
                         </MapView>
                     ) : (
                         <View style={styles.centered}>
-                             <ActivityIndicator size="large" color={theme.colors.primary} />
+                             <ActivityIndicator size="large" color="#D4AF37" />
                              <Text style={{marginTop: 10, color: '#666'}}>Locating you...</Text>
                         </View>
                     )}
@@ -506,7 +506,7 @@ const ConnectNowScreen = ({ navigation }) => {
                 <View style={styles.listContainer}>
                     {nearbyUsersLoading && nearbyUsers.length === 0 ? (
                         <View style={styles.loadingContainer}>
-                             <ActivityIndicator size="large" color={theme.colors.primary} />
+                             <ActivityIndicator size="large" color="#D4AF37" />
                              <Text style={styles.loadingText}>Searching area...</Text>
                         </View>
                     ) : nearbyUsersFiltered.length === 0 ? (
@@ -544,7 +544,7 @@ const ConnectNowScreen = ({ navigation }) => {
                                 <RefreshControl
                                     refreshing={nearbyUsersLoading}
                                     onRefresh={refreshNearbyUsers}
-                                    tintColor={theme.colors.primary}
+                                    tintColor="#D4AF37"
                                 />
                             }
                         />
@@ -556,7 +556,7 @@ const ConnectNowScreen = ({ navigation }) => {
           /* Offline State */
           <View style={styles.offlineContainer}>
               <View style={[styles.offlineIconCircle, { backgroundColor: '#f5f5f5' }]}>
-                 <Ionicons name="navigate-circle" size={80} color={theme.colors.primary} />
+                 <Ionicons name="navigate-circle" size={80} color="#D4AF37" />
               </View>
               <Text style={styles.offlineTitle}>Enable Connect Now</Text>
               <Text style={styles.offlineDesc}>
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
       gap: 6,
   },
   segmentActive: {
-      backgroundColor: '#000',
+      backgroundColor: '#D4AF37',
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.15,
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   },
   filterTabActive: {
       borderBottomWidth: 2,
-      borderBottomColor: '#000',
+      borderBottomColor: '#D4AF37',
   },
   filterText: {
       fontSize: 15,
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
       color: '#999',
   },
   filterTextActive: {
-      color: '#000',
+      color: '#D4AF37',
   },
   mapContainer: {
       flex: 1,
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
       height: 40,
       borderRadius: 20,
       borderWidth: 2,
-      borderColor: theme.colors.primary,
+      borderColor: '#D4AF37',
   },
   markerName: {
       fontSize: 10,
@@ -867,7 +867,7 @@ const styles = StyleSheet.create({
   },
   enableButton: {
       flexDirection: 'row',
-      backgroundColor: '#000',
+      backgroundColor: '#D4AF37',
       paddingHorizontal: 32,
       paddingVertical: 16,
       borderRadius: 30,

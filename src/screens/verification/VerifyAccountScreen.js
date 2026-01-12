@@ -142,7 +142,7 @@ const VerifyAccountScreen = ({ navigation }) => {
             {checklistItems.map((item, index) => (
                 <View key={index} style={styles.checklistItem}>
                     <View style={styles.iconContainer}>
-                        <Ionicons name={item.icon} size={20} color="#000" />
+                        <Ionicons name={item.icon} size={20} color="#D4AF37" />
                     </View>
                     <Text style={styles.checklistText}>{item.text}</Text>
                 </View>
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 18,
     borderRadius: 16,
-    backgroundColor: '#000',
+    backgroundColor: '#D4AF37',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: "#000",

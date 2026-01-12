@@ -71,7 +71,7 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
 
   if (!profile) return null;
 
-  const inputAccessoryViewID = 'superLikeInputAccessory';
+
 
   return (
     <Modal
@@ -93,7 +93,8 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
 
         {/* Sliding Sheet */}
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'position' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? -100 : 0}
             style={styles.keyboardAvoidingView}
         >
             <Animated.View 
@@ -150,7 +151,6 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
                         maxLength={140}
                         returnKeyType="done"
                         blurOnSubmit={true}
-                        inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
                     />
                 </View>
 
@@ -189,16 +189,7 @@ const SuperLikeModal = ({ visible, profile, onClose, onSend }) => {
             </Animated.View>
         </KeyboardAvoidingView>
 
-        {/* iOS Accessory */}
-        {Platform.OS === 'ios' && (
-          <InputAccessoryView nativeID={inputAccessoryViewID}>
-            <View style={styles.keyboardAccessory}>
-              <TouchableOpacity onPress={() => Keyboard.dismiss()}>
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </InputAccessoryView>
-        )}
+
 
 
       </View>
@@ -223,15 +214,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   bottomSheet: {
-    width: '100%',
+    width: '92%',
+    alignSelf: 'center',
+    marginBottom: Platform.OS === 'ios' ? 34 : 20,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    borderRadius: 28,
+    paddingBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 20,
   },
   handleContainer: {

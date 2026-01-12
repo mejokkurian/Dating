@@ -44,18 +44,26 @@ const LikesYouScreen = ({ navigation }) => {
 
   const handleMatchPress = (match) => {
     if (activeTab === 'likes') {
-      // Navigate to LikeProfile screen to review the user
-      navigation.navigate('LikeProfile', { 
-        user: match.user,
-        matchId: match.matchId || match._id 
-      });
+      if (match.isSuperLike) {
+        // Super Like -> Chat screen (Accept/Decline flow)
+        navigation.navigate('Chat', { 
+          user: match.user,
+          matchStatus: match.status,
+          isInitiator: match.isInitiator,
+          isSuperLike: match.isSuperLike,
+          matchId: match.matchId || match._id,
+          superLikeMessage: match.lastMessage?.content
+        });
+      } else {
+        // Normal Like -> View Profile (LikeProfileScreen)
+        navigation.navigate('LikeProfileScreen', { 
+            user: match.user,
+            matchId: match.matchId || match._id // Pass matchId needed for accept/decline actions
+        });
+      }
     } else {
-        // For waiting tab, maybe show profile or just alert
-        // For now, let's show profile in read-only mode if possible, or just standard view
-        // Using modal or existing screen? Let's use ViewUserProfile if available, or just nothing for now as per previous behavior
-        // Previous behavior in MessagesScreen was: alert('Waiting for them to like you back!');
-        // Let's improve it by showing the profile preview 
-        navigation.navigate('ViewUserProfile', { userId: match.user._id || match.user.id });
+        // For waiting tab
+        navigation.navigate('LikeProfileScreen', { user: match.user });
     }
   };
 
@@ -87,19 +95,31 @@ const LikesYouScreen = ({ navigation }) => {
     }
   });
 
-  const renderMatchItem = ({ item: match }) => (
+  const renderMatchItem = ({ item: match }) => {
+    // Debug log for Super Like message
+    if (match.isSuperLike) {
+      console.log('Rendering Super Like Match:', JSON.stringify(match, null, 2));
+    }
+    return (
     <TouchableOpacity 
-      style={styles.matchItem} 
+      style={[styles.matchItem, match.isSuperLike && styles.superLikeItem]} 
       onPress={() => handleMatchPress(match)}
     >
-      <Image 
-        source={{ 
-          uri: match.user.image || (match.user.photos && match.user.photos.length > 0
-            ? (match.user.photos[match.user.mainPhotoIndex ?? 0] || match.user.photos[0])
-            : null) || 'https://via.placeholder.com/60'
-        }} 
-        style={styles.matchAvatar} 
-      />
+      <View style={styles.avatarContainer}>
+          <Image 
+            source={{ 
+              uri: match.user.image || (match.user.photos && match.user.photos.length > 0
+                ? (match.user.photos[match.user.mainPhotoIndex ?? 0] || match.user.photos[0])
+                : null) || 'https://via.placeholder.com/60'
+            }} 
+            style={[styles.matchAvatar, match.isSuperLike && styles.superLikeAvatar]} 
+          />
+          {match.isSuperLike && (
+              <View style={styles.superLikeStarBadge}>
+                  <Ionicons name="star" size={12} color="#FFF" />
+              </View>
+          )}
+      </View>
       <View style={styles.matchContent}>
         <View style={styles.matchHeader}>
           <Text style={styles.matchName}>{match.user.name || match.user.displayName}</Text>
@@ -110,8 +130,10 @@ const LikesYouScreen = ({ navigation }) => {
         <View style={styles.likesYouContainer}>
             {activeTab === 'likes' ? (
                 <>
-                    <Ionicons name="heart" size={14} color="#D4AF37" />
-                    <Text style={styles.likesYouText}>Liked you</Text>
+                    <Ionicons name={match.isSuperLike ? "star" : "heart"} size={14} color="#D4AF37" />
+                    <Text style={styles.likesYouText}>
+                        {match.isSuperLike ? 'Super Liked you!' : 'Liked you'}
+                    </Text>
                 </>
             ) : (
                 <>
@@ -120,19 +142,25 @@ const LikesYouScreen = ({ navigation }) => {
                 </>
             )}
         </View>
+        {match.lastMessage && (
+            <Text style={styles.messagePreview} numberOfLines={1}>
+                {match.lastMessage.content}
+            </Text>
+        )}
       </View>
       {activeTab === 'likes' && (
-        <View style={styles.heartBadge}>
-            <Ionicons name="heart" size={18} color="#FFFFFF" />
+        <View style={[styles.heartBadge, match.isSuperLike && styles.superLikeBadge]}>
+            <Ionicons name={match.isSuperLike ? "star" : "heart"} size={18} color="#FFFFFF" />
         </View>
       )}
     </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#000" />
+        <ActivityIndicator size="large" color="#D4AF37" />
       </View>
     );
   }
@@ -190,10 +218,10 @@ const LikesYouScreen = ({ navigation }) => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          <Ionicons 
+           <Ionicons 
             name={activeTab === 'likes' ? "heart-outline" : "hourglass-outline"} 
             size={80} 
-            color="#CCC" 
+            color="#D4AF37" 
           />
           <Text style={styles.emptyTitle}>
             {activeTab === 'likes' ? 'No Likes Yet' : 'No Pending Requests'}
@@ -267,7 +295,7 @@ const styles = StyleSheet.create({
     color: '#999999',
   },
   tabTextActive: {
-    color: '#000000',
+    color: '#D4AF37',
     fontWeight: '700',
   },
   tabIndicator: {
@@ -276,10 +304,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#000000',
+    backgroundColor: '#D4AF37',
   },
   tabBadge: {
-    backgroundColor: '#000000',
+    backgroundColor: '#D4AF37',
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -375,6 +403,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 3,
+  },
+  superLikeItem: {
+      backgroundColor: '#FFF9E6', // Light gold bg
+  },
+  avatarContainer: {
+      position: 'relative',
+      marginRight: 16,
+  },
+  superLikeAvatar: {
+      borderWidth: 2,
+      borderColor: '#D4AF37',
+  },
+  superLikeStarBadge: {
+      position: 'absolute',
+      bottom: -4,
+      right: -4,
+      backgroundColor: '#D4AF37',
+      borderRadius: 10,
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: '#FFF',
+  },
+  superLikeBadge: {
+      backgroundColor: '#D4AF37',
+      // Maybe add a glow effect or different shadow
+      shadowColor: "#B8860B",
+      shadowOpacity: 0.5,
+  },
+  messagePreview: {
+      fontSize: 13,
+      color: '#666',
+      marginTop: 2,
+      fontStyle: 'italic',
   },
 });
 

@@ -83,6 +83,14 @@ const useMessages = (user, userData) => {
     }
   };
 
+  // CRITICAL: Clear messages immediately when user changes to prevent showing wrong chat
+  useEffect(() => {
+    setMessages([]);
+    setLoading(true);
+    setHasMore(true);
+    setPinnedMessage(null);
+  }, [user._id]);
+
   useEffect(() => {
     let mounted = true;
 

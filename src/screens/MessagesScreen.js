@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getMyMatches } from '../services/api/match';
 import { useAuth } from '../context/AuthContext';
 import { useBadge } from '../context/BadgeContext';
+import socketService from '../services/socket';
 
 const MessagesScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -20,6 +21,28 @@ const MessagesScreen = ({ navigation }) => {
       updateBadgeCounts(); // Update badge counts when screen comes into focus
     }, [updateBadgeCounts])
   );
+
+  useEffect(() => {
+     const handleUpdate = () => {
+         loadMatches();
+         updateBadgeCounts();
+     };
+
+     socketService.onNewMessage(handleUpdate);
+     socketService.onInteraction(handleUpdate); // For matches/likes
+     // Also listen for delivered/read if you want to update ticks, but this list only shows last message content. 
+     // We should listen for read updates though to clear unread badges.
+     socketService.onMessagesRead(() => {
+         loadMatches();
+         updateBadgeCounts();
+     });
+
+     return () => {
+         socketService.removeListener('new_message');
+         socketService.removeListener('interaction');
+         socketService.removeListener('messages_read');
+     };
+  }, [updateBadgeCounts]);
 
   const loadMatches = async () => {
     try {
@@ -107,7 +130,7 @@ const MessagesScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#000" />
+        <ActivityIndicator size="large" color="#D4AF37" />
       </View>
     );
   }
@@ -132,7 +155,7 @@ const MessagesScreen = ({ navigation }) => {
             <Ionicons 
               name="chatbubbles-outline"
               size={80} 
-              color="#CCC" 
+              color="#D4AF37" 
             />
             <Text style={styles.emptyTitle}>
               No Conversations Yet
@@ -237,7 +260,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#000000',
+    backgroundColor: '#D4AF37',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,

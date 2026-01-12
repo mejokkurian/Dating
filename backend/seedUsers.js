@@ -251,6 +251,54 @@ const seedData = [
     mainPhotoIndex: 0,
     isVerified: true,
     isPremium: true
+  },
+  {
+    email: 'lucas@test.com',
+    password: 'test123',
+    displayName: 'Lucas Miller',
+    age: 27,
+    gender: 'Male',
+    bio: 'Photographer 📷 Chasing sunsets and capturing moments. Love hiking, indie music, and road trips.',
+    location: 'Austin, TX',
+    occupation: 'Photographer',
+    education: 'UT Austin',
+    height: 180,
+    interests: ['Photography', 'Hiking', 'Music', 'Travel', 'Art', 'Camping'],
+    relationshipExpectations: 'Looking for something serious',
+    preferences: 'Female',
+    drinking: 'Socially',
+    smoking: 'No',
+    photos: [
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800', 
+      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800'
+    ],
+    mainPhotoIndex: 0,
+    isVerified: true
+  },
+  {
+    email: 'ryan@test.com',
+    password: 'test123',
+    displayName: 'Ryan Cooper',
+    age: 30,
+    gender: 'Male',
+    bio: 'Architect 🏗️ Designing the future. Love modern art, espresso, and cycling around the city.',
+    location: 'Seattle, WA',
+    occupation: 'Architect',
+    education: 'University of Washington',
+    height: 183,
+    interests: ['Architecture', 'Design', 'Cycling', 'Coffee', 'Art', 'Tech'],
+    relationshipExpectations: 'Casual dating',
+    preferences: 'Female',
+    drinking: 'Socially',
+    smoking: 'No',
+    photos: [
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800',
+      'https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=800'
+    ],
+    mainPhotoIndex: 0,
+    isVerified: true
   }
 ];
 

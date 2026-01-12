@@ -139,7 +139,7 @@ export const useCardInteractions = (
 
             // 3. Record Interaction
             // 3. Record Interaction (Optimistic - don't await)
-            recordInteraction(targetId, "SUPERLIKE");
+            recordInteraction(targetId, "SUPERLIKE", comment);
 
             // 4. Wait for animation (3.2s)
             await new Promise(resolve => setTimeout(resolve, 3200));

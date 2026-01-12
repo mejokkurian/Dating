@@ -65,7 +65,7 @@ const TopPicksScreen = ({ navigation }) => {
                 style={styles.image} 
               />
               <View style={styles.matchBadge}>
-                <Ionicons name="flame" size={12} color="#FFFFFF" />
+                <Ionicons name="flame" size={12} color="#D4AF37" />
                 <Text style={styles.matchText}>{profile.matchPercentage || 95}% Match</Text>
               </View>
               <View style={styles.cardContent}>
@@ -80,7 +80,7 @@ const TopPicksScreen = ({ navigation }) => {
         
         <TouchableOpacity style={styles.upgradeCard}>
           <View style={styles.iconContainer}>
-            <Ionicons name="diamond" size={32} color="#000" />
+            <Ionicons name="diamond" size={32} color="#D4AF37" />
           </View>
           <Text style={styles.upgradeTitle}>See More Picks</Text>
           <Text style={styles.upgradeSubtitle}>Upgrade to Premium to unlock unlimited curated matches.</Text>
@@ -195,11 +195,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
     elevation: 4,
+    borderWidth: 2,
+    borderColor: '#D4AF37',
   },
   upgradeTitle: {
     fontSize: 18,

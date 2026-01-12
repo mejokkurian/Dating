@@ -6,6 +6,7 @@ import { View, StyleSheet, Platform, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import theme from "../theme/theme";
 import { useBadge } from "../context/BadgeContext";
+import { LiquidGlassTabBar } from "../components/LiquidGlassTabBar";
 
 // Screens
 import MainScreen from "../screens/MainScreen";
@@ -21,6 +22,7 @@ import SettingsScreen from "../screens/settings/SettingsScreen";
 import NotificationSettingsScreen from "../screens/settings/NotificationSettingsScreen";
 import EditEmailScreen from "../screens/settings/EditEmailScreen";
 import VerifyAccountScreen from "../screens/verification/VerifyAccountScreen";
+import LikeProfileScreen from "../screens/LikeProfileScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -35,37 +37,31 @@ const TabNavigator = () => {
 
   return (
     <Tab.Navigator
+      tabBar={props => <LiquidGlassTabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: {
-          ...styles.tabBar,
-          bottom: Platform.OS === 'ios' ? 20 : Math.max(insets.bottom, 10),
-          paddingBottom: Platform.OS === 'ios' ? 10 : Math.max(insets.bottom / 2, 8),
-        },
+        // The following props are handled by our custom LiquidGlassTabBar, but we keep them for reference or if we revert
         tabBarActiveTintColor: theme.colors.primary || "#000000",
         tabBarInactiveTintColor: "#999999",
-        tabBarLabelStyle: styles.tabBarLabel,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           let badgeCount = null;
           const isLikesYou = route.name === "LikesYou";
 
           if (route.name === "Discover") {
-            iconName = "albums";
+            iconName = focused ? "albums" : "albums-outline";
           } else if (route.name === "TopPicks") {
-            iconName = "flash";
+            iconName = focused ? "flash" : "flash-outline";
           } else if (route.name === "ConnectNow") {
-            iconName = "location";
+            iconName = focused ? "location" : "location-outline";
           } else if (route.name === "Messages") {
-            iconName = "chatbubbles";
+            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
             badgeCount = unreadMessagesCount > 0 ? unreadMessagesCount : null;
           } else if (route.name === "LikesYou") {
-            iconName = "heart"; // Warning: Duplicate icon with Discover, but preserving as requested
+            iconName = focused ? "heart" : "heart-outline"; 
             badgeCount = likesYouCount > 0 ? likesYouCount : null;
-          } else if (route.name === "Premium") {
-            iconName = focused ? "diamond" : "diamond-outline";
-          }
+          } 
 
           // Use solid black for active, gray for inactive
           const iconColor = focused ? "#000000" : "#999999";
@@ -158,35 +154,22 @@ const TabNavigator = () => {
         component={VerifyAccountScreen}
         options={{ tabBarButton: () => null, headerShown: false }}
       />
+      <Tab.Screen
+        name="LikeProfileScreen"
+        component={LikeProfileScreen}
+        options={{ 
+          tabBarButton: () => null, 
+          headerShown: false,
+          tabBarStyle: { display: 'none' } 
+        }}
+      />
     </Tab.Navigator>
   );
 };
 
 const styles = StyleSheet.create({
-  tabBar: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    elevation: 0,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 25,
-    height: 70,
-    borderTopWidth: 0,
-    paddingTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.05)",
-  },
-  tabBarLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 4,
-    letterSpacing: 0.3,
-  },
+  // Previous View based styles are largely irrelevant now as we use the custom component,
+  // but we keep icon styles used by the renderItem
   iconWrapper: {
     position: "relative",
     alignItems: "center",
@@ -211,6 +194,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: "#000000",
+    display: "none", // Hiding this for now as per design clean up
   },
   badge: {
     position: "absolute",
