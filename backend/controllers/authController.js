@@ -161,12 +161,12 @@ exports.verifyPhoneOTP = async (req, res) => {
       return res.status(400).json({ message: 'Phone number and code are required' });
     }
 
-    // Verify OTP with Firebase
-    const verificationResult = await verifyOTP(phoneNumber, code);
+    // Verify OTP with AWS SNS
+    const isValid = await verifyOTP(phoneNumber, code);
     
-    // Check if verification failed
-    if (!verificationResult.success) {
-      return res.status(400).json({ message: verificationResult.error });
+    // verifyOTP returns true if valid, throws error if invalid
+    if (!isValid) {
+      return res.status(400).json({ message: 'Invalid verification code' });
     }
 
     // Check if user exists
