@@ -6,7 +6,12 @@ dotenv.config();
 
 const USER_ID = '6961ecdfce5a77e8e05b1f0f';
 
-mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://mejokkurian:Mejo12345@cluster0.wuywc.mongodb.net/dating-app')
+if (!process.env.MONGO_URI) {
+  console.error('❌ MONGO_URI environment variable is not set!');
+  process.exit(1);
+}
+
+mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("✅ MongoDB Connected");
     

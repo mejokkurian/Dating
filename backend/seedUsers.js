@@ -304,8 +304,14 @@ const seedData = [
 
 async function seedUsers() {
   try {
-    // MongoDB URI
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mejokkurian06_db_user:Mejokkurian@cluster0.do6pdpz.mongodb.net/test?retryWrites=true&w=majority';
+    // MongoDB URI - MUST be set in .env file
+    const MONGO_URI = process.env.MONGO_URI;
+    
+    if (!MONGO_URI) {
+      console.error('❌ MONGO_URI environment variable is not set!');
+      console.error('   Please create a .env file with your MongoDB connection string.');
+      process.exit(1);
+    }
     
     // Connect to MongoDB
     console.log('🔌 Connecting to MongoDB...');
