@@ -58,7 +58,7 @@ app.use('/api/location', locationRoutes);
 
 // Health Check
 app.get('/', (req, res) => {
-  res.send('Sugar Dating App API is running');
+  res.send('Sugar Dating App API is runnin');
 });
 
 // Database Connection and Server Startup
@@ -81,3 +81,4 @@ const startServer = async () => {
 };
 
 startServer();
+// Updated
