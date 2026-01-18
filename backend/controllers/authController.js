@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendOTP, verifyOTP } = require('../services/twilioService');
+const { sendOTP, verifyOTP } = require('../services/snsService'); // Using AWS SNS
 
 // Generate JWT Token
 const generateToken = (id) => {
