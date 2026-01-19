@@ -276,30 +276,30 @@ const seedData = [
     mainPhotoIndex: 0,
     isVerified: true
   },
-  {
-    email: 'ryan@test.com',
-    password: 'test123',
-    displayName: 'Ryan Cooper',
-    age: 30,
-    gender: 'Male',
-    bio: 'Architect 🏗️ Designing the future. Love modern art, espresso, and cycling around the city.',
-    location: 'Seattle, WA',
-    occupation: 'Architect',
-    education: 'University of Washington',
-    height: 183,
-    interests: ['Architecture', 'Design', 'Cycling', 'Coffee', 'Art', 'Tech'],
-    relationshipExpectations: 'Casual dating',
-    preferences: 'Female',
-    drinking: 'Socially',
-    smoking: 'No',
-    photos: [
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800',
-      'https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=800'
-    ],
-    mainPhotoIndex: 0,
-    isVerified: true
-  }
+  // {
+  //   email: 'ryan@test.com',
+  //   password: 'test123',
+  //   displayName: 'Ryan Cooper',
+  //   age: 30,
+  //   gender: 'Male',
+  //   bio: 'Architect 🏗️ Designing the future. Love modern art, espresso, and cycling around the city.',
+  //   location: 'Seattle, WA',
+  //   occupation: 'Architect',
+  //   education: 'University of Washington',
+  //   height: 183,
+  //   interests: ['Architecture', 'Design', 'Cycling', 'Coffee', 'Art', 'Tech'],
+  //   relationshipExpectations: 'Casual dating',
+  //   preferences: 'Female',
+  //   drinking: 'Socially',
+  //   smoking: 'No',
+  //   photos: [
+  //     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+  //     'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800',
+  //     'https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=800'
+  //   ],
+  //   mainPhotoIndex: 0,
+  //   isVerified: true
+  // }
 ];
 
 async function seedUsers() {
