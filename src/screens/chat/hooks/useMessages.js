@@ -342,18 +342,31 @@ const useMessages = (user, userData) => {
     return () => {
       mounted = false;
       try {
-        // Remove all listeners at once for faster cleanup
-        socketService.removeAllListeners();
+        // Cleanup specific listeners
+        socketService.removeListener('new_message');
+        socketService.removeListener('message_sent');
+        socketService.removeListener('message_error');
+        socketService.removeListener('message_delivered');
+        socketService.removeListener('messages_read');
+        socketService.removeListener('user_typing');
+        socketService.removeListener('user_recording');
+        socketService.removeListener('user_joined_chat');
+        socketService.removeListener('user_left_chat');
+        socketService.removeListener('chat_presence_ack');
+        socketService.removeListener('message_pinned');
+        socketService.removeListener('message_starred');
+        socketService.removeListener('message_deleted');
+        socketService.removeListener('view_once_opened');
         
-        // Also try to leave chat (but don't crash if it fails)
+        // Leave chat room
         try {
           socketService.leaveChat(user._id);
         } catch (error) {
           console.warn('Error leaving chat:', error);
         }
         
-        // Disconnect will also clean up
-        socketService.disconnect();
+        // NOTE: Do NOT disconnect socket here as it may interrupt other active screens/sessions
+        // The socket service manages connection based on AppState and Auth
       } catch (error) {
         console.warn('Error during cleanup:', error);
       }

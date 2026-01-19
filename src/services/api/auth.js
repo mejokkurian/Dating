@@ -3,13 +3,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const signInWithEmail = async (email, password) => {
   try {
+    console.log('🔍 Email login to:', api.defaults.baseURL);
     const response = await api.post("/auth/login", { email, password });
     if (response.data.token) {
       await AsyncStorage.setItem("userToken", response.data.token);
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
+    console.log('✅ Email login successful');
     return response.data;
   } catch (error) {
+    console.error('❌ Email login error details:');
+    console.error('  Code:', error.code);
+    console.error('  Message:', error.message);
+    console.error('  Base URL:', api.defaults.baseURL);
+    
     // Handle timeout and network errors
     if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
       throw {
@@ -34,6 +41,7 @@ export const signInWithEmail = async (email, password) => {
 
 export const createAccountWithEmail = async (email, password, displayName) => {
   try {
+    console.log('🔍 Account creation to:', api.defaults.baseURL);
     const response = await api.post("/auth/register", {
       email,
       password,
@@ -43,8 +51,14 @@ export const createAccountWithEmail = async (email, password, displayName) => {
       await AsyncStorage.setItem("userToken", response.data.token);
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
+    console.log('✅ Account created successfully');
     return response.data;
   } catch (error) {
+    console.error('❌ Account creation error details:');
+    console.error('  Code:', error.code);
+    console.error('  Message:', error.message);
+    console.error('  Base URL:', api.defaults.baseURL);
+    
     // Handle timeout and network errors
     if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
       throw {
@@ -117,9 +131,21 @@ export const signInWithApple = async (appleData) => {
 
 export const signInWithPhoneNumber = async (phoneNumber) => {
   try {
+    console.log('🔍 Attempting phone auth to:', api.defaults.baseURL);
+    console.log('🔍 Full endpoint:', `${api.defaults.baseURL}/auth/phone/send`);
+    console.log('🔍 Phone number:', phoneNumber);
+    
     const response = await api.post("/auth/phone/send", { phoneNumber });
+    console.log('✅ Phone auth response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('❌ Phone auth error - Full details:');
+    console.error('  Code:', error.code);
+    console.error('  Message:', error.message);
+    console.error('  Response:', error.response?.data);
+    console.error('  Status:', error.response?.status);
+    console.error('  Config URL:', error.config?.url);
+    console.error('  Base URL:', error.config?.baseURL);
     throw error.response ? error.response.data : error;
   }
 };

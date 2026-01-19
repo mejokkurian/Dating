@@ -45,9 +45,18 @@ const LikesYouScreen = ({ navigation }) => {
   const handleMatchPress = (match) => {
     if (activeTab === 'likes') {
       if (match.isSuperLike) {
+        console.log(`[LikesYouScreen] Navigating to Super Like Chat with: ${match.user?.displayName} (${match.user?._id})`);
         // Super Like -> Chat screen (Accept/Decline flow)
         navigation.navigate('Chat', { 
-          user: match.user,
+          user: {
+            ...match.user,
+            _id: match.user._id || match.user.id,
+            name: match.user.displayName || match.user.name,
+            displayName: match.user.displayName || match.user.name,
+            image: match.user.photos?.[match.user.mainPhotoIndex ?? 0] || match.user.photos?.[0],
+            photos: match.user.photos || [],
+            mainPhotoIndex: match.user.mainPhotoIndex ?? 0,
+          },
           matchStatus: match.status,
           isInitiator: match.isInitiator,
           isSuperLike: match.isSuperLike,

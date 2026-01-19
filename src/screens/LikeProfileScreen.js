@@ -16,6 +16,7 @@ import api from '../services/api/config';
 import theme from '../theme/theme';
 import { INTEREST_ICONS, DEFAULT_INTEREST_ICON, getInterestIcon } from '../constants/interestIcons';
 import CustomAlert from '../components/CustomAlert';
+import MatchSuccessBottomSheet from '../components/MatchSuccessBottomSheet';
 import { useCustomAlert } from '../hooks/useCustomAlert';
 
 import { recordInteraction } from '../services/api/match';
@@ -24,6 +25,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
   const { user, matchId, fromConnectNow } = route.params;
   const [loading, setLoading] = useState(false);
   const [showPassAnimation, setShowPassAnimation] = useState(false);
+  const [showMatchSheet, setShowMatchSheet] = useState(false);
   const { width, height } = useWindowDimensions();
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   
@@ -110,8 +112,9 @@ const LikeProfileScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
       
-      if (matchId) {
-        // Handle explicit match response (e.g. from LikesYou)
+      if (matchId) { // Assuming `matchId` implies a match object is available in context, or this is a placeholder for `match.isSuperLike` logic
+        console.log(`[LikesYouScreen] Navigating to Super Like Chat with: ${user?.displayName} (${user?._id})`); // Adjusted to use `user` from props
+        // Super Like -> Chat screen (Accept/Decline flow)
         await api.post(`/matches/${matchId}/respond`, {
           action: 'accept',
         });
@@ -121,35 +124,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
       }
 
       setLoading(false);
-      showAlert(
-        "It's a Match!",
-        `You and ${user.name || user.displayName} liked each other!`,
-        'success',
-        null,
-        [
-          {
-            text: 'Keep Browsing',
-            style: 'cancel',
-            onPress: () => {
-              hideAlert();
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.navigate('Discover');
-              }
-            },
-          },
-          {
-            text: 'Send Message',
-            onPress: () => {
-              hideAlert();
-              // Use push to always create a fresh chat instance
-              // This ensures each chat has its own state and prevents mixing users
-              navigation.push('Chat', { user });
-            },
-          },
-        ]
-      );
+      setShowMatchSheet(true);
     } catch (error) {
       console.error('Match error:', error);
       setLoading(false);
@@ -542,6 +517,29 @@ const LikeProfileScreen = ({ route, navigation }) => {
         buttons={alertConfig.buttons}
       />
       
+      
+      {/* Match Success Bottom Sheet */}
+      <MatchSuccessBottomSheet
+        
+        visible={showMatchSheet}
+        onClose={() => setShowMatchSheet(false)}
+        user={user}
+        onSendMessage={() => {
+          setShowMatchSheet(false);
+          navigation.navigate('MainTab', {
+            screen: 'Messages',
+            params: {
+              highlightUserId: user._id || user.id,
+            },
+          });
+        }}
+        onKeepBrowsing={() => {
+          setShowMatchSheet(false);
+          navigation.navigate('MainTab', {
+            screen: 'Messages',
+          });
+        }}
+      />
       {/* Pass Animation Overlay */}
       {showPassAnimation && (
         <Animated.View

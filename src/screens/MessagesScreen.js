@@ -8,12 +8,25 @@ import { useAuth } from '../context/AuthContext';
 import { useBadge } from '../context/BadgeContext';
 import socketService from '../services/socket';
 
-const MessagesScreen = ({ navigation }) => {
+const MessagesScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { updateBadgeCounts } = useBadge();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [highlightedUserId, setHighlightedUserId] = useState(null);
+
+  // Handle highlighted user from navigation params
+  useEffect(() => {
+    if (route.params?.highlightUserId) {
+      setHighlightedUserId(route.params.highlightUserId);
+      // Clear highlight after 3 seconds
+      const timer = setTimeout(() => {
+        setHighlightedUserId(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [route.params?.highlightUserId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,10 +107,13 @@ const MessagesScreen = ({ navigation }) => {
     return messageDate.toLocaleDateString();
   };
 
-  const renderMatchItem = (match) => (
+  const renderMatchItem = (match) => {
+    const isHighlighted = highlightedUserId === match.user._id;
+    
+    return (
     <TouchableOpacity 
       key={match.matchId} 
-      style={styles.chatItem} 
+      style={[styles.chatItem, isHighlighted && styles.highlightedChatItem]} 
       onPress={() => handleChatPress(match)}
     >
       <Image 
@@ -125,7 +141,8 @@ const MessagesScreen = ({ navigation }) => {
         </View>
       )}
     </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -269,6 +286,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  highlightedChatItem: {
+    backgroundColor: '#FFF9E6',
+    borderLeftWidth: 4,
+    borderLeftColor: '#D4AF37',
   },
 });
 

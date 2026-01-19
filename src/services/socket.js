@@ -2,9 +2,13 @@ import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from 'react-native';
 
+import { USE_EC2, LOCAL_URL, EC2_URL } from './api/config';
 
-// const SOCKET_URL = "https://dating-5sfs.onrender.com";
-const SOCKET_URL = "http://192.168.1.8:5001";
+// Socket URL Configuration (matches API config)
+const LOCAL_SOCKET_URL = "http://192.168.1.8:5001";
+const EC2_SOCKET_URL = "http://54.164.167.70:5001";  // Elastic IP - permanent
+
+const SOCKET_URL = USE_EC2 ? EC2_SOCKET_URL : LOCAL_SOCKET_URL;
 
 
 

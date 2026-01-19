@@ -18,6 +18,7 @@ import RomanticBackground from '../../components/RomanticBackground';
 import GlassCard from '../../components/GlassCard';
 import theme from '../../theme/theme';
 import api from '../../services/api/config';
+import { verifyPhoneOTP, signInWithPhoneNumber } from '../../services/api/auth';
 
 const PhoneOTPScreen = ({ route, navigation }) => {
   const { phoneNumber, confirmation } = route.params;
@@ -66,7 +67,7 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       setLoading(true);
 
       // Verify OTP via Twilio backend
-      const response = await verifyPhoneNumber(phoneNumber, otpCode);
+      const response = await verifyPhoneOTP(phoneNumber, otpCode);
 
       if (response && response.token) {
         // Authenticate the user
@@ -75,7 +76,7 @@ const PhoneOTPScreen = ({ route, navigation }) => {
         // Check user status and navigate accordingly
         // If user already exists (onboardingComplete is true), login will take care of redirect
         // But we want to be explicit about new users
-        if (response.user.onboardingComplete) {
+        if (response.onboardingCompleted) {
           console.log('User already completed onboarding');
           // No need to do anything, AuthContext will redirect to Main
         } else {

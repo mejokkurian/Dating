@@ -31,6 +31,7 @@ import {
   signInWithGoogle,
   signInWithApple,
 } from "../../services/api/auth";
+import { testConnection } from "../../services/api/config";
 import GradientButton from "../../components/GradientButton";
 import GlassCard from "../../components/GlassCard";
 import RomanticBackground from "../../components/RomanticBackground";
@@ -129,6 +130,15 @@ const LoginScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
+    
+    // Test connection to backend on mount
+    testConnection().then(isConnected => {
+      if (isConnected) {
+        console.log('✅ Backend is reachable');
+      } else {
+        console.warn('⚠️ Backend connection test failed - user may experience login issues');
+      }
+    });
   }, []);
 
   // Email validation
@@ -214,7 +224,7 @@ const LoginScreen = ({ navigation }) => {
       setLoading(true);
       const formattedPhone = `${selectedCountry.dialCode}${phoneNumber}`;
       
-      // Use Twilio phone authentication
+      // Use AWS SNS phone authentication
       const response = await signInWithPhoneNumber(formattedPhone);
       
       // Navigate to OTP screen
@@ -222,9 +232,9 @@ const LoginScreen = ({ navigation }) => {
         phoneNumber: formattedPhone
       });
       
-      console.log('✅ Twilio OTP sent to:', formattedPhone);
+      console.log('✅ AWS SNS OTP sent to:', formattedPhone);
     } catch (error) {
-      console.error('Twilio phone auth error:', error);
+      console.error('Phone auth error:', error);
       setPhoneError(error.response?.data?.message || "Failed to send verification code. Please try again.");
     } finally {
       setLoading(false);

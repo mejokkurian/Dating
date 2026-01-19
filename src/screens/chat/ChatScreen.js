@@ -239,14 +239,19 @@ const ChatScreen = ({ route, navigation }) => {
 
   // Debug: Log user object to verify structure
   useEffect(() => {
-    console.log('ChatScreen mounted with user:', JSON.stringify({
-      _id: user._id,
-      name: user.name,
-      displayName: user.displayName,
-      hasPhotos: !!user.photos,
-      photoCount: user.photos?.length
-    }));
-  }, [user._id]);
+    console.log('ChatScreen params:', JSON.stringify({
+      matchStatus: initialMatchStatus,
+      isInitiator,
+      isSuperLike,
+      hasSuperLikeMessage: !!superLikeMessage,
+      superLikeMessage, // Log the actual message
+      user: {
+        _id: user._id,
+        name: user.name,
+        displayName: user.displayName
+      }
+    }, null, 2));
+  }, [user._id, isSuperLike, superLikeMessage]);
 
   // Messages & Socket Hook
   const {
@@ -592,6 +597,9 @@ const ChatScreen = ({ route, navigation }) => {
         }
         return; // Exit function, prevent sending
       }
+
+      // Log attempt to send
+      console.log(`[handleSend] Sending message to: ${user.displayName} (${user._id})`);
 
       // Proceed with sending the message
       const tempId = Date.now().toString();
