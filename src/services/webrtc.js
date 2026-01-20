@@ -2,7 +2,6 @@ import {
   RTCPeerConnection,
   RTCSessionDescription,
   RTCIceCandidate,
-  RTCIceCandidate,
   mediaDevices,
 } from 'react-native-webrtc';
 import api from './api/config';

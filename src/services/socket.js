@@ -5,8 +5,9 @@ import { AppState } from 'react-native';
 import { USE_EC2, LOCAL_URL, EC2_URL } from './api/config';
 
 // Socket URL Configuration (matches API config)
+// Socket URL Configuration (matches API config)
 const LOCAL_SOCKET_URL = "http://192.168.1.8:5001";
-const EC2_SOCKET_URL = "http://54.164.167.70:5001";  // Elastic IP - permanent
+const EC2_SOCKET_URL = "https://api.emper.fun";  // Secure domain for socket as well
 
 const SOCKET_URL = USE_EC2 ? EC2_SOCKET_URL : LOCAL_SOCKET_URL;
 
@@ -53,9 +54,15 @@ class SocketService {
         return;
       }
 
+      console.log(`🔌 Connecting to Socket: ${SOCKET_URL}`);
+      
+      // Match the working debug_socket_client.js configuration exactly
       this.socket = io(SOCKET_URL, {
         auth: { token },
-        transports: ["websocket"],
+        transports: ["websocket"], // Force websocket only (debug script confirmed this works)
+        reconnection: true,
+        reconnectionAttempts: 10,
+        forceNew: true, // Force a new connection
       });
 
       this.socket.on("connect", () => {
