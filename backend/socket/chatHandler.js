@@ -105,15 +105,39 @@ module.exports = (io) => {
 
         // Check if receiver is online (in their room)
         const sockets = await io.in(receiverId.toString()).fetchSockets();
-        const isDelivered = sockets.length > 0;
+        const isOnline = sockets.length > 0;
+
+        // Check if receiver is actively viewing this specific chat
+        const receiverSocketRoom = `chat_${conversationId}`;
+        const receiverSockets = await io.in(receiverSocketRoom).fetchSockets();
+        const isReceiverInChat = receiverSockets.some(s => s.userId?.toString() === receiverId.toString());
+
+        // Determine initial status:
+        // - 'read' if receiver is actively viewing this chat
+        // - 'delivered' if receiver is online but not in this chat
+        // - 'sent' if receiver is offline
+        let initialStatus = 'sent';
+        const now = new Date();
+        
+        if (isReceiverInChat) {
+          initialStatus = 'read';
+        } else if (isOnline) {
+          initialStatus = 'delivered';
+        }
 
         // Save message to database
         const messageData = {
           conversationId,
           senderId,
           receiverId,
-          status: isDelivered ? 'delivered' : 'sent',
+          status: initialStatus,
         };
+
+        // Set readAt if immediately read
+        if (initialStatus === 'read') {
+          messageData.read = true;
+          messageData.readAt = now;
+        }
 
         // Add message type specific fields
         if (data.messageType === 'audio') {
@@ -185,11 +209,6 @@ module.exports = (io) => {
           ...message.toObject(),
           tempId: data.tempId,
         });
-
-        // Check if receiver is actively in the chat room
-        const receiverSocketRoom = `chat_${conversationId}`;
-        const receiverSockets = await io.in(receiverSocketRoom).fetchSockets();
-        const isReceiverInChat = receiverSockets.some(s => s.userId?.toString() === receiverId.toString());
 
         // Send push notification if receiver is not actively in the chat
         if (!isReceiverInChat) {
@@ -624,28 +643,31 @@ module.exports = (io) => {
 
     // Send WebRTC offer
     socket.on('webrtc_offer', (data) => {
-      const { to, offer } = data;
+      const { to, offer, connectionId } = data;
       io.to(to).emit('webrtc_offer', {
         from: socket.userId.toString(),
         offer,
+        connectionId,
       });
     });
 
     // Send WebRTC answer
     socket.on('webrtc_answer', (data) => {
-      const { to, answer } = data;
+      const { to, answer, connectionId } = data;
       io.to(to).emit('webrtc_answer', {
         from: socket.userId.toString(),
         answer,
+        connectionId,
       });
     });
 
     // Exchange ICE candidates
     socket.on('ice_candidate', (data) => {
-      const { to, candidate } = data;
+      const { to, candidate, connectionId } = data;
       io.to(to).emit('ice_candidate', {
         from: socket.userId.toString(),
         candidate,
+        connectionId,
       });
     });
 

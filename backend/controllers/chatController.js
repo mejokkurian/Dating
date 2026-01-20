@@ -7,10 +7,50 @@ const getConversationId = (userId1, userId2) => {
   return `${ids[0]}_${ids[1]}`;
 };
 
+// Generate Time-Limited TURN Credentials
+const getTurnCredentials = async (req, res) => {
+  try {
+    const turnSecret = process.env.TURN_SECRET || 'default_insecure_secret';
+    const ttl = 3600; // 1 hour
+    const username = `${Math.floor(Date.now() / 1000) + ttl}:${req.user._id}`;
+
+    // Generate HMAC-SHA1 signature
+    const crypto = require('crypto'); // crypto is built-in, no install needed typically but good to ensure
+    const hmac = crypto.createHmac('sha1', turnSecret);
+    hmac.setEncoding('base64');
+    hmac.write(username);
+    hmac.end();
+    const credential = hmac.read();
+
+    res.json({
+      username,
+      credential,
+      ttl,
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        {
+          urls: 'turn:54.164.167.70:3478?transport=udp',
+          username,
+          credential,
+        },
+        {
+          urls: 'turn:54.164.167.70:3478?transport=tcp',
+          username,
+          credential,
+        },
+      ],
+    });
+  } catch (error) {
+    console.error('Error generating TURN credentials:', error);
+    res.status(500).json({ message: 'Server error generating credentials' });
+  }
+};
+
 // @desc    Get all conversations for a user
 // @route   GET /api/chat/conversations
 // @access  Private
-exports.getConversations = async (req, res) => {
+const getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
 
