@@ -151,7 +151,8 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
       setLocalStream(stream);
 
       // Create peer connection with connection state monitoring
-      webRTCService.createPeerConnection(
+      // MUST await this because it fetches TURN credentials async
+      await webRTCService.createPeerConnection(
         (remoteStream) => {
           if (!mounted.current) return;
           console.log('Remote stream received');

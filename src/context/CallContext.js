@@ -157,6 +157,29 @@ export const CallProvider = ({ children }) => {
               isIncoming: true,
               incomingOffer: null,
             });
+            console.log('📞 Creating QC peer connection for acceptance...');
+      // Must await here too
+      await webRTCService.createPeerConnection(
+        (stream) => {
+          console.log('📞 Remote stream received (accepted)');
+          setCallState(prev => ({ ...prev, state: CALL_STATES.CONNECTED }));
+        },
+        (candidate, connectionId) => {
+          console.log('📞 sending ICE candidate answer for conn:', connectionId);
+          socketService.emit('ice_candidate', {
+            to: callState.user._id,
+            candidate,
+            connectionId
+          });
+        },
+        (state) => {
+          if (state === 'failed') {
+            transitionState(CALL_STATES.RECONNECTING);
+            webRTCService.handleDisconnection();
+          }
+        }
+      );
+      console.log('✅ Peer connection initialized for answer');   // Fallback to Phase 1 (in-app notification)
             return;
           } else {
             console.log('⚠️ Native notification failed, falling back to Phase 1');

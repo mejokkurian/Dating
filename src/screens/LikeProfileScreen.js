@@ -456,8 +456,8 @@ const LikeProfileScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Action Buttons - Fixed at Bottom (Hidden when from Connect Now) */}
-      {!fromConnectNow && (
+      {/* Action Buttons - Fixed at Bottom (Hidden when from Connect Now or Waiting) */}
+      {!fromConnectNow && !route.params?.isWaiting && (
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={[styles.actionButton]}
@@ -504,6 +504,19 @@ const LikeProfileScreen = ({ route, navigation }) => {
               </View>
             )}
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Waiting Status Banner */}
+      {route.params?.isWaiting && (
+        <View style={[styles.actionsContainer, { flexDirection: 'column', gap: 8 }]}>
+           <Ionicons name="time-outline" size={32} color="#D4AF37" />
+           <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>
+             Waiting for response
+           </Text>
+           <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+             You have already liked this profile
+           </Text>
         </View>
       )}
 

@@ -14,20 +14,42 @@ const LikesYouScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('likes'); // 'likes' or 'waiting'
 
+  // Ref to track last fetch time to prevent rapid refetching
+  const lastFetchTime = React.useRef(0);
+  const THROTTLE_MS = 15000; // 15 seconds cache
+
   useFocusEffect(
     useCallback(() => {
-      loadMatches();
-      updateBadgeCounts(); // Update badge counts when screen comes into focus
-    }, [updateBadgeCounts])
+      // Determine if we should fetch:
+      // 1. If no matches, fetch immediately
+      // 2. If refreshing, fetch (handled by onRefresh)
+      // 3. If enough time has passed since last fetch
+      const now = Date.now();
+      const shouldFetch = matches.length === 0 || (now - lastFetchTime.current > THROTTLE_MS);
+      
+      if (shouldFetch) {
+        loadMatches();
+      }
+      
+      updateBadgeCounts(); 
+    }, [updateBadgeCounts, matches.length])
   );
 
-  const loadMatches = async () => {
+  const loadMatches = async (force = false) => {
     try {
       if (matches.length === 0) setLoading(true);
+      
       const data = await getMyMatches();
-      // Keep all pending matches
       const pendingMatches = data.filter(match => match.status === 'pending');
-      setMatches(pendingMatches);
+      
+      // Smart update: Only set state if data actually changed
+      // This prevents "messy" re-renders/flickers
+      const hasChanged = JSON.stringify(pendingMatches) !== JSON.stringify(matches);
+      
+      if (hasChanged || force) {
+        setMatches(pendingMatches);
+        lastFetchTime.current = Date.now();
+      }
     } catch (error) {
       console.error('Load matches error:', error);
     } finally {
@@ -37,7 +59,7 @@ const LikesYouScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadMatches();
+    await loadMatches(true); // Force update on manual refresh
     updateBadgeCounts();
     setRefreshing(false);
   };
@@ -72,7 +94,10 @@ const LikesYouScreen = ({ navigation }) => {
       }
     } else {
         // For waiting tab
-        navigation.navigate('LikeProfileScreen', { user: match.user });
+        navigation.navigate('LikeProfileScreen', { 
+          user: match.user,
+          isWaiting: true // Flag to hide action buttons
+        });
     }
   };
 
