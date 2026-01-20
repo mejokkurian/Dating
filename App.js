@@ -8,6 +8,7 @@ import { BadgeProvider } from './src/context/BadgeContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import Toast from 'react-native-toast-message';
+import { initCache } from './src/services/MessageCache';
 
 // Configure notification handler for foreground notifications
 Notifications.setNotificationHandler({
@@ -37,6 +38,9 @@ export default function App() {
   const navigationRef = useRef(null);
 
   useEffect(() => {
+    // Initialize message cache
+    initCache();
+    
     // Background notification handler
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const notification = response.notification;

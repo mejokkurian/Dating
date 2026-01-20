@@ -7,6 +7,7 @@ import { getMyMatches } from '../services/api/match';
 import { useAuth } from '../context/AuthContext';
 import { useBadge } from '../context/BadgeContext';
 import socketService from '../services/socket';
+import { getCachedConversations, cacheConversation } from '../services/MessageCache';
 
 const MessagesScreen = ({ navigation, route }) => {
   const { user } = useAuth();
@@ -59,11 +60,24 @@ const MessagesScreen = ({ navigation, route }) => {
 
   const loadMatches = async () => {
     try {
-      // Don't show loading spinner on subsequent refreshes to avoid flickering
-      if (matches.length === 0) setLoading(true);
+      // 1. Load from cache FIRST (instant UI)
+      const cached = getCachedConversations();
+      if (cached.length > 0) {
+        console.log(`✅ Loaded ${cached.length} conversations from cache`);
+        setMatches(cached);
+        setLoading(false); // UI shows immediately!
+      }
+
+      // 2. Fetch from API in background
       const data = await getMyMatches();
+      
       // Only show active matches (chats)
       const activeChats = data.filter(match => match.status === 'active');
+      
+      // 3. Cache the conversations
+      activeChats.forEach(chat => cacheConversation(chat));
+      
+      // 4. Update UI with fresh data
       setMatches(activeChats);
     } catch (error) {
       console.error('Load matches error:', error);

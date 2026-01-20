@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import socketService from '../../../services/socket';
 import { getMessages } from '../../../services/api/chat';
 import { normalizeContent } from '../../../utils/messageContent';
+import { getCachedMessages, cacheMessages, cacheMessage, getLastSyncTime } from '../../../services/MessageCache';
 
 // Now using the shared normalizeContent from utils
 
@@ -21,21 +22,72 @@ const useMessages = (user, userData) => {
   // Use ref for pinnedMessage to access in socket callbacks without triggering re-effect
   const pinnedMessageRef = useRef(null);
   
+  // FIX 3: Race prevention - track if API fetch is in progress
+  const isFetchingRef = useRef(false);
+  
   // Update ref when state changes
   useEffect(() => {
     pinnedMessageRef.current = pinnedMessage;
   }, [pinnedMessage]);
 
   const loadMessages = async () => {
+    // FIX 3: Prevent concurrent API fetches
+    if (isFetchingRef.current) {
+      console.log('⏭️ Skipping fetch - already in progress');
+      return;
+    }
+
     try {
-      const data = await getMessages(user._id, null, 50);
+      // Generate conversation ID
+      const ids = [userData._id, user._id].sort();
+      const conversationId = `${ids[0]}_${ids[1]}`;
+      
+      // 1. Load from cache FIRST (instant UI)
+      const cached = getCachedMessages(conversationId, 50);
+      if (cached.length > 0) {
+        console.log(`✅ Loaded ${cached.length} messages from cache`);
+        setMessages(cached);
+        setLoading(false); // UI shows immediately!
+      }
+
+      // FIX 1: Incremental sync - get last message timestamp
+      const lastSync = getLastSyncTime(conversationId);
+      console.log(`🔄 Syncing messages since: ${lastSync ? new Date(lastSync).toISOString() : 'beginning'}`);
+
+      // 2. Fetch from API in background (only new messages)
+      isFetchingRef.current = true;
+      const data = await getMessages(user._id, lastSync ? new Date(lastSync).toISOString() : null, 50);
+      isFetchingRef.current = false;
+      
       // Normalize content to ensure it's always a string
       const normalizedData = data.map(msg => ({
         ...msg,
         content: normalizeContent(msg.content)
       }));
-      // For inverted list: newest first (index 0)
-      setMessages(normalizedData.reverse());
+      
+      // 3. Update cache with fresh data
+      if (normalizedData.length > 0) {
+        cacheMessages(normalizedData);
+        console.log(`✅ Cached ${normalizedData.length} new messages`);
+      }
+      
+      // FIX 2: Merge instead of replace (prevents flicker)
+      setMessages(prev => {
+        const merged = [...prev];
+        
+        normalizedData.forEach(newMsg => {
+          // Only add if not already in list
+          if (!merged.find(m => m._id === newMsg._id)) {
+            merged.push(newMsg);
+          }
+        });
+        
+        // Sort by createdAt descending (newest first for inverted list)
+        return merged.sort((a, b) => 
+          new Date(b.createdAt) - new Date(a.createdAt)
+        );
+      });
+      
       setHasMore(normalizedData.length >= 50);
       
       // Mark all as read if we have messages
@@ -44,6 +96,7 @@ const useMessages = (user, userData) => {
       }
     } catch (error) {
       console.error('Load messages error:', error);
+      isFetchingRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -112,6 +165,9 @@ const useMessages = (user, userData) => {
             content: normalizeContent(message.content)
           };
           
+          // Cache the message
+          cacheMessage(normalizedMessage);
+          
           setMessages((prev) => {
             if (!mounted) return prev;
             // Check for duplicates
@@ -173,6 +229,9 @@ const useMessages = (user, userData) => {
           ...message,
           content: normalizeContent(message.content)
         };
+        
+        // Cache the sent message
+        cacheMessage(normalizedMessage);
         
         setMessages((prev) => {
           if (!mounted) return prev;
