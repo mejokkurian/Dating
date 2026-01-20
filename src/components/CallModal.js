@@ -38,6 +38,10 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
+  
+  // Production features
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [networkQuality, setNetworkQuality] = useState('good');
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const durationInterval = useRef(null);
@@ -146,13 +150,14 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
       const stream = await webRTCService.getLocalStream(callType === 'video', true);
       setLocalStream(stream);
 
-      // Create peer connection FIRST
+      // Create peer connection with connection state monitoring
       webRTCService.createPeerConnection(
         (remoteStream) => {
           if (!mounted.current) return;
           console.log('Remote stream received');
           setRemoteStream(remoteStream);
           setCallStatus('connected');
+          setIsReconnecting(false);
         },
         (candidate) => {
           if (!mounted.current) return;
@@ -162,8 +167,38 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
             to: user._id,
             candidate,
           });
+        },
+        (connectionState) => {
+          if (!mounted.current) return;
+          // Handle connection state changes
+          console.log('Connection state changed:', connectionState);
+          
+          if (connectionState === 'connected') {
+            setCallStatus('connected');
+            setIsReconnecting(false);
+          } else if (connectionState === 'disconnected' || connectionState === 'reconnecting') {
+            setIsReconnecting(true);
+          } else if (connectionState === 'failed_permanent') {
+            Alert.alert('Call Failed', 'Unable to establish connection');
+            handleEndCall();
+          }
         }
       );
+      
+      // Set ICE restart callback for reconnection
+      webRTCService.setICERestartCallback((offer) => {
+        console.log('ICE restart - sending new offer');
+        socketService.emit('webrtc_offer', {
+          to: user._id,
+          offer,
+        });
+      });
+      
+      // Start quality monitoring when connected
+      webRTCService.startQualityMonitoring((quality) => {
+        if (!mounted.current) return;
+        setNetworkQuality(quality.quality);
+      });
 
       // Setup WebRTC event listeners BEFORE creating offer/answer
       setupWebRTCListeners();
@@ -285,6 +320,7 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
   };
 
   const cleanup = () => {
+    webRTCService.stopQualityMonitoring();
     webRTCService.close();
     setLocalStream(null);
     setRemoteStream(null);
@@ -292,6 +328,8 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
     setCallDuration(0);
     setIsMuted(false);
     setIsVideoOn(callType === 'video');
+    setIsReconnecting(false);
+    setNetworkQuality('good');
     
     if (durationInterval.current) {
       clearInterval(durationInterval.current);
@@ -356,8 +394,27 @@ const CallModal = ({ visible, onClose, callType, user, userId, isIncoming = fals
             {callStatus === 'calling' && 'Calling...'}
             {callStatus === 'ringing' && 'Incoming Call...'}
             {callStatus === 'connecting' && 'Connecting...'}
-            {callStatus === 'connected' && formatDuration(callDuration)}
+            {isReconnecting && 'Reconnecting...'}
+            {callStatus === 'connected' && !isReconnecting && formatDuration(callDuration)}
           </Text>
+          
+          {/* Network Quality Warning */}
+          {callStatus === 'connected' && (networkQuality === 'poor' || networkQuality === 'bad') && (
+            <View style={styles.qualityWarning}>
+              <Ionicons name="warning" size={16} color="#FF9500" />
+              <Text style={styles.qualityWarningText}>
+                {networkQuality === 'poor' ? 'Poor connection' : 'Very poor connection'}
+              </Text>
+            </View>
+          )}
+          
+          {/* Reconnecting Indicator */}
+          {isReconnecting && (
+            <View style={styles.reconnectingIndicator}>
+              <View style={styles.reconnectingDot} />
+              <Text style={styles.reconnectingText}>Reconnecting...</Text>
+            </View>
+          )}
         </View>
 
         {/* Local Video Preview (for video calls) */}
@@ -563,6 +620,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF3B30',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  qualityWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 149, 0, 0.2)',
+    borderRadius: 20,
+    gap: 6,
+  },
+  qualityWarningText: {
+    color: '#FF9500',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  reconnectingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 8,
+  },
+  reconnectingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF9500',
+  },
+  reconnectingText: {
+    color: '#FF9500',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

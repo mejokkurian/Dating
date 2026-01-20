@@ -30,7 +30,13 @@
         "NSCameraUsageDescription": "We need access to your camera to take a selfie for account verification.",
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to select a selfie for account verification.",
         "NSMicrophoneUsageDescription": "We need access to your microphone for audio and video calls.",
-        "NSAppTransportSecurity": {}
+        "NSAppTransportSecurity": {},
+        "UIBackgroundModes": [
+          "voip",
+          "audio",
+          "fetch",
+          "remote-notification"
+        ]
       },
       "appleTeamId": "4AGP4UZK96"
     },

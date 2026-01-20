@@ -9,6 +9,16 @@ import { getUserById } from '../services/api/user';
 
 const CallContext = createContext({});
 
+// Call state machine
+const CALL_STATES = {
+  IDLE: 'idle',
+  CALLING: 'calling',
+  RINGING: 'ringing',
+  CONNECTED: 'connected',
+  RECONNECTING: 'reconnecting',
+  ENDED: 'ended'
+};
+
 export const useCall = () => {
   const context = useContext(CallContext);
   if (!context) {
@@ -20,23 +30,15 @@ export const useCall = () => {
 export const CallProvider = ({ children }) => {
   const { user } = useAuth();
   const [callState, setCallState] = useState({
+    state: CALL_STATES.IDLE,
     visible: false,
     callType: null, // 'audio' or 'video'
     user: null, // The other user
     isIncoming: false,
     incomingOffer: null,
+    quality: 'good', // Network quality
+    duration: 0,
   });
-
-  // Reset state helper
-  const resetCallState = () => {
-    setCallState({
-      visible: false,
-      callType: null,
-      user: null,
-      isIncoming: false,
-      incomingOffer: null,
-    });
-  };
 
   const callStateRef = useRef(callState);
   const callStartTime = useRef(null);
@@ -197,15 +199,41 @@ export const CallProvider = ({ children }) => {
     };
   }, [user?._id]); // Removed callState dependency to avoid listener thrashing
 
+  // State machine transition with validation
+  const transitionState = (newState) => {
+    const current = callState.state;
+    
+    // Valid transitions
+    const validTransitions = {
+      [CALL_STATES.IDLE]: [CALL_STATES.CALLING, CALL_STATES.RINGING],
+      [CALL_STATES.CALLING]: [CALL_STATES.CONNECTED, CALL_STATES.ENDED],
+      [CALL_STATES.RINGING]: [CALL_STATES.CONNECTED, CALL_STATES.ENDED],
+      [CALL_STATES.CONNECTED]: [CALL_STATES.RECONNECTING, CALL_STATES.ENDED],
+      [CALL_STATES.RECONNECTING]: [CALL_STATES.CONNECTED, CALL_STATES.ENDED],
+      [CALL_STATES.ENDED]: [CALL_STATES.IDLE]
+    };
+
+    if (!validTransitions[current]?.includes(newState)) {
+      console.warn(`⚠️ Invalid state transition: ${current} → ${newState}`);
+      return false;
+    }
+
+    console.log(`🔄 State transition: ${current} → ${newState}`);
+    setCallState(prev => ({ ...prev, state: newState }));
+    return true;
+  };
+
   const startCall = (targetUser, type = 'audio') => {
     callStartTime.current = Date.now();
-    setCallState({
+    transitionState(CALL_STATES.CALLING);
+    setCallState(prev => ({
+      ...prev,
       visible: true,
       callType: type,
       user: targetUser,
       isIncoming: false,
       incomingOffer: null,
-    });
+    }));
   };
 
   const endCall = () => {
@@ -226,7 +254,21 @@ export const CallProvider = ({ children }) => {
       callStartTime.current = null;
     }
     
-    resetCallState();
+    // Transition to ENDED then IDLE
+    transitionState(CALL_STATES.ENDED);
+    setTimeout(() => {
+      transitionState(CALL_STATES.IDLE);
+      setCallState({
+        state: CALL_STATES.IDLE,
+        visible: false,
+        callType: null,
+        user: null,
+        isIncoming: false,
+        incomingOffer: null,
+        quality: 'good',
+        duration: 0,
+      });
+    }, 100); // Small delay for state transition
   };
 
   return (
