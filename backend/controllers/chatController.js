@@ -8,7 +8,7 @@ const getConversationId = (userId1, userId2) => {
 };
 
 // Generate Time-Limited TURN Credentials
-const getTurnCredentials = async (req, res) => {
+exports.getTurnCredentials = async (req, res) => {
   try {
     const turnSecret = process.env.TURN_SECRET || 'default_insecure_secret';
     const ttl = 3600; // 1 hour
@@ -50,7 +50,7 @@ const getTurnCredentials = async (req, res) => {
 // @desc    Get all conversations for a user
 // @route   GET /api/chat/conversations
 // @access  Private
-const getConversations = async (req, res) => {
+exports.getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
 
