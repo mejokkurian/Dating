@@ -45,6 +45,9 @@ const getConversationId = (userId1, userId2) => {
   return `${ids[0]}_${ids[1]}`;
 };
 
+// Rate limiting for call initiation (10 calls per minute per user)
+const callRateLimiter = new Map(); // userId -> { count, resetTime }
+
 module.exports = (io) => {
   // Socket.IO middleware for JWT authentication
   io.use((socket, next) => {
@@ -613,7 +616,24 @@ module.exports = (io) => {
     
     // Initiate a call
     socket.on('call_user', async (data) => {
-      const { to, callType, from } = data;
+      const { to, callType } = data;
+      const from = socket.userId.toString(); // Use authenticated user ID (security)
+      
+      // Rate limiting: 10 calls per minute per user
+      const now = Date.now();
+      const userLimiter = callRateLimiter.get(from);
+      
+      if (userLimiter && userLimiter.resetTime > now) {
+        if (userLimiter.count >= 10) {
+          console.warn(`⚠️ Rate limit exceeded for user ${from}`);
+          socket.emit('call_error', { message: 'Rate limit exceeded. Please wait before making another call.' });
+          return;
+        }
+        userLimiter.count++;
+      } else {
+        callRateLimiter.set(from, { count: 1, resetTime: now + 60000 }); // 1 minute window
+      }
+      
       console.log(`Call from ${from} to ${to}, type: ${callType}`);
       
       // Notify the recipient via Socket.IO
@@ -671,7 +691,6 @@ module.exports = (io) => {
       });
     });
 
-    // Call accepted
     socket.on('call_accepted', (data) => {
       const { to } = data;
       io.to(to).emit('call_accepted', {
@@ -700,6 +719,14 @@ module.exports = (io) => {
     socket.on('end_call', (data) => {
       const { to } = data;
       io.to(to).emit('call_ended', {
+        from: socket.userId.toString(),
+      });
+    });
+
+    // Handle call busy signal
+    socket.on('call_busy', (data) => {
+      const { to } = data;
+      io.to(to).emit('call_busy', {
         from: socket.userId.toString(),
       });
     });

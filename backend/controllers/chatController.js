@@ -10,7 +10,14 @@ const getConversationId = (userId1, userId2) => {
 // Generate Time-Limited TURN Credentials
 exports.getTurnCredentials = async (req, res) => {
   try {
-    const turnSecret = process.env.TURN_SECRET || 'default_insecure_secret';
+    const turnSecret = process.env.TURN_SECRET;
+    
+    // CRITICAL: Fail if TURN_SECRET is not set (security requirement)
+    if (!turnSecret) {
+      console.error('❌ CRITICAL: TURN_SECRET environment variable is not set!');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+    
     const ttl = 3600; // 1 hour
     const username = `${Math.floor(Date.now() / 1000) + ttl}:${req.user._id}`;
 
