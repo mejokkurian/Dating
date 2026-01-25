@@ -5,6 +5,12 @@ const User = require('../models/User');
 const pushNotificationService = require('../services/pushNotificationService');
 const NotificationFactory = require('../services/notifications/notificationFactory');
 
+// Rate limiting for call initiation (10 calls per minute per user)
+const callRateLimiter = new Map(); // userId -> { count, resetTime }
+
+// Track active calls with connection IDs for validation
+const activeCalls = new Map(); // "userId-to" -> connectionId
+
 // Custom bad words list for dating app
 const customBadWords = [
   // Add dating app specific inappropriate terms
@@ -613,7 +619,24 @@ module.exports = (io) => {
     
     // Initiate a call
     socket.on('call_user', async (data) => {
-      const { to, callType, from } = data;
+      const { to, callType } = data;
+      const from = socket.userId.toString(); // Use authenticated user ID (HIGH-5 fix)
+      
+      // Rate limiting: 10 calls per minute per user
+      const now = Date.now();
+      const userLimiter = callRateLimiter.get(from);
+      
+      if (userLimiter && userLimiter.resetTime > now) {
+        if (userLimiter.count >= 10) {
+          console.warn(`⚠️ Rate limit exceeded for user ${from}`);
+          socket.emit('call_error', { message: 'Rate limit exceeded. Please wait before making another call.' });
+          return;
+        }
+        userLimiter.count++;
+      } else {
+        callRateLimiter.set(from, { count: 1, resetTime: now + 60000 }); // 1 minute window
+      }
+      
       console.log(`Call from ${from} to ${to}, type: ${callType}`);
       
       // Notify the recipient via Socket.IO
@@ -644,18 +667,48 @@ module.exports = (io) => {
     // Send WebRTC offer
     socket.on('webrtc_offer', (data) => {
       const { to, offer, connectionId } = data;
+      const from = socket.userId.toString();
+      
+      console.log(`📤 Forwarding WebRTC offer from ${from} to ${to}, connectionId: ${connectionId}`);
+      
+      // Track active call with connection ID
+      const callKey = `${from}-${to}`;
+      if (connectionId) {
+        activeCalls.set(callKey, connectionId);
+      }
+      
       io.to(to).emit('webrtc_offer', {
-        from: socket.userId.toString(),
+        from,
         offer,
         connectionId,
       });
+      
+      console.log(`✅ WebRTC offer forwarded to ${to}`);
     });
 
     // Send WebRTC answer
     socket.on('webrtc_answer', (data) => {
       const { to, answer, connectionId } = data;
+      const from = socket.userId.toString();
+      
+      // Validate connection ID matches active call
+      // Check both directions since connection ID is stored for caller->callee
+      const callKey1 = `${to}-${from}`; // Reverse direction (callee->caller)
+      const callKey2 = `${from}-${to}`; // Forward direction (caller->callee) 
+      const expectedConnectionId1 = activeCalls.get(callKey1);
+      const expectedConnectionId2 = activeCalls.get(callKey2);
+      const expectedConnectionId = expectedConnectionId1 || expectedConnectionId2;
+      
+      if (connectionId && expectedConnectionId && connectionId !== expectedConnectionId) {
+        console.warn(`⚠️ Connection ID mismatch for answer: expected ${expectedConnectionId}, got ${connectionId}`);
+        console.warn(`   Checked keys: ${callKey1} (${expectedConnectionId1}), ${callKey2} (${expectedConnectionId2})`);
+        // Don't reject - might be a timing issue, just log it
+      } else if (connectionId && expectedConnectionId) {
+        console.log(`✅ Connection ID validated for answer: ${connectionId}`);
+      }
+      
       io.to(to).emit('webrtc_answer', {
-        from: socket.userId.toString(),
+        from,
         answer,
         connectionId,
       });
@@ -664,8 +717,24 @@ module.exports = (io) => {
     // Exchange ICE candidates
     socket.on('ice_candidate', (data) => {
       const { to, candidate, connectionId } = data;
+      const from = socket.userId.toString();
+      
+      // Validate connection ID if provided
+      if (connectionId) {
+        const callKey1 = `${from}-${to}`;
+        const callKey2 = `${to}-${from}`;
+        const expectedId1 = activeCalls.get(callKey1);
+        const expectedId2 = activeCalls.get(callKey2);
+        
+        // Connection ID should match either direction
+        if (expectedId1 && connectionId !== expectedId1 && expectedId2 && connectionId !== expectedId2) {
+          console.warn(`⚠️ Ignoring ICE candidate - connection ID mismatch: ${connectionId}`);
+          return; // Ignore stale ICE candidate
+        }
+      }
+      
       io.to(to).emit('ice_candidate', {
-        from: socket.userId.toString(),
+        from,
         candidate,
         connectionId,
       });
@@ -699,7 +768,23 @@ module.exports = (io) => {
     // Call ended
     socket.on('end_call', (data) => {
       const { to } = data;
+      const from = socket.userId.toString();
+      
+      // Clean up active call tracking
+      const callKey1 = `${from}-${to}`;
+      const callKey2 = `${to}-${from}`;
+      activeCalls.delete(callKey1);
+      activeCalls.delete(callKey2);
+      
       io.to(to).emit('call_ended', {
+        from,
+      });
+    });
+
+    // Handle call busy signal
+    socket.on('call_busy', (data) => {
+      const { to } = data;
+      io.to(to).emit('call_busy', {
         from: socket.userId.toString(),
       });
     });
