@@ -44,23 +44,25 @@ const ChatHeader = ({
         </Text>
       </View>
       
-      {/* Call Buttons */}
-      <View style={styles.callButtons}>
-        <TouchableOpacity 
-          onPress={onAudioCall}
-          style={[styles.callButton, callState.visible && { opacity: 0.5 }]}
-          disabled={callState.visible}
-        >
-          <Ionicons name="call" size={28} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={onVideoCall}
-          style={[styles.callButton, callState.visible && { opacity: 0.5 }]}
-          disabled={callState.visible}
-        >
-          <Ionicons name="videocam" size={28} color="#000" />
-        </TouchableOpacity>
-      </View>
+      {/* Call Buttons - HIDDEN FOR PRODUCTION */}
+      {false && (
+        <View style={styles.callButtons}>
+          <TouchableOpacity 
+            onPress={onAudioCall}
+            style={[styles.callButton, callState.visible && { opacity: 0.5 }]}
+            disabled={callState.visible}
+          >
+            <Ionicons name="call" size={28} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={onVideoCall}
+            style={[styles.callButton, callState.visible && { opacity: 0.5 }]}
+            disabled={callState.visible}
+          >
+            <Ionicons name="videocam" size={28} color="#000" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };

@@ -125,14 +125,17 @@ export const CallProvider = ({ children }) => {
 
     socketService.onWebRTCOffer(handleWebRTCOffer);
 
-    // Listen for push notifications (when app is in background/closed)
+    // Listen for push notifications (when app is in foreground)
+    // Note: Notification taps when app is backgrounded/killed are handled in App.js
+    // This listener only fires when notification is received while app is in foreground
     const notificationSubscription = Notifications.addNotificationReceivedListener(async (notification) => {
       const data = notification.request.content.data;
-      console.log('📱 Push notification received:', data);
+      console.log('📱 Push notification received (foreground):', data);
       
-      // Handle incoming call notification
+      // Handle incoming call notification (only when app is in foreground)
+      // When app is in background/killed, notification tap is handled in App.js AppContent
       if (data?.type === 'call') {
-        console.log('📞 Call notification received in background!');
+        console.log('📞 Call notification received in foreground!');
         const { callerId, callerName, callType } = data;
         
         // Check if call modal is already visible
@@ -141,53 +144,10 @@ export const CallProvider = ({ children }) => {
           return;
         }
 
-        // Try to use native full-screen notification on Android
-        if (nativeCallService.isAvailable()) {
-          console.log('📱 Using native Android full-screen call notification');
-          const result = await nativeCallService.showIncomingCall(callerId, callerName, callType);
-          
-          if (result.success) {
-            console.log('✅ Native full-screen notification shown');
-            // Native notification will handle the UI
-            // We still set state for when user accepts
-            setCallState({
-              visible: true,
-              callType: callType || 'audio',
-              user: { _id: callerId, name: callerName || 'Unknown Caller', image: null },
-              isIncoming: true,
-              incomingOffer: null,
-            });
-            console.log('📞 Creating QC peer connection for acceptance...');
-      // Must await here too
-      await webRTCService.createPeerConnection(
-        (stream) => {
-          console.log('📞 Remote stream received (accepted)');
-          setCallState(prev => ({ ...prev, state: CALL_STATES.CONNECTED }));
-        },
-        (candidate, connectionId) => {
-          console.log('📞 sending ICE candidate answer for conn:', connectionId);
-          socketService.emit('ice_candidate', {
-            to: callState.user._id,
-            candidate,
-            connectionId
-          });
-        },
-        (state) => {
-          if (state === 'failed') {
-            transitionState(CALL_STATES.RECONNECTING);
-            webRTCService.handleDisconnection();
-          }
-        }
-      );
-      console.log('✅ Peer connection initialized for answer');   // Fallback to Phase 1 (in-app notification)
-            return;
-          } else {
-            console.log('⚠️ Native notification failed, falling back to Phase 1');
-          }
-        }
-
-        // Fallback to Phase 1 (in-app notification)
-        console.log('📞 Opening call UI from notification (Phase 1 fallback)...');
+        // Show call UI immediately when notification received in foreground
+        // Note: If user taps the notification alert, it won't trigger addNotificationResponseReceivedListener
+        // The call modal is already shown, so user can accept/reject directly
+        console.log('📞 Opening call UI from notification (foreground)...');
         setCallState({
           visible: true,
           callType: callType || 'audio',
@@ -294,8 +254,16 @@ export const CallProvider = ({ children }) => {
     }, 100); // Small delay for state transition
   };
 
+  // Method to check if call is active for a specific user (for deep linking)
+  const isCallActiveForUser = (userId) => {
+    return callState.visible && 
+           callState.user?._id === userId && 
+           callState.state !== CALL_STATES.ENDED &&
+           callState.state !== CALL_STATES.IDLE;
+  };
+
   return (
-    <CallContext.Provider value={{ startCall, endCall, callState }}>
+    <CallContext.Provider value={{ startCall, endCall, callState, isCallActiveForUser }}>
       {children}
       {/* Global Call Modal */}
       {callState.visible && (

@@ -209,13 +209,22 @@ export const NotificationProvider = ({ children, navigationRef }) => {
       }
     );
 
-    // Handle notification taps
+    // Handle notification taps (only fires when app is backgrounded/killed)
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const notification = response.notification;
-        console.log('Notification tapped:', notification);
+        const data = notification.request.content.data;
+        console.log('📱 Notification tapped (from NotificationContext):', data);
 
-        // Handle navigation
+        // Handle call notifications - these are handled in App.js AppContent
+        // But we can also handle them here as fallback
+        if (data?.type === 'call') {
+          console.log('📞 Call notification tapped in NotificationContext (fallback)');
+          // App.js AppContent will handle this, but we log it here
+          return;
+        }
+
+        // Handle other notification types
         if (navigationRef?.current) {
           handleNotificationTap(notification, navigationRef.current);
         }

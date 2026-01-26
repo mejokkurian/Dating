@@ -4,6 +4,10 @@
     "slug": "stafftraveller_mob",
     "scheme": "sugardating",
     "version": "1.0.0",
+    "deepLinking": {
+      "enabled": true,
+      "prefixes": ["sugardating://"]
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
