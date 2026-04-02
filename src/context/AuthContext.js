@@ -33,11 +33,15 @@ export const AuthProvider = ({ children }) => {
             setUserData(profile);
             setOnboardingComplete(profile.onboardingCompleted);
           } catch (err) {
-            console.error('Failed to fetch latest profile:', err);
+            if (__DEV__) {
+              console.error('Failed to fetch latest profile:', err);
+            }
             // If the token is invalid (e.g. secret changed), we should logout
             // Checking if the error implies an auth failure would be ideal, but for now:
             if (err.response && (err.response.status === 401 || err.response.status === 403)) {
-               console.log('Token invalid, logging out...');
+               if (__DEV__) {
+                 console.log('Token invalid, logging out...');
+               }
                await logout();
                return;
             }
@@ -51,7 +55,9 @@ export const AuthProvider = ({ children }) => {
         setOnboardingComplete(false);
       }
     } catch (e) {
-      console.error('Error checking login status:', e);
+      if (__DEV__) {
+        console.error('Error checking login status:', e);
+      }
     } finally {
       setLoading(false);
     }
@@ -75,19 +81,27 @@ export const AuthProvider = ({ children }) => {
       setUserData(null);
       setOnboardingComplete(false);
     } catch (e) {
-      console.error('Error logging out:', e);
+      if (__DEV__) {
+        console.error('Error logging out:', e);
+      }
     }
   };
+
+  // Convenience derived from userData — avoids importing SubscriptionContext in every screen
+  const subscriptionTier = userData?.subscriptionTier || 'free';
+  const isPremiumUser = userData?.isPremium || false;
 
   const value = {
     user,
     userData,
     loading,
     onboardingComplete,
+    subscriptionTier,
+    isPremiumUser,
     setUserData,
     setOnboardingComplete,
-    login, // Expose login function to update state after successful API login
-    logout, // Expose logout function
+    login,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

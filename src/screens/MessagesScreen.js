@@ -6,16 +6,20 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getMyMatches } from '../services/api/match';
 import { useAuth } from '../context/AuthContext';
 import { useBadge } from '../context/BadgeContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import socketService from '../services/socket';
 import { getCachedConversations, cacheConversation } from '../services/MessageCache';
 
 const MessagesScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { updateBadgeCounts } = useBadge();
+  const { isOffline } = useNetworkStatus();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [highlightedUserId, setHighlightedUserId] = useState(null);
+  const [error, setError] = useState(null);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
 
   // Handle highlighted user from navigation params
   useEffect(() => {
@@ -42,8 +46,28 @@ const MessagesScreen = ({ navigation, route }) => {
          updateBadgeCounts();
      };
 
+     const handleMessageEdited = (data) => {
+       // When a message is edited, update the conversation list
+       // The last message content might have changed
+       if (__DEV__) {
+         console.log('📝 Message edited in conversation list, refreshing...');
+       }
+       loadMatches();
+     };
+
+     const handleMessageDeleted = (data) => {
+       // When a message is deleted, update the conversation list
+       // The last message might have changed if the deleted message was the last one
+       if (__DEV__) {
+         console.log('🗑️ Message deleted in conversation list, refreshing...');
+       }
+       loadMatches();
+     };
+
      socketService.onNewMessage(handleUpdate);
      socketService.onInteraction(handleUpdate); // For matches/likes
+     socketService.onMessageEdited(handleMessageEdited);
+     socketService.onMessageDeleted(handleMessageDeleted);
      // Also listen for delivered/read if you want to update ticks, but this list only shows last message content. 
      // We should listen for read updates though to clear unread badges.
      socketService.onMessagesRead(() => {
@@ -54,16 +78,33 @@ const MessagesScreen = ({ navigation, route }) => {
      return () => {
          socketService.removeListener('new_message');
          socketService.removeListener('interaction');
+         socketService.removeListener('message_edited');
+         socketService.removeListener('message_deleted');
          socketService.removeListener('messages_read');
      };
   }, [updateBadgeCounts]);
 
   const loadMatches = async () => {
+    // Clear previous error
+    setError(null);
+
+    // Don't fetch when offline - show cached data
+    if (isOffline) {
+      const cached = getCachedConversations();
+      if (cached.length > 0) {
+        setMatches(cached);
+      }
+      setLoading(false);
+      return;
+    }
+
     try {
       // 1. Load from cache FIRST (instant UI)
       const cached = getCachedConversations();
       if (cached.length > 0) {
-        console.log(`✅ Loaded ${cached.length} conversations from cache`);
+        if (__DEV__) {
+          console.log(`✅ Loaded ${cached.length} conversations from cache`);
+        }
         setMatches(cached);
         setLoading(false); // UI shows immediately!
       }
@@ -80,7 +121,20 @@ const MessagesScreen = ({ navigation, route }) => {
       // 4. Update UI with fresh data
       setMatches(activeChats);
     } catch (error) {
-      console.error('Load matches error:', error);
+      if (__DEV__) {
+        console.error('Load matches error:', error);
+      }
+      
+      // Set error state with user-friendly message
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          'Failed to load conversations. Please check your connection and try again.';
+      setError({
+        message: errorMessage,
+        retry: loadMatches
+      });
+      
+      // On error, keep cached conversations visible if available
     } finally {
       setLoading(false);
     }
@@ -88,9 +142,21 @@ const MessagesScreen = ({ navigation, route }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadMatches();
-    updateBadgeCounts(); // Update badge counts on refresh
-    setRefreshing(false);
+    setRefreshSuccess(false);
+    setError(null);
+    try {
+      await loadMatches();
+      updateBadgeCounts(); // Update badge counts on refresh
+      setRefreshSuccess(true);
+      // Auto-dismiss success banner after 2 seconds
+      setTimeout(() => {
+        setRefreshSuccess(false);
+      }, 2000);
+    } catch (error) {
+      // Error is handled by loadMatches
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleChatPress = (match) => {
@@ -175,7 +241,62 @@ const MessagesScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      {/* Offline Banner */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.offlineText}>No Internet Connection</Text>
+        </View>
+      )}
+
+      {/* Refresh Success Banner */}
+      {refreshSuccess && (
+        <View style={styles.successBanner}>
+          <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+          <Text style={styles.successText}>Conversations refreshed</Text>
+        </View>
+      )}
+
+      {/* Error Banner */}
+      {error && matches.length > 0 && (
+        <View style={styles.errorBanner}>
+          <View style={styles.errorContent}>
+            <Ionicons name="alert-circle" size={20} color="#FF4444" />
+            <Text style={styles.errorText}>{error.message}</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => {
+              setError(null);
+              if (error.retry) {
+                error.retry();
+              }
+            }}
+            style={styles.errorRetryButton}
+          >
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {error && matches.length === 0 ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#FF4444" />
+          <Text style={styles.errorTitle}>Failed to Load Conversations</Text>
+          <Text style={styles.errorMessage}>{error.message}</Text>
+          <TouchableOpacity 
+            onPress={() => {
+              setError(null);
+              if (error.retry) {
+                error.retry();
+              }
+            }}
+            style={styles.errorRetryButtonLarge}
+          >
+            <Text style={styles.errorRetryTextLarge}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -201,6 +322,7 @@ const MessagesScreen = ({ navigation, route }) => {
           </View>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -305,6 +427,111 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF9E6',
     borderLeftWidth: 4,
     borderLeftColor: '#D4AF37',
+  },
+  offlineBanner: {
+    backgroundColor: '#FF4444',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  successBanner: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  errorBanner: {
+    backgroundColor: '#FFEBEE',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFCDD2',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#C62828',
+    marginLeft: 8,
+    flex: 1,
+  },
+  errorRetryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FF4444',
+    borderRadius: 6,
+  },
+  errorRetryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  errorRetryButtonLarge: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#D4AF37',
+    borderRadius: 8,
+  },
+  errorRetryTextLarge: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  offlineBanner: {
+    backgroundColor: '#FF4444',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

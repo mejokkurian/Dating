@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../theme/theme';
 import BottomSheet from './BottomSheet';
+import { sanitizeAndValidateMessage } from '../utils/inputSanitization';
 
 const QUICK_MESSAGES = [
   'Hey! 👋',
@@ -24,6 +26,8 @@ const QuickHelloModal = ({
   onClose,
   onSend,
   user,
+  loading = false,
+  rateLimitInfo = { allowed: true, remaining: 5 },
 }) => {
   const [selectedMessage, setSelectedMessage] = useState('');
   const [customMessage, setCustomMessage] = useState('');
@@ -35,21 +39,38 @@ const QuickHelloModal = ({
       setSelectedMessage(QUICK_MESSAGES[0]);
       setCustomMessage('');
     } else {
-      // Reset state when modal closes
-      setSelectedMessage('');
-      setCustomMessage('');
+      // Reset state when modal closes (only if not loading)
+      if (!loading) {
+        setSelectedMessage('');
+        setCustomMessage('');
+      }
     }
-  }, [visible]);
+  }, [visible, loading]);
 
   const handleSend = () => {
-    const message = customMessage.trim() || selectedMessage;
-    if (message) {
-      onSend(user, message);
-      setSelectedMessage('');
-      setCustomMessage('');
-      onClose();
+    if (loading || !rateLimitInfo.allowed) return; // Prevent sending while already in progress or rate limited
+    
+    // Use selected message or custom message
+    const rawMessage = customMessage.trim() || selectedMessage;
+    
+    if (!rawMessage || !user) return;
+    
+    // Sanitize and validate the message
+    const result = sanitizeAndValidateMessage(rawMessage, 200);
+    
+    if (!result.valid) {
+      // If validation fails, don't send (could show error to user)
+      console.warn('Message validation failed:', result.error);
+      return;
     }
+    
+    // Send sanitized message
+    onSend(user, result.sanitized);
+    // Don't close modal here - let parent handle it after success
+    // Don't reset state here - parent will handle cleanup
   };
+  
+  const canSend = rateLimitInfo.allowed && (selectedMessage || customMessage.trim()) && !loading;
 
   return (
     <BottomSheet
@@ -78,11 +99,15 @@ const QuickHelloModal = ({
                 style={[
                   styles.quickMessageButton,
                   selectedMessage === message && styles.quickMessageButtonSelected,
+                  loading && styles.quickMessageButtonDisabled,
                 ]}
                 onPress={() => {
-                  setSelectedMessage(message);
-                  setCustomMessage('');
+                  if (!loading) {
+                    setSelectedMessage(message);
+                    setCustomMessage('');
+                  }
                 }}
+                disabled={loading}
               >
                 <Text
                   style={[
@@ -103,16 +128,39 @@ const QuickHelloModal = ({
             placeholderTextColor="#999"
             value={customMessage}
             onChangeText={(text) => {
-              setCustomMessage(text);
-              setSelectedMessage('');
+              if (!loading) {
+                setCustomMessage(text);
+                setSelectedMessage('');
+              }
             }}
             multiline
             maxLength={200}
+            editable={!loading}
           />
           {customMessage.length > 0 && (
             <Text style={styles.charCount}>
               {customMessage.length}/200
             </Text>
+          )}
+          
+          {/* Rate limit indicator */}
+          {rateLimitInfo.remaining !== undefined && rateLimitInfo.remaining < 3 && (
+            <View style={styles.rateLimitContainer}>
+              <Ionicons 
+                name={rateLimitInfo.allowed ? "information-circle-outline" : "warning-outline"} 
+                size={16} 
+                color={rateLimitInfo.allowed ? "#FFA500" : "#FF3B30"} 
+              />
+              <Text style={[
+                styles.rateLimitText,
+                !rateLimitInfo.allowed && styles.rateLimitTextError
+              ]}>
+                {rateLimitInfo.allowed 
+                  ? `${rateLimitInfo.remaining} quick hello${rateLimitInfo.remaining !== 1 ? 's' : ''} remaining this minute`
+                  : `Rate limit reached. Please wait before sending another.`
+                }
+              </Text>
+            </View>
           )}
         </ScrollView>
 
@@ -120,20 +168,30 @@ const QuickHelloModal = ({
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
             onPress={onClose}
+            disabled={loading}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={[styles.cancelButtonText, loading && styles.disabledText]}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.button,
               styles.sendButton,
-              (!selectedMessage && !customMessage.trim()) && styles.sendButtonDisabled,
+              !canSend && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={!selectedMessage && !customMessage.trim()}
+            disabled={!canSend}
           >
-            <Ionicons name="send" size={18} color="#fff" />
-            <Text style={styles.sendButtonText}>Send</Text>
+            {loading ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.sendButtonText}>Sending...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="send" size={18} color="#fff" />
+                <Text style={styles.sendButtonText}>Send</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -247,6 +305,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  quickMessageButtonDisabled: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    opacity: 0.5,
+  },
+  rateLimitContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFF9E6',
+    borderWidth: 1,
+    borderColor: '#FFE066',
+  },
+  rateLimitText: {
+    fontSize: 13,
+    color: '#FFA500',
+    marginLeft: 8,
+    flex: 1,
+  },
+  rateLimitTextError: {
+    color: '#FF3B30',
   },
 });
 

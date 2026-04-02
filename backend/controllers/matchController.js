@@ -193,6 +193,40 @@ exports.recordInteraction = async (req, res) => {
       return res.status(400).json({ message: "targetId and action required" });
     }
 
+    // ── Daily swipe limit for free users ────────────────────────────────────
+    // Only LIKE, PASS, SUPERLIKE count toward the daily limit.
+    const FREE_DAILY_LIMIT = 10;
+    const swipeUser = await User.findById(userId).select(
+      'isPremium subscriptionTier dailySwipeCount dailySwipeDate'
+    );
+    const isFree = !swipeUser.isPremium || swipeUser.subscriptionTier === 'free';
+
+    if (isFree) {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD UTC
+
+      // Reset counter if it's a new calendar day
+      if (swipeUser.dailySwipeDate !== today) {
+        swipeUser.dailySwipeCount = 0;
+        swipeUser.dailySwipeDate = today;
+      }
+
+      if (swipeUser.dailySwipeCount >= FREE_DAILY_LIMIT) {
+        return res.status(429).json({
+          message: 'Daily swipe limit reached. Upgrade to Gold for unlimited swipes.',
+          limitReached: true,
+          limit: FREE_DAILY_LIMIT,
+          used: swipeUser.dailySwipeCount,
+        });
+      }
+
+      // Increment atomically
+      await User.findByIdAndUpdate(userId, {
+        $inc: { dailySwipeCount: 1 },
+        $set: { dailySwipeDate: today },
+      });
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // Remove old interaction (Change of Heart support)
     await Interaction.deleteMany({ userId, targetId });
 

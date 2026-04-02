@@ -29,6 +29,10 @@ import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import theme from '../../theme/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { sanitizeText } from '../../utils/inputSanitization';
+import * as authAnalytics from '../../services/authAnalytics';
+import { AUTH_ERROR_MESSAGES, getAuthErrorMessage } from '../../utils/authErrorMessages';
 
 // Client IDs from .env
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
@@ -39,8 +43,10 @@ const SignUpScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false); // Persist loading state across navigation
   const { login } = useAuth();
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
+  const { isOffline } = useNetworkStatus();
 
   // Validation errors
   const [emailError, setEmailError] = useState('');
@@ -97,22 +103,42 @@ const SignUpScreen = ({ navigation }) => {
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) {
-      return 'Email is required';
+      return AUTH_ERROR_MESSAGES.EMAIL_REQUIRED;
     }
     if (!emailRegex.test(email)) {
-      return 'Please enter a valid email address';
+      return AUTH_ERROR_MESSAGES.EMAIL_INVALID;
     }
     return '';
   };
 
-  // Password validation
+  // Password validation with strength requirements
   const validatePassword = (password) => {
     if (!password) {
-      return 'Password is required';
+      return AUTH_ERROR_MESSAGES.PASSWORD_REQUIRED;
     }
-    if (password.length < 6) {
-      return 'Password must be at least 6 characters';
+    
+    if (password.length < 8) {
+      return AUTH_ERROR_MESSAGES.PASSWORD_TOO_SHORT;
     }
+    if (password.length > 128) {
+      return AUTH_ERROR_MESSAGES.PASSWORD_TOO_LONG;
+    }
+    
+    // Check for at least one uppercase letter
+    if (!/[A-Z]/.test(password)) {
+      return AUTH_ERROR_MESSAGES.PASSWORD_NO_UPPERCASE;
+    }
+    
+    // Check for at least one lowercase letter
+    if (!/[a-z]/.test(password)) {
+      return AUTH_ERROR_MESSAGES.PASSWORD_NO_LOWERCASE;
+    }
+    
+    // Check for at least one number
+    if (!/[0-9]/.test(password)) {
+      return AUTH_ERROR_MESSAGES.PASSWORD_NO_NUMBER;
+    }
+    
     return '';
   };
 
@@ -165,9 +191,41 @@ const SignUpScreen = ({ navigation }) => {
     setPasswordError('');
     setFormError('');
 
+    if (isOffline) {
+      setFormError(AUTH_ERROR_MESSAGES.NO_INTERNET);
+      return;
+    }
+
+    // Rate limiting - debounce check
+    const now = Date.now();
+    const timeSinceLastAttempt = now - lastAttemptTimeRef.current;
+    if (timeSinceLastAttempt < AUTH_DEBOUNCE_MS) {
+      authAnalytics.trackRateLimitHit('signup_debounce');
+      setFormError(AUTH_ERROR_MESSAGES.RATE_LIMIT_DEBOUNCE);
+      return;
+    }
+
+    // Rate limiting - attempts per minute check
+    const oneMinuteAgo = now - AUTH_RATE_WINDOW;
+    attemptTimestampsRef.current = attemptTimestampsRef.current.filter(timestamp => timestamp > oneMinuteAgo);
+    
+    if (attemptTimestampsRef.current.length >= AUTH_RATE_LIMIT) {
+      authAnalytics.trackRateLimitHit('signup_per_minute');
+      setFormError(AUTH_ERROR_MESSAGES.RATE_LIMIT_PER_MINUTE);
+      return;
+    }
+
+    // Update rate limit tracking
+    lastAttemptTimeRef.current = now;
+    attemptTimestampsRef.current.push(now);
+
+    // Sanitize inputs
+    const sanitizedEmail = sanitizeText(email);
+    const sanitizedPassword = password; // Don't sanitize password, but validate it
+
     // Validate inputs
-    const emailErr = validateEmail(email);
-    const passwordErr = validatePassword(password);
+    const emailErr = validateEmail(sanitizedEmail);
+    const passwordErr = validatePassword(sanitizedPassword);
 
     if (emailErr) {
       setEmailError(emailErr);
@@ -179,30 +237,45 @@ const SignUpScreen = ({ navigation }) => {
     }
 
     setLoading(true);
+    loadingRef.current = true;
     try {
-      const response = await createAccountWithEmail(email, password);
+      const response = await createAccountWithEmail(sanitizedEmail, sanitizedPassword);
+      authAnalytics.trackSignupAttempt('email', true);
       
       // Update auth context
       await login(response);
       
     } catch (error) {
-      console.error('Sign up error:', error);
-      // API errors usually come as { message: '...' }
-      const errorMessage = error.message || 'An error occurred. Please try again.';
+      const errorMessage = getAuthErrorMessage(error, AUTH_ERROR_MESSAGES.SIGNUP_FAILED);
+      authAnalytics.trackSignupAttempt('email', false, errorMessage);
+      authAnalytics.trackAuthError('email', errorMessage, error.code);
+      if (__DEV__) {
+        console.error('Sign up error:', error);
+      }
       setFormError(errorMessage);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
+  // Restore loading state on mount if needed
+  React.useEffect(() => {
+    if (loadingRef.current && !loading) {
+      setLoading(true);
+    }
+  }, []);
+
   const handleGoogleSignUp = async () => {
-    if (!GOOGLE_IOS_CLIENT_ID || !GOOGLE_ANDROID_CLIENT_ID) {
+    if (__DEV__ && (!GOOGLE_IOS_CLIENT_ID || !GOOGLE_ANDROID_CLIENT_ID)) {
         console.warn('Google Client IDs are missing!');
     }
     try {
         await promptAsync();
     } catch(err) {
-        console.error("Google prompt error", err);
+        if (__DEV__) {
+          console.error("Google prompt error", err);
+        }
         showAlert("Error", "Failed to start Google sign up", "error");
     }
   };
@@ -210,9 +283,14 @@ const SignUpScreen = ({ navigation }) => {
   const handleGoogleSignUpSuccess = async (idToken) => {
     try {
       setLoading(true);
+      loadingRef.current = true;
       const data = await signInWithGoogle({ token: idToken, type: 'register' });
+      authAnalytics.trackSignupAttempt('google', true);
       await login(data);
     } catch (error) {
+      const errorMessage = error.message || 'Google sign-up failed';
+      authAnalytics.trackSignupAttempt('google', false, errorMessage);
+      authAnalytics.trackAuthError('google', errorMessage, error.code);
       if (error.message && error.message.includes("User already exists")) {
          showAlert(
             "Account Exists", 
@@ -221,16 +299,18 @@ const SignUpScreen = ({ navigation }) => {
             () => navigation.navigate("Login")
          );
       } else {
-         showAlert('Error', error.message || 'Google sign-up failed', 'error');
+         showAlert('Error', errorMessage, 'error');
       }
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
   const handleAppleSignUp = async () => {
     try {
       setLoading(true);
+      loadingRef.current = true;
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -245,11 +325,15 @@ const SignUpScreen = ({ navigation }) => {
         type: 'register'
       });
 
+      authAnalytics.trackSignupAttempt('apple', true);
       await login(data);
     } catch (error) {
       if (error.code === 'ERR_CANCELED') {
         return;
       }
+      const errorMessage = error.message || 'Apple sign-up failed';
+      authAnalytics.trackSignupAttempt('apple', false, errorMessage);
+      authAnalytics.trackAuthError('apple', errorMessage, error.code);
       if (error.message && error.message.includes("User already exists")) {
          showAlert(
             "Account Exists", 
@@ -258,10 +342,11 @@ const SignUpScreen = ({ navigation }) => {
             () => navigation.navigate("Login")
          );
       } else {
-         showAlert('Error', error.message || 'Apple sign-up failed', 'error');
+         showAlert('Error', errorMessage, 'error');
       }
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
@@ -297,6 +382,12 @@ const SignUpScreen = ({ navigation }) => {
               <Text style={styles.subtitle}>
                 Join us and start your journey
               </Text>
+              {isOffline && (
+                <View style={styles.offlineBanner}>
+                  <Ionicons name="cloud-offline-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.offlineBannerText}>No Internet Connection</Text>
+                </View>
+              )}
             </View>
 
             {/* Social Sign Up Buttons */}
@@ -336,6 +427,15 @@ const SignUpScreen = ({ navigation }) => {
                 <View style={styles.errorContainer}>
                   <Ionicons name="alert-circle" size={16} color="#FF3B30" />
                   <Text style={styles.errorText}>{formError}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setFormError("");
+                      handleSignUp();
+                    }}
+                    style={styles.retryButton}
+                  >
+                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  </TouchableOpacity>
                 </View>
               ) : null}
 
@@ -378,11 +478,17 @@ const SignUpScreen = ({ navigation }) => {
                       }}
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
+                      accessibilityLabel="Password input"
+                      accessibilityHint={showPassword ? "Password is visible" : "Password is hidden. Must be at least 8 characters with uppercase, lowercase, and number"}
+                      accessibilityRole="textbox"
                     />
                     <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={togglePasswordVisibility}
                       activeOpacity={0.6}
+                      accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                      accessibilityHint="Toggles password visibility"
+                      accessibilityRole="button"
                     >
                       <Animated.View
                         style={{
@@ -406,7 +512,11 @@ const SignUpScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.authButton}
                 onPress={handleSignUp}
-                disabled={loading}
+                disabled={loading || isOffline}
+                accessibilityLabel="Sign up button"
+                accessibilityHint="Creates a new account with your email and password"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: loading || isOffline }}
               >
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
@@ -647,6 +757,35 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: 12,
     marginRight: 4,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF5252',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  offlineBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  retryButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#D4AF37',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  retryButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

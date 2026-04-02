@@ -22,6 +22,8 @@ import CustomAlert from '../../components/CustomAlert';
 import DeclineConfirmationSheet from '../../components/DeclineConfirmationSheet';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useBadge } from '../../context/BadgeContext';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import * as chatAnalytics from '../../services/chatAnalytics';
 import StickerPicker from './components/StickerPicker';
 import StickerMessage from './components/StickerMessage';
 import AudioMessage from './components/messages/AudioMessage';
@@ -36,6 +38,7 @@ import AttachmentOptionsModal from './components/input/AttachmentOptionsModal';
 import ChatInput from './components/input/ChatInput';
 import ImageViewModal from './components/ImageViewModal';
 import MessageActionSheet from './components/MessageActionSheet';
+import ForwardConversationModal from './components/ForwardConversationModal';
 import ProfanityWarningModal from './components/ProfanityWarningModal';
 import PinnedMessageBanner from './components/PinnedMessageBanner';
 import useAudioRecorder from './hooks/useAudioRecorder';
@@ -46,6 +49,7 @@ import { useFileUpload } from './hooks/useFileUpload';
 import { useImagePicker } from './hooks/useImagePicker';
 import styles from './styles';
 import { normalizeContent } from '../../utils/messageContent';
+import { sanitizeText } from '../../utils/inputSanitization';
 
 // Import bad-words with error handling for React Native compatibility
 let Filter;
@@ -97,6 +101,10 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
       onLongPress={() => handleLongPress(item)}
       delayLongPress={200}
       activeOpacity={0.9}
+      accessible={true}
+      accessibilityLabel={`${isMine ? 'Your' : 'Their'} ${item.messageType || 'text'} message${item.content ? `: ${item.content.substring(0, 50)}` : ''}`}
+      accessibilityHint="Double tap and hold to view message options"
+      accessibilityRole="button"
     >
       {item.isPinned && (
         <View style={[
@@ -173,10 +181,58 @@ const MessageItem = React.memo(({ item, userData, user, handleLongPress, setRepl
             onLongPress={() => handleLongPress(item)}
           />
           ) : (
-            <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText]}>
-              {safeContent || ' '}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText]}>
+                {safeContent || ' '}
+              </Text>
+              {item.isEdited && (
+                <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText, { fontSize: 10, opacity: 0.6, marginLeft: 4, fontStyle: 'italic' }]}>
+                  (edited)
+                </Text>
+              )}
+            </View>
           )}
+
+        {/* Reactions */}
+        {item.reactions && item.reactions.length > 0 && (
+          <View style={[
+            styles.reactionsContainer,
+            isMine ? styles.reactionsContainerMine : styles.reactionsContainerTheirs
+          ]}>
+            {Object.entries(
+              item.reactions.reduce((acc, reaction) => {
+                if (!acc[reaction.emoji]) {
+                  acc[reaction.emoji] = [];
+                }
+                acc[reaction.emoji].push(reaction);
+                return acc;
+              }, {})
+            ).map(([emoji, reactions]) => {
+              const reactionUserId = reactions[0]?.userId?._id || reactions[0]?.userId;
+              const hasUserReaction = reactions.some(r => {
+                const rUserId = r.userId?._id || r.userId;
+                return String(rUserId) === String(userData._id);
+              });
+              
+              return (
+                <TouchableOpacity
+                  key={emoji}
+                  style={[
+                    styles.reactionBubble,
+                    hasUserReaction && styles.reactionBubbleActive
+                  ]}
+                  onPress={() => handleLongPress(item)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                  {reactions.length > 1 && (
+                    <Text style={styles.reactionCount}>{reactions.length}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.messageFooter}>
           {item.starredBy?.includes(userData._id) && (
@@ -234,23 +290,26 @@ const ChatScreen = ({ route, navigation }) => {
   const { updateBadgeCounts } = useBadge();
   const { userData } = useAuth();
   const { startCall, callState } = useCall();
+  const { isOffline } = useNetworkStatus();
   const isMine = userData._id === user._id;
   const insets = useSafeAreaInsets();
 
   // Debug: Log user object to verify structure
   useEffect(() => {
-    console.log('ChatScreen params:', JSON.stringify({
-      matchStatus: initialMatchStatus,
-      isInitiator,
-      isSuperLike,
-      hasSuperLikeMessage: !!superLikeMessage,
-      superLikeMessage, // Log the actual message
-      user: {
-        _id: user._id,
-        name: user.name,
-        displayName: user.displayName
-      }
-    }, null, 2));
+    if (__DEV__) {
+      console.log('ChatScreen params:', JSON.stringify({
+        matchStatus: initialMatchStatus,
+        isInitiator,
+        isSuperLike,
+        hasSuperLikeMessage: !!superLikeMessage,
+        superLikeMessage, // Log the actual message
+        user: {
+          _id: user._id,
+          name: user.name,
+          displayName: user.displayName
+        }
+      }, null, 2));
+    }
   }, [user._id, isSuperLike, superLikeMessage]);
 
   // Messages & Socket Hook
@@ -269,6 +328,9 @@ const ChatScreen = ({ route, navigation }) => {
     setPinnedMessage,
     loadMessages,
     loadMoreMessages,
+    error: messagesError,
+    setError: setMessagesError,
+    isShowingCached,
   } = useMessages(user, userData);
   
   // Audio Recording - using custom hook
@@ -302,14 +364,51 @@ const ChatScreen = ({ route, navigation }) => {
     handleReply,
     handlePin,
     handleStar,
+    handleEdit,
+    startEdit,
+    cancelEdit,
+    editingMessage,
+    forwardingMessage,
+    showForwardModal,
+    setShowForwardModal,
+    startForward,
+    cancelForward,
+    handleForward,
+    handleReaction,
     handleDelete,
     confirmDelete,
-  } = useMessageActions(userData);
+    isActionLoading,
+  } = useMessageActions(userData, setMessages);
   
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const [showHoldHint, setShowHoldHint] = useState(false);
   const [inputText, setInputText] = useState('');
+  
+  // Update input text when editing message
+  useEffect(() => {
+    if (editingMessage) {
+      setInputText(editingMessage.content || '');
+    } else if (!editingMessage) {
+      // Clear input when canceling edit (only if we were editing)
+      // Don't clear if user just sent a message normally
+      if (inputText === (editingMessage?.content || '')) {
+        setInputText('');
+      }
+    }
+  }, [editingMessage]);
+  
   const [isOnline, setIsOnline] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  
+  // Rate limiting refs
+  const lastSendTimeRef = useRef(0);
+  const sendTimestampsRef = useRef([]);
+  const MESSAGE_RATE_LIMIT = 10; // Max 10 messages per minute
+  const MESSAGE_RATE_WINDOW = 60000; // 1 minute in milliseconds
+  const MESSAGE_DEBOUNCE_MS = 500; // 500ms debounce between sends
+  const MAX_MESSAGE_LENGTH = 5000; // Max message length
   
   // Presence Subscription
   useEffect(() => {
@@ -328,7 +427,9 @@ const ChatScreen = ({ route, navigation }) => {
       socketService.onUserStatusChange((data) => {
         if (!mounted) return;
         if (data.userId === user._id) {
-           console.log('User status changed:', data.status);
+           if (__DEV__) {
+             console.log('User status changed:', data.status);
+           }
            setIsOnline(data.status === 'online');
         }
       });
@@ -568,7 +669,36 @@ const ChatScreen = ({ route, navigation }) => {
   };
 
   const handleSend = async (messageTextOverride = null, bypassProfanityCheck = false) => {
+    // If editing a message, handle edit instead
+    if (editingMessage) {
+      const actualText = messageTextOverride || inputText || '';
+      if (actualText.trim() && actualText.trim() !== editingMessage.content) {
+        await handleEdit(actualText.trim());
+        setInputText('');
+        return;
+      } else {
+        cancelEdit();
+        setInputText('');
+        return;
+      }
+    }
     if (!isMountedRef.current) return;
+    
+    // Prevent sending when already sending
+    if (isSending) {
+      return;
+    }
+    
+    // Prevent sending when offline
+    if (isOffline) {
+      Alert.alert(
+        'No Internet Connection',
+        'Please check your connection and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     try {
       // Handle case where handleSend is called with an event object (from onPress)
       // If first param is an event object, ignore it and use inputText
@@ -586,10 +716,60 @@ const ChatScreen = ({ route, navigation }) => {
       } else {
         messageText = messageText.trim();
       }
-      if (!messageText) return;
+      
+      // Sanitize message content
+      messageText = sanitizeText(messageText);
+      
+      // Input validation
+      if (!messageText) {
+        return; // Empty message
+      }
+      
+      if (messageText.length > MAX_MESSAGE_LENGTH) {
+        Alert.alert(
+          'Message Too Long',
+          `Messages cannot exceed ${MAX_MESSAGE_LENGTH} characters. Your message is ${messageText.length} characters.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Rate limiting - debounce check
+      const now = Date.now();
+      const timeSinceLastSend = now - lastSendTimeRef.current;
+      if (timeSinceLastSend < MESSAGE_DEBOUNCE_MS) {
+        chatAnalytics.trackRateLimitHit('message_send');
+        Alert.alert(
+          'Too Fast',
+          'Please wait a moment before sending another message.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Rate limiting - messages per minute check
+      const oneMinuteAgo = now - MESSAGE_RATE_WINDOW;
+      sendTimestampsRef.current = sendTimestampsRef.current.filter(timestamp => timestamp > oneMinuteAgo);
+      
+      if (sendTimestampsRef.current.length >= MESSAGE_RATE_LIMIT) {
+        chatAnalytics.trackRateLimitHit('message_per_minute');
+        Alert.alert(
+          'Rate Limit Exceeded',
+          `You can only send ${MESSAGE_RATE_LIMIT} messages per minute. Please wait a moment.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Update rate limit tracking
+      lastSendTimeRef.current = now;
+      sendTimestampsRef.current.push(now);
+      
+      setIsSending(true);
 
       // Client-side profanity check (unless bypassed for "Send anyway")
       if (!bypassProfanityCheck && filter && filter.isProfane && filter.isProfane(messageText)) {
+        chatAnalytics.trackProfanityDetected(messageText.length, false);
         // Show profanity warning modal instead of Alert
         if (isMountedRef.current) {
           setPendingMessage(messageText);
@@ -599,7 +779,9 @@ const ChatScreen = ({ route, navigation }) => {
       }
 
       // Log attempt to send
-      console.log(`[handleSend] Sending message to: ${user.displayName} (${user._id})`);
+      if (__DEV__) {
+        console.log(`[handleSend] Sending message to: ${user.displayName} (${user._id})`);
+      }
 
       // Proceed with sending the message
       const tempId = Date.now().toString();
@@ -624,6 +806,7 @@ const ChatScreen = ({ route, navigation }) => {
         scrollToBottom();
       }
 
+      const sendStartTime = Date.now();
       try {
         await socketService.sendMessage(
           user._id, 
@@ -635,16 +818,37 @@ const ChatScreen = ({ route, navigation }) => {
           replyToMessage?._id, // Pass replyTo ID
           { bypassProfanityCheck: bypassProfanityCheck } // Pass bypass flag
         );
+        
+        // Track successful send
+        const sendDuration = Date.now() - sendStartTime;
+        chatAnalytics.trackMessageSent('text', !!replyToMessage, messageText.length);
+        chatAnalytics.trackAPICall('send_message', sendDuration, true);
       } catch (error) {
-        console.error('Send message error:', error);
+        if (__DEV__) {
+          console.error('Send message error:', error);
+        }
+        
+        // Track failed send
+        const sendDuration = Date.now() - sendStartTime;
+        chatAnalytics.trackMessageSendFailed(error, 'text');
+        chatAnalytics.trackAPICall('send_message', sendDuration, false);
+        
         // Remove optimistic message on error
         if (isMountedRef.current) {
           setMessages((prev) => prev.filter(m => m.tempId !== tempId));
-          Alert.alert('Error', 'Failed to send message. Please try again.');
+          const errorMessage = error?.response?.data?.message || 
+                              error?.message || 
+                              'Failed to send message. Please try again.';
+          Alert.alert('Error', errorMessage);
         }
+      } finally {
+        setIsSending(false);
       }
     } catch (error) {
-      console.error('Error in handleSend:', error);
+      if (__DEV__) {
+        console.error('Error in handleSend:', error);
+      }
+      setIsSending(false);
       Alert.alert('Error', 'An error occurred while sending the message.');
     }
   };
@@ -772,7 +976,9 @@ const ChatScreen = ({ route, navigation }) => {
   // Handle Image Press
   const handleImagePress = (item) => {
     if (item.isViewOnce) {
-      console.log('handleImagePress item:', item);
+      if (__DEV__) {
+        console.log('handleImagePress item:', item);
+      }
       const isMine = item.senderId._id === userData._id;
       
       if (isMine) {
@@ -832,7 +1038,48 @@ const ChatScreen = ({ route, navigation }) => {
         onAudioCall={() => startCall(user, 'audio')}
         onVideoCall={() => startCall(user, 'video')}
         callState={callState}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        isSearchMode={isSearchMode}
+        onSearchToggle={setIsSearchMode}
       />
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.offlineText}>No Internet Connection</Text>
+        </View>
+      )}
+
+      {/* Error Banner */}
+      {messagesError && (
+        <View style={styles.errorBanner}>
+          <View style={styles.errorContent}>
+            <Ionicons name="alert-circle" size={20} color="#FF4444" />
+            <Text style={styles.errorText}>{messagesError.message}</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => {
+              setMessagesError(null);
+              if (messagesError.retry) {
+                messagesError.retry();
+              }
+            }}
+            style={styles.errorRetryButton}
+          >
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Cache Indicator */}
+      {isShowingCached && messages.length > 0 && (
+        <View style={styles.cacheIndicator}>
+          <Ionicons name="time-outline" size={16} color="#666" />
+          <Text style={styles.cacheIndicatorText}>Showing cached messages</Text>
+        </View>
+      )}
 
       {/* Pinned Message Banner */}
       <PinnedMessageBanner 
@@ -841,17 +1088,78 @@ const ChatScreen = ({ route, navigation }) => {
         scrollToMessage={scrollToMessage}
       />
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item._id || item.tempId}
-        inverted
-        contentContainerStyle={styles.messagesList}
-        onEndReached={loadMoreMessages}
-        onEndReachedThreshold={0.2}
-        ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color="#D4AF37" /> : null}
-      />
+      {loading && messages.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#D4AF37" />
+          <Text style={styles.loadingText}>Loading messages...</Text>
+        </View>
+      ) : messagesError && messages.length === 0 ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#FF4444" />
+          <Text style={styles.errorTitle}>Failed to Load Messages</Text>
+          <Text style={styles.errorMessage}>{messagesError.message}</Text>
+          <TouchableOpacity 
+            onPress={() => {
+              setMessagesError(null);
+              if (messagesError.retry) {
+                messagesError.retry();
+              }
+            }}
+            style={styles.errorRetryButtonLarge}
+          >
+            <Text style={styles.errorRetryTextLarge}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={searchQuery 
+            ? messages.filter(msg => 
+                normalizeContent(msg.content || '').toLowerCase().includes(searchQuery.toLowerCase())
+              )
+            : messages
+          }
+          renderItem={renderMessage}
+          keyExtractor={(item) => item._id || item.tempId}
+          inverted
+          contentContainerStyle={styles.messagesList}
+          onEndReached={!searchQuery ? loadMoreMessages : undefined}
+          onEndReachedThreshold={0.2}
+          ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color="#D4AF37" /> : null}
+          ListEmptyComponent={
+            !loading && messages.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="chatbubbles-outline" size={80} color="#D4AF37" />
+                <Text style={styles.emptyStateTitle}>Start the Conversation</Text>
+                <Text style={styles.emptyStateText}>
+                  Send a message to {user.displayName || user.name} to begin chatting!
+                </Text>
+              </View>
+            ) : searchQuery && messages.filter(msg => 
+              normalizeContent(msg.content || '').toLowerCase().includes(searchQuery.toLowerCase())
+            ).length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="search-outline" size={64} color="#999" />
+                <Text style={styles.emptyStateTitle}>No Messages Found</Text>
+                <Text style={styles.emptyStateText}>
+                  No messages match "{searchQuery}"
+                </Text>
+              </View>
+            ) : null
+          }
+          // Performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={20}
+          windowSize={10}
+          getItemLayout={(data, index) => ({
+            length: 80, // Estimated average message height
+            offset: 80 * index,
+            index,
+          })}
+        />
+      )}
 
       {/* Show pending UI if status is pending OR if it's a super like request we haven't answered yet */}
       {(matchStatus === 'pending' || (isSuperLike && !isInitiator && matchStatus !== 'active')) ? (
@@ -958,6 +1266,7 @@ const ChatScreen = ({ route, navigation }) => {
               inputText={inputText}
               handleTyping={handleTyping}
               handleSend={handleSend}
+              isEditing={!!editingMessage}
               handleAudioSend={(data) => {
                 if (data && data.uri) {
                   uploadAndSendAudio(data.uri, data.duration);
@@ -975,6 +1284,7 @@ const ChatScreen = ({ route, navigation }) => {
               cancelRecording={cancelRecording}
               stopRecording={stopRecording}
               showHoldToRecordHint={showHoldToRecordHint}
+              disabled={isSending || isOffline}
             />
             
             {/* Hold to Record Hint - Moved here to stay above keyboard */}
@@ -1034,9 +1344,21 @@ const ChatScreen = ({ route, navigation }) => {
         onReply={handleReply}
         onPin={handlePin}
         onStar={handleStar}
+        onEdit={startEdit}
+        onForward={startForward}
+        onReaction={handleReaction}
         onDelete={confirmDelete}
         userData={userData}
         isMine={selectedMessage?.senderId?._id === userData._id}
+        isActionLoading={isActionLoading}
+      />
+
+      <ForwardConversationModal
+        visible={showForwardModal}
+        onClose={cancelForward}
+        onSelectConversation={handleForward}
+        currentUserId={user._id}
+        messageToForward={forwardingMessage}
       />
 
       <ProfanityWarningModal

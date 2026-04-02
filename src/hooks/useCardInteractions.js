@@ -4,20 +4,44 @@ import Animated, { useSharedValue, withTiming } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { recordInteraction } from '../services/api/match';
 import { useProfileAnimations } from './useProfileAnimations';
+import * as discoverAnalytics from '../services/discoverAnalytics';
+import { useSwipeLimit } from './useSwipeLimit';
+import { useSubscription } from '../context/SubscriptionContext';
+
+// Rate limiting constants
+const ACTION_DEBOUNCE_MS = 1000; // 1 second debounce between actions
+const SWIPE_RATE_LIMIT = 10; // Max 10 swipes per minute
+const SWIPE_RATE_WINDOW = 60000; // 1 minute in milliseconds
 
 export const useCardInteractions = (
-    profiles, 
-    currentIndex, 
-    setCurrentIndex, 
-    isPendingMode, 
+    profiles,
+    currentIndex,
+    setCurrentIndex,
+    isPendingMode,
     setIsPendingMode,
     loadProfiles
 ) => {
     const navigation = useNavigation();
-    
+    const { showPaywall } = useSubscription();
+    const { isLimitReached, incrementSwipeCount } = useSwipeLimit();
+
     // Animation Values
     const swipeY = useSharedValue(0);
     const cardOpacity = useSharedValue(1);
+
+    // Rate limiting refs
+    const lastActionTime = useRef(0);
+    const swipeTimestampsRef = useRef([]);
+    const [isActionLoading, setIsActionLoading] = useState(false);
+
+    // Daily swipe limit guard — called before every swipe action
+    const checkDailyLimit = useCallback(() => {
+        if (isLimitReached) {
+            showPaywall('swipes');
+            return false;
+        }
+        return true;
+    }, [isLimitReached, showPaywall]);
 
     // Reset animations when index changes
     // This is crucial for the "Blank Screen" fix
@@ -41,22 +65,87 @@ export const useCardInteractions = (
         resetAnimations
     } = useProfileAnimations();
 
+    // Check rate limit for swipe actions
+    const checkSwipeRateLimit = useCallback(() => {
+        const now = Date.now();
+        const windowStart = now - SWIPE_RATE_WINDOW;
+        
+        // Remove timestamps outside the rate limit window
+        swipeTimestampsRef.current = swipeTimestampsRef.current.filter(
+            timestamp => timestamp > windowStart
+        );
+        
+        // Check if limit exceeded
+        if (swipeTimestampsRef.current.length >= SWIPE_RATE_LIMIT) {
+            const oldestTimestamp = swipeTimestampsRef.current[0];
+            const waitTime = Math.ceil((oldestTimestamp + SWIPE_RATE_WINDOW - now) / 1000);
+            return {
+                allowed: false,
+                waitTime, // seconds to wait
+                remaining: 0,
+            };
+        }
+        
+        return { 
+            allowed: true,
+            remaining: SWIPE_RATE_LIMIT - swipeTimestampsRef.current.length,
+        };
+    }, []);
+
     // Handle Swipe Up (Pass)
     const handleSwipeUp = useCallback(async (profile) => {
-        console.log("Rejected:", profile?.name || profile?.displayName);
-        
+        // Daily swipe limit check (client-side fast path)
+        if (!checkDailyLimit()) return;
+
+        // Rate limiting: prevent rapid actions
+        const now = Date.now();
+        if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
+            return;
+        }
+
+        // Check per-minute rate limit
+        const rateLimitCheck = checkSwipeRateLimit();
+        if (!rateLimitCheck.allowed) {
+            discoverAnalytics.trackRateLimitHit("PASS", rateLimitCheck.waitTime);
+            Alert.alert(
+                'Too Many Actions',
+                `Please wait ${rateLimitCheck.waitTime} seconds before swiping again.`,
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        // Input validation
+        const targetId = profile?._id || profile?.id;
+        if (!targetId || typeof targetId !== 'string' || targetId.trim().length === 0) {
+            Alert.alert('Error', 'Invalid profile. Please try again.');
+            return;
+        }
+
+        lastActionTime.current = now;
+        swipeTimestampsRef.current.push(now);
+        setIsActionLoading(true);
+        incrementSwipeCount();
+
         // Trigger pass animation from hook
         await triggerPassAnimation(async () => {
             try {
-                const targetId = profile?._id || profile?.id;
-                if (!targetId) {
-                    console.error("Profile ID missing for pass interaction");
+                await recordInteraction(targetId, "PASS");
+                discoverAnalytics.trackSwipeAction("PASS", targetId, true);
+            } catch (error) {
+                if (__DEV__) {
+                    console.error("Error recording reject:", error);
+                }
+                // Backend 429 = daily limit reached — show paywall
+                if (error?.response?.status === 429 && error?.response?.data?.limitReached) {
+                    showPaywall('swipes');
+                    setIsActionLoading(false);
                     return;
                 }
-                console.log("Calling recordInteraction PASS:", targetId);
-                await recordInteraction(targetId, "PASS");
-            } catch (error) {
-                console.error("Error recording reject:", error);
+                discoverAnalytics.trackSwipeAction("PASS", targetId, false, error);
+                Alert.alert('Error', 'Failed to record pass. Please try again.');
+            } finally {
+                setIsActionLoading(false);
             }
 
             // Prepare next card to be invisible initially (for fade-in effect)
@@ -83,21 +172,62 @@ export const useCardInteractions = (
 
     // Handle Like (from Bottom Sheet or specific action)
     const handleLike = useCallback(async (profile, setShowBottomSheet) => {
+        // Daily swipe limit check (client-side fast path)
+        if (!checkDailyLimit()) return;
+
+        // Rate limiting: prevent rapid actions
+        const now = Date.now();
+        if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
+            return;
+        }
+
+        // Check per-minute rate limit
+        const rateLimitCheck = checkSwipeRateLimit();
+        if (!rateLimitCheck.allowed) {
+            discoverAnalytics.trackRateLimitHit("LIKE", rateLimitCheck.waitTime);
+            Alert.alert(
+                'Too Many Actions',
+                `Please wait ${rateLimitCheck.waitTime} seconds before liking again.`,
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        // Input validation
+        const targetId = profile?._id || profile?.id;
+        if (!targetId || typeof targetId !== 'string' || targetId.trim().length === 0) {
+            Alert.alert('Error', 'Invalid profile. Please try again.');
+            return;
+        }
+
+        lastActionTime.current = now;
+        swipeTimestampsRef.current.push(now);
+        setIsActionLoading(true);
+        incrementSwipeCount();
+
         // 1. Close Sheet immediately to show animation
         if (setShowBottomSheet) setShowBottomSheet(false);
 
         // 2. Trigger Visual Animation (Hearts)
-        // We pass a dummy callback or null because we want to manage timing ourselves for the card switch
-        triggerLikeAnimation(null); 
+        triggerLikeAnimation(null);
 
         // 3. Record Interaction (Optimistic)
         try {
-            const targetId = profile?._id || profile?.id;
-            if (targetId) {
-                recordInteraction(targetId, "LIKE");
-            }
+            await recordInteraction(targetId, "LIKE");
+            discoverAnalytics.trackSwipeAction("LIKE", targetId, true);
         } catch (error) {
-            console.error("Error recording like:", error);
+            if (__DEV__) {
+                console.error("Error recording like:", error);
+            }
+            if (error?.response?.status === 429 && error?.response?.data?.limitReached) {
+                showPaywall('swipes');
+                setIsActionLoading(false);
+                return;
+            }
+            discoverAnalytics.trackSwipeAction("LIKE", targetId, false, error);
+            Alert.alert('Error', 'Failed to record like. Please try again.');
+            setIsActionLoading(false);
+            return;
         }
 
         // 4. Wait for heart animation to play out (matching Super Like feel)
@@ -121,16 +251,46 @@ export const useCardInteractions = (
 
         // 8. Fade In New Card
         cardOpacity.value = withTiming(1, { duration: 300 });
+        setIsActionLoading(false);
 
-    }, [isPendingMode, navigation, setCurrentIndex, setIsPendingMode, loadProfiles, triggerLikeAnimation, cardOpacity]);
+    }, [isPendingMode, navigation, setCurrentIndex, setIsPendingMode, loadProfiles, triggerLikeAnimation, cardOpacity, checkSwipeRateLimit]);
 
     // Handle Super Like
     const handleSuperLike = useCallback(async (profile, comment = "", setShowBottomSheet) => {
-        console.log("Super Liked:", profile?.name);
-        try {
-            const targetId = profile?._id || profile?.id;
-            if (!targetId) return;
+        // Daily swipe limit check (client-side fast path)
+        if (!checkDailyLimit()) return;
 
+        // Rate limiting: prevent rapid actions
+        const now = Date.now();
+        if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
+            return;
+        }
+
+        // Check per-minute rate limit
+        const rateLimitCheck = checkSwipeRateLimit();
+        if (!rateLimitCheck.allowed) {
+            discoverAnalytics.trackRateLimitHit("SUPERLIKE", rateLimitCheck.waitTime);
+            Alert.alert(
+                'Too Many Actions',
+                `Please wait ${rateLimitCheck.waitTime} seconds before super liking again.`,
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        // Input validation
+        const targetId = profile?._id || profile?.id;
+        if (!targetId || typeof targetId !== 'string' || targetId.trim().length === 0) {
+            Alert.alert('Error', 'Invalid profile. Please try again.');
+            return;
+        }
+
+        lastActionTime.current = now;
+        swipeTimestampsRef.current.push(now);
+        setIsActionLoading(true);
+        incrementSwipeCount();
+
+        try {
             // 1. Close Sheet immediately
             if (setShowBottomSheet) setShowBottomSheet(false);
 
@@ -139,7 +299,13 @@ export const useCardInteractions = (
 
             // 3. Record Interaction
             // 3. Record Interaction (Optimistic - don't await)
-            recordInteraction(targetId, "SUPERLIKE", comment);
+            recordInteraction(targetId, "SUPERLIKE", comment)
+                .then(() => {
+                    discoverAnalytics.trackSwipeAction("SUPERLIKE", targetId, true);
+                })
+                .catch((err) => {
+                    discoverAnalytics.trackSwipeAction("SUPERLIKE", targetId, false, err);
+                });
 
             // 4. Wait for animation (3.2s)
             await new Promise(resolve => setTimeout(resolve, 3200));
@@ -162,11 +328,16 @@ export const useCardInteractions = (
 
             // 8. Fade In New Card
             cardOpacity.value = withTiming(1, { duration: 300 });
+            setIsActionLoading(false);
 
         } catch (error) {
-            console.error("Error recording super like:", error);
+            if (__DEV__) {
+                console.error("Error recording super like:", error);
+            }
+            Alert.alert('Error', 'Failed to record super like. Please try again.');
+            setIsActionLoading(false);
         }
-    }, [triggerLikeAnimation, setCurrentIndex, isPendingMode, navigation, setIsPendingMode, loadProfiles, cardOpacity]);
+    }, [triggerLikeAnimation, setCurrentIndex, isPendingMode, navigation, setIsPendingMode, loadProfiles, cardOpacity, checkSwipeRateLimit]);
 
     return {
         swipeY,
@@ -174,6 +345,7 @@ export const useCardInteractions = (
         handleSwipeUp,
         handleSuperLike,
         handleLike,
+        isActionLoading,
         // Expose animation states for the Overlay
         animationState: {
             showPassAnimation,

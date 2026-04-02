@@ -4,6 +4,9 @@ import { Alert, AppState, Platform, Linking } from 'react-native';
 import { updateLocation } from '../services/api/connectNow';
 import socketService from '../services/socket';
 import { LOCATION_UPDATE_INTERVAL, BACKGROUND_UPDATE_INTERVAL, USE_TEST_LOCATION, TEST_COORDINATES } from '../constants/location';
+import * as connectNowAnalytics from '../services/connectNowAnalytics';
+import { CONNECT_NOW_ERRORS } from '../constants/errorMessages';
+import { validateCoordinates } from '../utils/locationValidation';
 
 /**
  * Custom hook for tracking user location and updating it to the server
@@ -17,12 +20,16 @@ export const useLocationTracking = (enabled = false) => {
   const updateIntervalRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
   const isMountedRef = useRef(true);
+  const lastLocationRef = useRef(null);
+  const lastUpdateTimeRef = useRef(null);
+  const currentSpeedRef = useRef(0); // Speed in m/s
+  const adaptiveIntervalRef = useRef(null);
 
   // Request location permissions
   const requestPermissions = async (showAlertOnDenied = true) => {
     try {
       // Check current permission status first
-      const { status: currentStatus, canAskAgain } = await Location.getForegroundPermissionsAsync();
+      const { status: currentStatus, canAskAgain: initialCanAskAgain } = await Location.getForegroundPermissionsAsync();
       
       if (currentStatus === 'granted') {
         setPermissionStatus(currentStatus);
@@ -39,36 +46,123 @@ export const useLocationTracking = (enabled = false) => {
         return true;
       }
 
-      // Request foreground permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setPermissionStatus(status);
-
-      if (status !== 'granted') {
-        setError('Location permission denied');
+      // If permission was previously denied and can't ask again, direct to settings
+      if (currentStatus === 'denied' && initialCanAskAgain === false) {
+        setError('Location permission permanently denied');
+        setPermissionStatus('denied');
         
         if (showAlertOnDenied) {
-          // Show alert with retry option
+          const platformMessage = Platform.OS === 'ios'
+            ? 'To enable Connect Now, please allow location access:\n\n1. Tap "Open Settings" below\n2. Find "Location" in the app settings\n3. Select "While Using the App" or "Always"\n4. Return to the app to continue'
+            : 'To enable Connect Now, please allow location access:\n\n1. Tap "Open Settings" below\n2. Find "Permissions" or "App Permissions"\n3. Enable "Location"\n4. Return to the app to continue';
+          
           Alert.alert(
             'Location Permission Required',
-            'We need your location to show you nearby users. Please allow location access.',
+            `Location access is required for Connect Now to show you nearby users and let others find you.\n\n${platformMessage}`,
             [
               { text: 'Cancel', style: 'cancel' },
-              ...(canAskAgain !== false ? [{
-                text: 'Try Again',
-                onPress: () => requestPermissions(true),
-              }] : []),
               {
                 text: 'Open Settings',
                 onPress: async () => {
-                  if (Platform.OS === 'ios') {
-                    await Linking.openURL('app-settings:');
-                  } else {
-                    await Linking.openSettings();
+                  try {
+                    if (Platform.OS === 'ios') {
+                      await Linking.openURL('app-settings:');
+                    } else {
+                      await Linking.openSettings();
+                    }
+                  } catch (error) {
+                    console.error('Error opening settings:', error);
+                    Alert.alert(
+                      'Unable to Open Settings',
+                      'Please manually open your device settings and enable location permission for this app.',
+                      [{ text: 'OK' }]
+                    );
                   }
                 },
               },
             ]
           );
+        }
+        return false;
+      }
+
+      // Request foreground permission
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      setPermissionStatus(status);
+
+      // Track permission request
+      connectNowAnalytics.trackLocationPermission(status, canAskAgain, {
+        isPermanentlyDenied: canAskAgain === false,
+      });
+
+      if (status !== 'granted') {
+        setError('Location permission denied');
+        
+        if (showAlertOnDenied) {
+          // Determine if permission is permanently denied
+          const isPermanentlyDenied = canAskAgain === false || status === 'denied';
+          
+          if (isPermanentlyDenied) {
+            // Permanently denied - must go to settings
+            const platformMessage = Platform.OS === 'ios'
+              ? 'To enable Connect Now, please allow location access:\n\n1. Tap "Open Settings" below\n2. Find "Location" in the app settings\n3. Select "While Using the App" or "Always"\n4. Return to the app to continue'
+              : 'To enable Connect Now, please allow location access:\n\n1. Tap "Open Settings" below\n2. Find "Permissions" or "App Permissions"\n3. Enable "Location"\n4. Return to the app to continue';
+            
+            Alert.alert(
+              'Location Permission Required',
+              `Location access is required for Connect Now to show you nearby users and let others find you.\n\n${platformMessage}`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Open Settings',
+                  onPress: async () => {
+                    try {
+                      if (Platform.OS === 'ios') {
+                        await Linking.openURL('app-settings:');
+                      } else {
+                        await Linking.openSettings();
+                      }
+                    } catch (error) {
+                      console.error('Error opening settings:', error);
+                      Alert.alert(
+                        'Unable to Open Settings',
+                        'Please manually open your device settings and enable location permission for this app.',
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  },
+                },
+              ]
+            );
+          } else {
+            // Can ask again - show retry option with helpful guidance
+            Alert.alert(
+              'Location Permission Required',
+              'Connect Now needs your location to:\n• Show you nearby users\n• Let others find you\n• Update your location in real-time\n\nPlease allow location access when prompted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Try Again',
+                  onPress: () => requestPermissions(true),
+                },
+                {
+                  text: 'Open Settings',
+                  style: 'default',
+                  onPress: async () => {
+                    try {
+                      if (Platform.OS === 'ios') {
+                        await Linking.openURL('app-settings:');
+                      } else {
+                        await Linking.openSettings();
+                      }
+                    } catch (error) {
+                      console.error('Error opening settings:', error);
+                    }
+                  },
+                },
+              ]
+            );
+          }
         }
         
         return false;
@@ -86,14 +180,37 @@ export const useLocationTracking = (enabled = false) => {
     } catch (err) {
       setError(err.message);
       if (showAlertOnDenied) {
+        const platformMessage = Platform.OS === 'ios'
+          ? 'You can enable location access manually:\n\n1. Open Settings app\n2. Find this app in the list\n3. Tap "Location"\n4. Select "While Using the App" or "Always"'
+          : 'You can enable location access manually:\n\n1. Open Settings app\n2. Go to "Apps" or "Application Manager"\n3. Find this app\n4. Tap "Permissions"\n5. Enable "Location"';
+        
         Alert.alert(
-          'Error',
-          `Failed to request location permission: ${err.message}`,
+          'Permission Request Error',
+          `Unable to request location permission.\n\n${platformMessage}\n\nError: ${err.message}`,
           [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Try Again',
               onPress: () => requestPermissions(true),
+            },
+            {
+              text: 'Open Settings',
+              onPress: async () => {
+                try {
+                  if (Platform.OS === 'ios') {
+                    await Linking.openURL('app-settings:');
+                  } else {
+                    await Linking.openSettings();
+                  }
+                } catch (error) {
+                  console.error('Error opening settings:', error);
+                  Alert.alert(
+                    'Unable to Open Settings',
+                    'Please manually open your device settings and enable location permission for this app.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              },
             },
           ]
         );
@@ -134,10 +251,23 @@ export const useLocationTracking = (enabled = false) => {
         accuracy: Location.Accuracy.Balanced,
       });
 
+      // Validate coordinates from device
+      const lat = currentLocation.coords.latitude;
+      const lon = currentLocation.coords.longitude;
+      const validation = validateCoordinates(lat, lon);
+      
+      if (!validation.valid) {
+        console.error('Invalid coordinates from device:', validation.error);
+        if (isMountedRef.current) {
+          setError(validation.error);
+        }
+        return null;
+      }
+
       if (isMountedRef.current) {
         setLocation({
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
+          latitude: lat,
+          longitude: lon,
           timestamp: new Date(),
         });
       }
@@ -150,16 +280,127 @@ export const useLocationTracking = (enabled = false) => {
     }
   };
 
-  // Update location to server
-  const updateLocationToServer = async (lat, lon) => {
+  // Calculate distance between two coordinates in meters (Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Calculate speed based on location changes
+  const calculateSpeed = (newLat, newLon) => {
+    if (!lastLocationRef.current || !lastUpdateTimeRef.current) {
+      return 0;
+    }
+
+    const distance = calculateDistance(
+      lastLocationRef.current.latitude,
+      lastLocationRef.current.longitude,
+      newLat,
+      newLon
+    );
+
+    const timeElapsed = (Date.now() - lastUpdateTimeRef.current) / 1000; // seconds
+    if (timeElapsed === 0) return 0;
+
+    const speed = distance / timeElapsed; // m/s
+    return speed;
+  };
+
+  // Get adaptive update interval based on movement speed
+  const getAdaptiveInterval = (speed) => {
+    const baseInterval = appStateRef.current === 'active' 
+      ? LOCATION_UPDATE_INTERVAL 
+      : BACKGROUND_UPDATE_INTERVAL;
+
+    // Speed thresholds (m/s)
+    // 0-1 m/s: Stationary or very slow (walking slowly) - use longer intervals
+    // 1-3 m/s: Walking or slow movement - use medium intervals
+    // >3 m/s: Running, cycling, or driving - use shorter intervals
+
+    if (speed < 1) {
+      // Stationary or very slow - update less frequently
+      return Math.max(baseInterval * 2, 300000); // At least 5 minutes, up to 2x base
+    } else if (speed < 3) {
+      // Walking speed - use base interval
+      return baseInterval;
+    } else if (speed < 10) {
+      // Running or cycling - update more frequently
+      return Math.min(baseInterval / 2, 60000); // At most 1 minute, half of base
+    } else {
+      // Driving or fast movement - update very frequently
+      return 30000; // 30 seconds
+    }
+  };
+
+  // Update location to server with retry logic
+  const updateLocationToServer = async (lat, lon, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    const startTime = Date.now();
+    
+    // Validate coordinates before processing
+    const validation = validateCoordinates(lat, lon);
+    if (!validation.valid) {
+      console.error('Invalid coordinates:', validation.error);
+      if (isMountedRef.current) {
+        setError(validation.error);
+      }
+      return;
+    }
+    
     try {
-      // Update via API
+      // Calculate speed before updating (uses previous location)
+      const speed = calculateSpeed(lat, lon);
+      currentSpeedRef.current = speed;
+      
+      // Update via API (validation already done, but updateLocation will validate again)
       await updateLocation(lat, lon);
       
       // Also emit via socket for real-time updates
       socketService.updateLocation(lat, lon);
+      
+      const duration = Date.now() - startTime;
+      
+      // Track successful update
+      connectNowAnalytics.trackLocationUpdate(true, duration, null, {
+        speed: speed.toFixed(2),
+        retryCount,
+      });
+      
+      // Update last location and time after successful update
+      lastLocationRef.current = { latitude: lat, longitude: lon };
+      lastUpdateTimeRef.current = Date.now();
     } catch (err) {
       console.error('Error updating location to server:', err);
+      
+      // Retry on network errors (not on 4xx client errors)
+      if (retryCount < MAX_RETRIES && (
+        err.code === 'ECONNREFUSED' || 
+        err.code === 'ECONNABORTED' ||
+        err.message?.includes('Network Error')
+      )) {
+        // Exponential backoff: wait 1s, then 2s
+        await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
+        return updateLocationToServer(lat, lon, retryCount + 1);
+      }
+      
+      // Track failed update
+      const duration = Date.now() - startTime;
+      connectNowAnalytics.trackLocationUpdate(false, duration, err, {
+        retryCount,
+        errorCode: err.code,
+      });
+      
+      // Set error state for critical failures (after retries exhausted)
+      if (retryCount >= MAX_RETRIES && isMountedRef.current) {
+        setError(CONNECT_NOW_ERRORS.LOCATION_UPDATE_FAILED);
+      }
     }
   };
 
@@ -179,51 +420,112 @@ export const useLocationTracking = (enabled = false) => {
     // Get initial location
     const initialLocation = await getCurrentLocation();
     if (initialLocation) {
-      await updateLocationToServer(
-        initialLocation.coords.latitude,
-        initialLocation.coords.longitude
-      );
+      const lat = initialLocation.coords.latitude;
+      const lon = initialLocation.coords.longitude;
+      
+      // Initialize tracking references
+      lastLocationRef.current = { latitude: lat, longitude: lon };
+      lastUpdateTimeRef.current = Date.now();
+      currentSpeedRef.current = 0;
+      
+      await updateLocationToServer(lat, lon);
     }
 
-    // Set up interval for location updates
-    const updateLocationPeriodically = async () => {
+    // Adaptive location update function
+    const updateLocationAdaptively = async () => {
       const currentLocation = await getCurrentLocation();
-      if (currentLocation) {
-        await updateLocationToServer(
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude
-        );
+      if (currentLocation && isMountedRef.current) {
+        const lat = currentLocation.coords.latitude;
+        const lon = currentLocation.coords.longitude;
+        
+        await updateLocationToServer(lat, lon);
+        
+        // Calculate new adaptive interval based on current speed
+        const speed = currentSpeedRef.current;
+        const newInterval = getAdaptiveInterval(speed);
+        
+        // Clear old timeout and set new one with adaptive timing
+        if (updateIntervalRef.current) {
+          clearTimeout(updateIntervalRef.current);
+        }
+        
+        // Set up next update with adaptive interval
+        updateIntervalRef.current = setTimeout(() => {
+          if (isMountedRef.current && enabled) {
+            updateLocationAdaptively();
+          }
+        }, newInterval);
       }
     };
 
-    // Use different intervals based on app state
-    const interval = appStateRef.current === 'active' 
+    // Start with base interval, then adapt based on movement
+    const baseInterval = appStateRef.current === 'active' 
       ? LOCATION_UPDATE_INTERVAL 
       : BACKGROUND_UPDATE_INTERVAL;
 
-    updateIntervalRef.current = setInterval(updateLocationPeriodically, interval);
+    // Initial update after base interval
+    updateIntervalRef.current = setTimeout(() => {
+      if (isMountedRef.current && enabled) {
+        updateLocationAdaptively();
+      }
+    }, baseInterval);
 
     // Only watch position if not using test location
     if (!USE_TEST_LOCATION) {
-      // Watch position changes (more battery efficient for significant changes)
+      // Watch position changes with adaptive distance interval based on speed
+      // Faster movement = larger distance threshold (less frequent updates when moving fast)
+      // Slower movement = smaller distance threshold (more frequent updates when stationary)
+      const getAdaptiveDistanceInterval = () => {
+        const speed = currentSpeedRef.current;
+        if (speed < 1) return 20; // Stationary - update every 20m
+        if (speed < 3) return 50; // Walking - update every 50m (default)
+        if (speed < 10) return 100; // Running - update every 100m
+        return 200; // Driving - update every 200m
+      };
+
       try {
+        // Start with default distance interval
+        let distanceInterval = 50;
+        
         locationSubscriptionRef.current = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: interval,
-            distanceInterval: 50, // Update if moved 50 meters
+            timeInterval: 10000, // Check every 10 seconds (minimum)
+            distanceInterval: distanceInterval,
           },
           (newLocation) => {
             if (isMountedRef.current) {
+              const lat = newLocation.coords.latitude;
+              const lon = newLocation.coords.longitude;
+              
+              // Validate coordinates from watchPositionAsync
+              const validation = validateCoordinates(lat, lon);
+              if (!validation.valid) {
+                console.error('Invalid coordinates from watchPositionAsync:', validation.error);
+                if (isMountedRef.current) {
+                  setError(validation.error);
+                }
+                return;
+              }
+              
               setLocation({
-                latitude: newLocation.coords.latitude,
-                longitude: newLocation.coords.longitude,
+                latitude: lat,
+                longitude: lon,
                 timestamp: new Date(),
               });
-              updateLocationToServer(
-                newLocation.coords.latitude,
-                newLocation.coords.longitude
-              );
+              
+              // Update location and calculate speed
+              const speed = calculateSpeed(lat, lon);
+              currentSpeedRef.current = speed;
+              lastLocationRef.current = { latitude: lat, longitude: lon };
+              lastUpdateTimeRef.current = Date.now();
+              
+              // Update to server
+              updateLocationToServer(lat, lon);
+              
+              // Adapt distance interval based on speed (for future updates)
+              // Note: We can't change distanceInterval on the fly, but this helps
+              // optimize the next watchPositionAsync call if we restart it
             }
           }
         );
@@ -240,9 +542,17 @@ export const useLocationTracking = (enabled = false) => {
       locationSubscriptionRef.current = null;
     }
     if (updateIntervalRef.current) {
-      clearInterval(updateIntervalRef.current);
+      clearTimeout(updateIntervalRef.current);
       updateIntervalRef.current = null;
     }
+    if (adaptiveIntervalRef.current) {
+      clearTimeout(adaptiveIntervalRef.current);
+      adaptiveIntervalRef.current = null;
+    }
+    // Reset tracking references
+    lastLocationRef.current = null;
+    lastUpdateTimeRef.current = null;
+    currentSpeedRef.current = 0;
   };
 
   // Handle app state changes
@@ -252,11 +562,20 @@ export const useLocationTracking = (enabled = false) => {
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // App has come to the foreground
-        if (enabled) {
-          stopTracking();
-          startTracking();
-        }
+        // App has come to the foreground - check if permission status changed
+        // (e.g., user granted permission in settings)
+        Location.getForegroundPermissionsAsync().then(({ status }) => {
+          if (isMountedRef.current) {
+            setPermissionStatus(status);
+            // If permission was just granted and tracking is enabled, start tracking
+            if (status === 'granted' && enabled) {
+              stopTracking();
+              startTracking();
+            }
+          }
+        }).catch(() => {
+          // Ignore permission check errors
+        });
       }
       appStateRef.current = nextAppState;
     });

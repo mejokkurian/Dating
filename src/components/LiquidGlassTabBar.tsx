@@ -71,12 +71,12 @@ export const LiquidGlassTabBar: React.FC<BottomTabBarProps> = ({ state, descript
       {/* 1. THE GLASS BACKGROUND (Clean, no inner boxes) */}
       <Canvas style={styles.canvas}>
         <RoundedRect rect={roundedRect} color="transparent">
-           <Shadow dx={0} dy={4} blur={12} color="rgba(0,0,0,0.1)" />
+           <Shadow dx={0} dy={3} blur={12} color="rgba(0,0,0,0.12)" />
         </RoundedRect>
 
-        {/* Blur & Fill */}
+        {/* Blur & Fill - Extra white background */}
         <BackdropBlur blur={30} clip={roundedRect}>
-           <Fill color="rgba(255, 255, 255, 0.80)" />
+           <Fill color="rgba(255, 255, 255, 0.95)" />
         </BackdropBlur>
 
         {/* The Hairline Border (The "Apple" stroke) */}
@@ -143,6 +143,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: TAB_WIDTH,
     height: TAB_HEIGHT,
+    elevation: 6, // Android shadow
+    shadowColor: '#000', // iOS shadow
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
   },
   canvas: {
     flex: 1,

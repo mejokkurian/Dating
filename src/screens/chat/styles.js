@@ -14,6 +14,95 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+  },
+  errorBanner: {
+    backgroundColor: '#FFEBEE',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFCDD2',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#C62828',
+    marginLeft: 8,
+    flex: 1,
+  },
+  errorRetryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FF4444',
+    borderRadius: 6,
+  },
+  errorRetryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  errorRetryButtonLarge: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#D4AF37',
+    borderRadius: 8,
+  },
+  errorRetryTextLarge: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -218,6 +307,42 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  reactionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+    marginBottom: 2,
+    gap: 4,
+  },
+  reactionsContainerMine: {
+    justifyContent: 'flex-end',
+  },
+  reactionsContainerTheirs: {
+    justifyContent: 'flex-start',
+  },
+  reactionBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  reactionBubbleActive: {
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  reactionEmoji: {
+    fontSize: 14,
+  },
+  reactionCount: {
+    fontSize: 11,
+    color: '#666',
+    marginLeft: 4,
+    fontWeight: '600',
+  },
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -338,17 +463,14 @@ const styles = StyleSheet.create({
   },
   emojiButton: {
     padding: 6,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
+  emojiButtonActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   emojiText: {
     fontSize: 24,
-  },
-  emojiPlusButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#404040',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   // Message Preview
   messagePreview: {
@@ -634,6 +756,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#D4AF37',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cacheIndicator: {
+    backgroundColor: '#FFF9E6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5E6D3',
+  },
+  cacheIndicatorText: {
+    color: '#666',
+    fontSize: 12,
+    marginLeft: 6,
+    fontStyle: 'italic',
   },
 });
 

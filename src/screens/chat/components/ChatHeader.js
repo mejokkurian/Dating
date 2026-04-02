@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const ChatHeader = ({ 
@@ -11,8 +11,50 @@ const ChatHeader = ({
   onAudioCall,
   onVideoCall,
   callState,
-  isOnline
+  isOnline,
+  searchQuery,
+  onSearchChange,
+  isSearchMode,
+  onSearchToggle
 }) => {
+  if (isSearchMode) {
+    return (
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => {
+            onSearchToggle(false);
+            onSearchChange('');
+          }}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={28} color="#000" />
+        </TouchableOpacity>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search messages..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={onSearchChange}
+            autoFocus
+            accessible={true}
+            accessibilityLabel="Search messages"
+            accessibilityHint="Type to search for messages in this conversation"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => onSearchChange('')}
+              style={styles.clearButton}
+            >
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.header}>
       <TouchableOpacity 
@@ -26,10 +68,20 @@ const ChatHeader = ({
           }
         }} 
         style={styles.backButton}
+        accessible={true}
+        accessibilityLabel="Go back"
+        accessibilityHint="Navigate back to previous screen"
+        accessibilityRole="button"
       >
         <Ionicons name="chevron-back" size={28} color="#000" />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('ViewUserProfile', { userId: user._id, user })}>
+      <TouchableOpacity 
+        onPress={() => navigation.navigate('ViewUserProfile', { userId: user._id, user })}
+        accessible={true}
+        accessibilityLabel={`View ${user.displayName || user.name}'s profile`}
+        accessibilityHint="Tap to view user profile"
+        accessibilityRole="button"
+      >
         <Image 
           source={{ 
             uri: user.image || (user.photos && user.photos.length > 0 ? (user.photos[user.mainPhotoIndex || 0] || user.photos[0]) : 'https://via.placeholder.com/40' ) 
@@ -43,6 +95,17 @@ const ChatHeader = ({
           {!isOnline ? 'Offline' : isRemoteRecording ? 'Recording audio...' : isTyping ? 'Typing...' : isOtherUserInChat ? 'In Chat' : 'Online'}
         </Text>
       </View>
+      
+      <TouchableOpacity 
+        onPress={() => onSearchToggle(true)}
+        style={styles.searchButton}
+        accessible={true}
+        accessibilityLabel="Search messages"
+        accessibilityHint="Tap to search for messages in this conversation"
+        accessibilityRole="button"
+      >
+        <Ionicons name="search" size={24} color="#000" />
+      </TouchableOpacity>
       
       {/* Call Buttons - HIDDEN FOR PRODUCTION */}
       {false && (
@@ -109,6 +172,35 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  searchButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#000',
+    paddingVertical: 8,
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
   },
 });
 

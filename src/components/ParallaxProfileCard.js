@@ -6,6 +6,7 @@ import {
   Dimensions,
   Image,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -33,7 +34,13 @@ const ParallaxProfileCard = ({
   disabled = false,
   swipeAnimatedValue,
   cardOpacity, // Destructured prop
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
+  // Image loading state
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+
   // --- Audio Aura Logic ---
   const [sound, setSound] = useState(null);
 
@@ -181,13 +188,40 @@ const ParallaxProfileCard = ({
           onPress={() => !disabled && onCardPress(data)}
           style={{ flex: 1 }}
           delayLongPress={500}
+          accessible={true}
+          accessibilityLabel={accessibilityLabel || `Profile of ${data?.displayName || data?.name || 'user'}`}
+          accessibilityHint={accessibilityHint || "Double tap to view full profile, swipe up to pass"}
+          accessibilityRole="button"
+          disabled={disabled}
         >
           {/* Parallax Image */}
           <View style={styles.imageContainer}>
+            {imageLoading && !imageError && (
+              <View style={styles.imageLoadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+              </View>
+            )}
+            {imageError && (
+              <View style={styles.imageErrorContainer}>
+                <Ionicons name="image-outline" size={60} color={theme.colors.text?.secondary || "#999"} />
+                <Text style={styles.imageErrorText}>Image unavailable</Text>
+              </View>
+            )}
             <Animated.Image
               source={{ uri: mainPhoto }}
-              style={[styles.cardImage, imageStyle]}
+              style={[styles.cardImage, imageStyle, (imageLoading || imageError) && styles.hiddenImage]}
               resizeMode="cover"
+              onLoadStart={() => {
+                setImageLoading(true);
+                setImageError(false);
+              }}
+              onLoadEnd={() => {
+                setImageLoading(false);
+              }}
+              onError={() => {
+                setImageLoading(false);
+                setImageError(true);
+              }}
             />
           </View>
           
@@ -280,10 +314,40 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: "hidden",
     borderRadius: 24,
+    position: "relative",
   },
   cardImage: {
     width: "100%",
     height: "100%",
+  },
+  hiddenImage: {
+    opacity: 0,
+  },
+  imageLoadingContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.background?.secondary || "#F5F5F5",
+  },
+  imageErrorContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.background?.secondary || "#F5F5F5",
+  },
+  imageErrorText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: theme.colors.text?.secondary || "#999",
+    textAlign: "center",
   },
   gradient: {
     position: "absolute",

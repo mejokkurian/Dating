@@ -5,8 +5,7 @@ import { AppState } from 'react-native';
 import { USE_EC2, LOCAL_URL, EC2_URL } from './api/config';
 
 // Socket URL Configuration (matches API config)
-// Socket URL Configuration (matches API config)
-const LOCAL_SOCKET_URL = "http://192.168.1.8:5001";
+const LOCAL_SOCKET_URL = "http://192.168.1.4:5001";  // Your local development server (use IP for physical devices)
 const EC2_SOCKET_URL = "https://api.emper.fun";  // Secure domain for socket as well
 
 const SOCKET_URL = USE_EC2 ? EC2_SOCKET_URL : LOCAL_SOCKET_URL;
@@ -20,6 +19,11 @@ class SocketService {
     this.listenerQueue = [];
     this.activeListeners = []; // Keep track of all active listeners to re-attach on reconnect
     this.appStateSubscription = null;
+  }
+  
+  // Getter for socket (for debugging)
+  get socketInstance() {
+    return this.socket;
     
     // Setup AppState listener
     this.setupAppStateListener();
@@ -77,15 +81,58 @@ class SocketService {
           this.activeListeners.push({ event, callback });
         }
         
-        // Re-attach all persistent listeners
+        // Re-attach all persistent listeners on reconnect
         if (this.activeListeners.length > 0) {
-            console.log(`Re-attaching ${this.activeListeners.length} active listeners`);
+            console.log(`Re-attaching ${this.activeListeners.length} active listeners on reconnect`);
             this.activeListeners.forEach(({ event, callback }) => {
-                // Remove existing listener for this event/callback combo to prevent duplicates if socket.io kept them
+                // Remove existing listener for this event/callback combo to prevent duplicates
                 this.socket.off(event, callback); 
                 this.socket.on(event, callback);
             });
         }
+      });
+
+      // Handle reconnection events
+      this.socket.on("reconnect", (attemptNumber) => {
+        console.log(`Socket reconnected after ${attemptNumber} attempts`);
+        this.connected = true;
+        
+        // Track reconnection (import dynamically to avoid circular dependency)
+        import('../services/connectNowAnalytics').then(({ trackSocketReconnect }) => {
+          trackSocketReconnect(attemptNumber, true);
+        }).catch(() => {
+          // Ignore if analytics not available
+        });
+        
+        // Re-attach all persistent listeners on reconnect
+        if (this.activeListeners.length > 0) {
+            console.log(`Re-attaching ${this.activeListeners.length} active listeners after reconnect`);
+            this.activeListeners.forEach(({ event, callback }) => {
+                // Remove existing listener to prevent duplicates
+                this.socket.off(event, callback); 
+                this.socket.on(event, callback);
+            });
+        }
+      });
+
+      this.socket.on("reconnect_attempt", (attemptNumber) => {
+        console.log(`Socket reconnect attempt ${attemptNumber}`);
+      });
+
+      this.socket.on("reconnect_error", (error) => {
+        console.error("Socket reconnect error:", error);
+      });
+
+      this.socket.on("reconnect_failed", () => {
+        console.error("Socket reconnection failed after all attempts");
+        this.connected = false;
+        
+        // Track reconnection failure
+        import('../services/connectNowAnalytics').then(({ trackSocketReconnect }) => {
+          trackSocketReconnect(10, false); // Max attempts reached
+        }).catch(() => {
+          // Ignore if analytics not available
+        });
       });
 
       this.socket.on("disconnect", () => {
@@ -185,19 +232,53 @@ class SocketService {
     this.socket.emit("message_star", { messageId, star });
   }
 
+  // Edit message
+  editMessage(messageId, newContent) {
+    if (!this.socket) return;
+    this.socket.emit("message_edit", { messageId, content: newContent });
+  }
+
+  // React to message (emoji can be null to remove reaction)
+  reactToMessage(messageId, emoji) {
+    if (!this.socket) return;
+    this.socket.emit("message_reaction", { messageId, emoji });
+  }
+
   // Generic listener handler
   addListener(event, callback) {
-    // Add to persistent registry
-    this.activeListeners.push({ event, callback });
+    // Add to persistent registry (avoid duplicates)
+    const exists = this.activeListeners.some(
+      l => l.event === event && l.callback === callback
+    );
+    if (!exists) {
+      this.activeListeners.push({ event, callback });
+    }
     
-    if (this.socket && this.connected) {
+    // Always try to attach listener, even if not connected yet
+    // It will be re-attached on connect/reconnect
+    if (this.socket) {
+      // Remove existing listener for this callback to prevent duplicates
+      this.socket.off(event, callback);
       this.socket.on(event, callback);
-    } 
+      if (__DEV__) {
+        console.log(`✅ Listener attached for ${event}`);
+      }
+    } else if (__DEV__) {
+      console.warn(`⚠️ Socket not initialized, listener for ${event} will be attached on connect`);
+    }
   }
 
   // Listen for new messages
   onNewMessage(callback) {
+    if (__DEV__) {
+      console.log('📡 Attaching new_message listener');
+    }
     this.addListener("new_message", callback);
+    if (__DEV__ && this.socket) {
+      // Verify listener was attached
+      const listeners = this.socket.listeners('new_message');
+      console.log(`📡 new_message listeners count: ${listeners.length}`);
+    }
   }
 
   // Listen for message sent confirmation
@@ -233,6 +314,16 @@ class SocketService {
   // Listen for message deleted
   onMessageDeleted(callback) {
     this.addListener("message_deleted", callback);
+  }
+
+  // Listen for message edited
+  onMessageEdited(callback) {
+    this.addListener("message_edited", callback);
+  }
+
+  // Listen for message reacted
+  onMessageReacted(callback) {
+    this.addListener("message_reacted", callback);
   }
 
   // Acknowledge message delivery
@@ -285,18 +376,38 @@ class SocketService {
   }
 
   // Remove listeners
-  removeListener(eventName) {
+  removeListener(eventName, specificCallback = null) {
     if (this.socket) {
       try {
-        this.socket.off(eventName);
+        if (specificCallback) {
+          // Remove specific callback only
+          this.socket.off(eventName, specificCallback);
+          if (__DEV__) {
+            console.log(`🗑️ Removed specific listener for ${eventName}`);
+          }
+        } else {
+          // Remove all listeners for this event (legacy behavior)
+          this.socket.off(eventName);
+          if (__DEV__) {
+            console.log(`🗑️ Removed all listeners for ${eventName}`);
+          }
+        }
       } catch (error) {
-        console.warn("Error removing listener:", error);
+        if (__DEV__) {
+          console.warn("Error removing listener:", error);
+        }
       }
     }
     // Remove from registry
-    this.activeListeners = this.activeListeners.filter(
-      (item) => item.event !== eventName
-    );
+    if (specificCallback) {
+      this.activeListeners = this.activeListeners.filter(
+        (item) => !(item.event === eventName && item.callback === specificCallback)
+      );
+    } else {
+      this.activeListeners = this.activeListeners.filter(
+        (item) => item.event !== eventName
+      );
+    }
     // Also remove from queue if present
     this.listenerQueue = this.listenerQueue.filter(
       (item) => item.event !== eventName

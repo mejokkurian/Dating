@@ -1,12 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
   Dimensions,
+  TouchableOpacity,
+  ScrollView,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import theme from "../theme/theme";
 
 // Components
@@ -26,12 +31,20 @@ import HeartOverlay from "../components/HeartOverlay";
 // Hooks
 import { useDiscoverProfiles } from "../hooks/useDiscoverProfiles";
 import { useCardInteractions } from "../hooks/useCardInteractions";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+
+// Analytics
+import * as discoverAnalytics from "../services/discoverAnalytics";
+
+// API
+import { recordInteraction } from "../services/api/match";
 
 const MainScreen = ({ navigation, route }) => {
   // --- 1. State & Data Hook ---
   const {
       profiles,
       loading,
+      error,
       currentIndex,
       setCurrentIndex,
       isPendingMode,
@@ -44,6 +57,9 @@ const MainScreen = ({ navigation, route }) => {
       loadInitialData,
   } = useDiscoverProfiles();
 
+  // Network status
+  const { isOffline } = useNetworkStatus();
+
   // --- 2. Interactions & Animation Hook ---
   const {
       swipeY,
@@ -51,6 +67,7 @@ const MainScreen = ({ navigation, route }) => {
       handleSwipeUp,
       handleSuperLike,
       handleLike,
+      isActionLoading,
       animationState,
       triggerLikeAnimation
   } = useCardInteractions(
@@ -61,6 +78,22 @@ const MainScreen = ({ navigation, route }) => {
       setIsPendingMode, 
       loadProfiles
   );
+
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Track screen view
+  useEffect(() => {
+    discoverAnalytics.trackDiscoverScreenView();
+  }, []);
+
+  // Track profiles loaded
+  useEffect(() => {
+    if (!loading && profiles.length > 0) {
+      // This is approximate - in real implementation, track actual load time
+      discoverAnalytics.trackProfilesLoaded(profiles.length, 0);
+    }
+  }, [loading, profiles.length]);
 
   // --- 3. Local UI State ---
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -96,25 +129,79 @@ const MainScreen = ({ navigation, route }) => {
 
   // --- 4. Handlers ---
 
-  const handleCardPress = (profile) => {
+  const handleCardPress = useCallback((profile) => {
     if (showTutorial && tutorialStep === 0) {
         setTutorialStep(1); 
     }
+    
+    // Track profile view
+    const profileId = profile?._id || profile?.id;
+    if (profileId) {
+      discoverAnalytics.trackProfileView(profileId);
+    }
+    
     setSelectedProfile(profile);
     setShowBottomSheet(true);
-  };
+  }, [showTutorial, tutorialStep]);
 
   const handleSendMatch = async (profile, comment) => {
-    // For Match Logic, we might want to also extract this eventually, 
-    // but for now keeping simplified version here or move to useCardInteractions if needed.
-    // To match original logic exactly:
-     console.log("Match request sent to:", profile.name);
-     // ... (Logic from original file: Notification, setCurrentIndex) ...
-     // For simplicity in refactor, we just advance the card
-     setCurrentIndex((prev) => prev + 1);
+    // Input validation
+    if (!profile) {
+      Alert.alert('Error', 'Invalid profile. Please try again.');
+      return;
+    }
+
+    const targetId = profile._id || profile.id;
+    if (!targetId || typeof targetId !== 'string' || targetId.trim().length === 0) {
+      Alert.alert('Error', 'Invalid profile ID. Please try again.');
+      return;
+    }
+
+    try {
+      // Record match request with comment
+      await recordInteraction(targetId, "LIKE", comment);
+      
+      // Track success
+      discoverAnalytics.trackMatchRequest(targetId, true);
+      
+      // Advance to next card
+      setCurrentIndex((prev) => prev + 1);
+      
+      // Show success feedback (optional)
+      // You could show a toast or notification here
+    } catch (error) {
+      if (__DEV__) {
+        console.error("Error sending match request:", error);
+      }
+      
+      // Track failure
+      discoverAnalytics.trackMatchRequest(targetId, false, error);
+      
+      Alert.alert(
+        'Error',
+        'Failed to send match request. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
-  const currentProfile = profiles[currentIndex];
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    discoverAnalytics.trackEmptyStateAction('refresh');
+    try {
+      await loadInitialData();
+    } catch (err) {
+      // Error is already handled in loadInitialData
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Memoize current profile to prevent unnecessary re-renders
+  const currentProfile = useMemo(() => {
+    return profiles[currentIndex];
+  }, [profiles, currentIndex]);
 
   // --- 5. Render ---
 
@@ -128,6 +215,79 @@ const MainScreen = ({ navigation, route }) => {
         ]}
       >
         <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading profiles...</Text>
+      </LinearGradient>
+    );
+  }
+
+  // Error State
+  if (error && profiles.length === 0) {
+    return (
+      <LinearGradient
+        colors={theme.colors.gradients.background}
+        style={styles.gradient}
+      >
+        <View style={styles.container}>
+          <HomeHeader
+            isPendingMode={false}
+            onBack={() => {}}
+            onProfilePress={() => navigation.navigate("Profile")}
+            onFilterPress={() => {}}
+            onUndo={() => {}}
+            canUndo={false}
+          />
+          <ScrollView 
+            contentContainerStyle={styles.errorContainer}
+            refreshControl={null}
+          >
+            {error.isOffline || isOffline ? (
+              <>
+                <Ionicons name="cloud-offline-outline" size={80} color="#FF5252" />
+                <Text style={styles.errorTitle}>No Internet Connection</Text>
+                <Text style={styles.errorText}>
+                  Please check your internet connection and try again.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="alert-circle-outline" size={80} color="#FF5252" />
+                <Text style={styles.errorTitle}>
+                  {error.isNetworkError 
+                    ? (error.networkErrorType === 'timeout' ? 'Connection Timeout' : 'No Connection')
+                    : error.response?.status === 401
+                    ? 'Authentication Required'
+                    : error.response?.status === 403
+                    ? 'Permission Denied'
+                    : 'Unable to Load Profiles'}
+                </Text>
+                <Text style={styles.errorText}>
+                  {error.isNetworkError
+                    ? error.userMessage || 'Please check your internet connection and try again.'
+                    : error.response?.status === 401 
+                    ? 'Please log in again to view profiles.'
+                    : error.response?.status === 403
+                    ? 'You don\'t have permission to view profiles.'
+                    : error.response?.status === 404
+                    ? 'Profiles not found. Please try again.'
+                    : error.response?.status === 429
+                    ? 'Too many requests. Please wait a moment and try again.'
+                    : error.response?.status >= 500
+                    ? 'Our servers are experiencing issues. Please try again later.'
+                    : 'Unable to load profiles. Please check your connection and try again.'}
+                </Text>
+              </>
+            )}
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                loadInitialData();
+              }}
+            >
+              <Ionicons name="refresh" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       </LinearGradient>
     );
   }
@@ -151,21 +311,47 @@ const MainScreen = ({ navigation, route }) => {
             }}
             onProfilePress={() => navigation.navigate("Profile")}
             onFilterPress={() => setShowFilterModal(true)}
-            onUndo={handleUndo}
+            onUndo={() => {
+                discoverAnalytics.trackUndoAction();
+                handleUndo();
+            }}
             canUndo={currentIndex > 0}
         />
+        
+        {/* Offline Banner */}
+        {isOffline && (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.offlineBannerText}>No Internet Connection</Text>
+          </View>
+        )}
 
         {/* Card Stack */}
-        <View style={styles.cardContainer}>
-          {currentIndex < profiles.length ? (
+        <ScrollView
+          contentContainerStyle={styles.cardContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+          scrollEnabled={false}
+          horizontal={false}
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+        >
+          {currentIndex < profiles.length && currentProfile ? (
             <ParallaxProfileCard
-              key={currentProfile.id}
+              key={currentProfile.id || currentIndex}
               data={currentProfile}
               onSwipeUp={handleSwipeUp}
               onCardPress={handleCardPress}
-              disabled={showBottomSheet || showMatchModal || showSuperLikeModal}
+              disabled={showBottomSheet || showMatchModal || showSuperLikeModal || isOffline || isActionLoading}
               swipeAnimatedValue={swipeY} 
               cardOpacity={cardOpacity}
+              accessibilityLabel={`Profile card for ${currentProfile.displayName || currentProfile.name || 'user'}`}
+              accessibilityHint="Double tap to view full profile, swipe up to pass"
             />
           ) : (
             <EmptyCardState 
@@ -173,10 +359,13 @@ const MainScreen = ({ navigation, route }) => {
                     setCurrentIndex(0);
                     await loadInitialData();
                 }}
-                onFilter={() => setShowFilterModal(true)}
+                onFilter={() => {
+                  discoverAnalytics.trackFilterApplied(filterState);
+                  setShowFilterModal(true);
+                }}
             />
           )}
-        </View>
+        </ScrollView>
       </View>
 
       {/* --- Modals & Overlays --- */}
@@ -224,7 +413,10 @@ const MainScreen = ({ navigation, route }) => {
         visible={showFilterModal}
         filterState={filterState}
         onClose={() => setShowFilterModal(false)}
-        onUpdateFilter={setFilterState}
+        onUpdateFilter={(newFilters) => {
+          discoverAnalytics.trackFilterApplied(newFilters);
+          setFilterState(newFilters);
+        }}
       />
 
       {/* Date Proposal Pill */}
@@ -321,11 +513,71 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     flex: 1,
+    width: '100%',
     paddingHorizontal: 15,
-    paddingBottom: 20,
+    paddingBottom: 140,
     justifyContent: "flex-start", // Move cards up
     alignItems: "center",
-    paddingTop: 50, // Increased buffer to prevent header overlap
+    paddingTop: 20, // Reduced buffer for empty state
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: theme.colors.text || "#666",
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+    paddingBottom: 100,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#333",
+    marginTop: 20,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primary || "#D4AF37",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    minWidth: 150,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF5252',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    marginHorizontal: 15,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  offlineBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

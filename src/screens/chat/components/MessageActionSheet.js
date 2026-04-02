@@ -12,7 +12,11 @@ const MessageActionSheet = ({
   onReply,
   onPin,
   onStar,
+  onEdit,
+  onForward,
   onDelete,
+  onReaction,
+  isActionLoading = false,
 }) => {
   if (!visible || !selectedMessage) return null;
 
@@ -26,6 +30,9 @@ const MessageActionSheet = ({
   }
 
   const isMine = selectedMessage.senderId._id === userData._id;
+  const isTextMessage = selectedMessage.messageType === 'text' || !selectedMessage.messageType;
+  const isRecent = (Date.now() - new Date(selectedMessage.createdAt).getTime()) < 15 * 60 * 1000; // 15 minutes
+  const canEdit = isMine && isTextMessage && isRecent && !selectedMessage.isEdited;
 
   // Format time helper
   const formatTime = (dateString) => {
@@ -40,33 +47,36 @@ const MessageActionSheet = ({
       </TouchableWithoutFeedback>
       
       <View style={styles.whatsappActionContainer}>
-        {/* Emoji Reactions Bar */}
-        <View style={styles.emojiBar}>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>👍</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>❤️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>😂</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>😮</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>😢</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>🙏</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiButton}>
-            <Text style={styles.emojiText}>👏</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiPlusButton}>
-            <Ionicons name="add" size={20} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+        {/* Emoji Reactions Bar - Only show for received messages (not sent by current user) */}
+        {!isMine && (
+          <View style={styles.emojiBar}>
+            {['👍', '❤️', '😂', '😮', '😢', '🙏', '👏'].map((emoji) => {
+              const hasReaction = selectedMessage.reactions?.some(r => {
+                const rUserId = r.userId?._id || r.userId;
+                return String(rUserId) === String(userData._id) && r.emoji === emoji;
+              });
+              return (
+                <TouchableOpacity
+                  key={emoji}
+                  style={[
+                    styles.emojiButton,
+                    hasReaction && styles.emojiButtonActive,
+                    isActionLoading && { opacity: 0.5 }
+                  ]}
+                  onPress={() => {
+                    if (!isActionLoading && onReaction) {
+                      onReaction(emoji);
+                    }
+                  }}
+                  disabled={isActionLoading}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.emojiText}>{emoji}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {/* Selected Message Preview */}
         <View style={[
@@ -97,12 +107,17 @@ const MessageActionSheet = ({
         <View style={styles.whatsappActionMenu}>
           {/* Reply - Available for all messages */}
           <TouchableOpacity 
-            style={styles.whatsappActionItem} 
+            style={[styles.whatsappActionItem, isActionLoading && { opacity: 0.5 }]} 
             onPress={() => {
-              console.log('Direct Reply Pressed');
-              onReply();
+              if (__DEV__) {
+                console.log('Direct Reply Pressed');
+              }
+              if (!isActionLoading) {
+                onReply();
+              }
             }}
             activeOpacity={0.7}
+            disabled={isActionLoading}
           >
             <Text style={styles.whatsappActionText}>Reply</Text>
             <Ionicons name="arrow-undo-outline" size={22} color="#007AFF" />
@@ -110,12 +125,17 @@ const MessageActionSheet = ({
 
           {/* Pin - Available for all messages */}
           <TouchableOpacity 
-            style={styles.whatsappActionItem} 
+            style={[styles.whatsappActionItem, isActionLoading && { opacity: 0.5 }]} 
             onPress={() => {
-              console.log('Direct Pin Pressed');
-              onPin();
+              if (__DEV__) {
+                console.log('Direct Pin Pressed');
+              }
+              if (!isActionLoading) {
+                onPin();
+              }
             }}
             activeOpacity={0.7}
+            disabled={isActionLoading}
           >
             <Text style={styles.whatsappActionText}>
               {selectedMessage.isPinned ? 'Unpin' : 'Pin'}
@@ -129,12 +149,17 @@ const MessageActionSheet = ({
 
           {/* Star - Available for all messages */}
           <TouchableOpacity 
-            style={styles.whatsappActionItem} 
+            style={[styles.whatsappActionItem, isActionLoading && { opacity: 0.5 }]} 
             onPress={() => {
-              console.log('Direct Star Pressed');
-              onStar();
+              if (__DEV__) {
+                console.log('Direct Star Pressed');
+              }
+              if (!isActionLoading) {
+                onStar();
+              }
             }}
             activeOpacity={0.7}
+            disabled={isActionLoading}
           >
             <Text style={styles.whatsappActionText}>
               {selectedMessage.starredBy?.includes(userData._id) ? 'Unstar' : 'Star'}
@@ -146,15 +171,58 @@ const MessageActionSheet = ({
             />
           </TouchableOpacity>
 
+          {/* Edit - Only for my text messages, within 15 minutes, not already edited */}
+          {canEdit && (
+            <TouchableOpacity 
+              style={[styles.whatsappActionItem, isActionLoading && { opacity: 0.5 }]} 
+              onPress={() => {
+                if (__DEV__) {
+                  console.log('Direct Edit Pressed');
+                }
+                if (!isActionLoading) {
+                  onEdit();
+                }
+              }}
+              activeOpacity={0.7}
+              disabled={isActionLoading}
+            >
+              <Text style={styles.whatsappActionText}>Edit</Text>
+              <Ionicons name="create-outline" size={22} color="#007AFF" />
+            </TouchableOpacity>
+          )}
+
+          {/* Forward - Available for all messages */}
+          <TouchableOpacity 
+            style={[styles.whatsappActionItem, isActionLoading && { opacity: 0.5 }]} 
+            onPress={() => {
+              if (__DEV__) {
+                console.log('Direct Forward Pressed');
+              }
+              if (!isActionLoading) {
+                onForward();
+              }
+            }}
+            activeOpacity={0.7}
+            disabled={isActionLoading}
+          >
+            <Text style={styles.whatsappActionText}>Forward</Text>
+            <Ionicons name="arrow-forward-outline" size={22} color="#007AFF" />
+          </TouchableOpacity>
+
           {/* Delete - Only for my messages */}
           {isMine && (
             <TouchableOpacity 
-              style={[styles.whatsappActionItem, styles.lastActionItem]} 
+              style={[styles.whatsappActionItem, styles.lastActionItem, isActionLoading && { opacity: 0.5 }]} 
               onPress={() => {
-                console.log('Direct Delete Pressed');
-                onDelete();
+                if (__DEV__) {
+                  console.log('Direct Delete Pressed');
+                }
+                if (!isActionLoading) {
+                  onDelete();
+                }
               }}
               activeOpacity={0.7}
+              disabled={isActionLoading}
             >
               <Text style={[styles.whatsappActionText, { color: '#FF3B30' }]}>Delete</Text>
               <Ionicons name="trash-outline" size={22} color="#FF3B30" />

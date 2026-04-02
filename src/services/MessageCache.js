@@ -30,7 +30,10 @@ export const initCache = () => {
         file_url TEXT,
         call_type TEXT,
         call_duration INTEGER,
-        call_status TEXT
+        call_status TEXT,
+        is_edited INTEGER DEFAULT 0,
+        edited_at INTEGER,
+        reactions TEXT
       );
     `);
     
@@ -56,6 +59,23 @@ export const initCache = () => {
       console.log('✅ Added call data columns to existing table');
     } catch (e) {
       // Columns already exist, ignore error
+    }
+    
+    // Migration: Add edit columns if they don't exist (for existing databases)
+    try {
+      db.execSync(`ALTER TABLE messages ADD COLUMN is_edited INTEGER DEFAULT 0;`);
+      db.execSync(`ALTER TABLE messages ADD COLUMN edited_at INTEGER;`);
+      console.log('✅ Added edit data columns to existing table');
+    } catch (e) {
+      // Columns already exist, ignore error
+    }
+    
+    // Migration: Add reactions column if it doesn't exist (for existing databases)
+    try {
+      db.execSync(`ALTER TABLE messages ADD COLUMN reactions TEXT;`);
+      console.log('✅ Added reactions column to existing table');
+    } catch (e) {
+      // Column already exists, ignore error
     }
     
     // Create index for fast queries
@@ -120,6 +140,23 @@ export const getCachedMessages = (conversationId, limit = 50) => {
         };
       }
       
+      // Add edit information
+      if (msg.is_edited) {
+        message.isEdited = true;
+        if (msg.edited_at) {
+          message.editedAt = new Date(msg.edited_at).toISOString();
+        }
+      }
+      
+      // Add reactions
+      if (msg.reactions) {
+        try {
+          message.reactions = JSON.parse(msg.reactions);
+        } catch (e) {
+          message.reactions = [];
+        }
+      }
+      
       return message;
     });
   } catch (error) {
@@ -169,8 +206,8 @@ export const cacheMessage = (msg) => {
        (id, conversation_id, sender_id, receiver_id, content, message_type, 
         status, created_at, reply_to_id, audio_url, audio_duration, 
         image_url, sticker_emoji, file_name, file_url,
-        call_type, call_duration, call_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        call_type, call_duration, call_status, is_edited, edited_at, reactions)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         msg._id,
         msg.conversationId,
@@ -190,6 +227,9 @@ export const cacheMessage = (msg) => {
         msg.callData?.callType || null,
         msg.callData?.duration || null,
         msg.callData?.status || null,
+        msg.isEdited ? 1 : 0,
+        msg.editedAt ? new Date(msg.editedAt).getTime() : null,
+        msg.reactions && msg.reactions.length > 0 ? JSON.stringify(msg.reactions) : null,
       ]
     );
   } catch (error) {
@@ -275,6 +315,31 @@ export const getCachedConversations = () => {
   } catch (error) {
     console.error('❌ Error getting cached conversations:', error);
     return [];
+  }
+};
+
+/**
+ * Delete a message from cache
+ * @param {string} messageId - The message ID to delete
+ */
+export const deleteCachedMessage = (messageId) => {
+  if (!db) {
+    console.warn('⚠️ Database not initialized');
+    return;
+  }
+  
+  try {
+    db.runSync(
+      `DELETE FROM messages WHERE id = ?`,
+      [messageId]
+    );
+    if (__DEV__) {
+      console.log(`✅ Deleted message ${messageId} from cache`);
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.error('❌ Error deleting message from cache:', error);
+    }
   }
 };
 

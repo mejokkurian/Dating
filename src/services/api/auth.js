@@ -1,21 +1,109 @@
 import api from "./config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const signInWithEmail = async (email, password) => {
+/**
+ * Retry configuration for auth API calls
+ */
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelay: 1000, // 1 second
+  maxDelay: 8000, // 8 seconds
+  retryableStatusCodes: [408, 429, 500, 502, 503, 504], // Timeout, rate limit, server errors
+};
+
+/**
+ * Check if an error is retryable
+ * @param {Error} error - The error object
+ * @returns {boolean} - Whether the error is retryable
+ */
+const isRetryableError = (error) => {
+  // Network errors (no response received)
+  if (!error.response) {
+    const networkErrors = [
+      'ECONNREFUSED',
+      'ECONNABORTED',
+      'ETIMEDOUT',
+      'Network Error',
+      'timeout',
+    ];
+    return networkErrors.some(err => 
+      error.code === err || 
+      error.message?.includes(err)
+    );
+  }
+
+  // Retry on specific HTTP status codes
+  const status = error.response?.status;
+  return RETRY_CONFIG.retryableStatusCodes.includes(status);
+};
+
+/**
+ * Calculate delay for exponential backoff
+ * @param {number} attempt - Current attempt number (0-indexed)
+ * @returns {number} - Delay in milliseconds
+ */
+const calculateDelay = (attempt) => {
+  const delay = RETRY_CONFIG.initialDelay * Math.pow(2, attempt);
+  return Math.min(delay, RETRY_CONFIG.maxDelay);
+};
+
+/**
+ * Execute API call with retry logic and exponential backoff
+ * @param {Function} apiCall - The API call function to execute
+ * @param {number} retryCount - Current retry attempt (default: 0)
+ * @returns {Promise} - The API response
+ */
+const executeWithRetry = async (apiCall, retryCount = 0) => {
   try {
-    console.log('🔍 Email login to:', api.defaults.baseURL);
+    return await apiCall();
+  } catch (error) {
+    // Don't retry if error is not retryable
+    if (!isRetryableError(error)) {
+      throw error.response ? error.response.data : error;
+    }
+
+    // Don't retry if max retries reached
+    if (retryCount >= RETRY_CONFIG.maxRetries) {
+      throw error.response ? error.response.data : error;
+    }
+
+    // Calculate delay and wait before retrying
+    const delay = calculateDelay(retryCount);
+    if (__DEV__) {
+      console.log(`Retrying auth API call (attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries}) after ${delay}ms...`);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // Recursive retry
+    return executeWithRetry(apiCall, retryCount + 1);
+  }
+};
+
+export const signInWithEmail = async (email, password) => {
+  return executeWithRetry(async () => {
+    if (__DEV__) {
+      console.log('🔍 Email login to:', api.defaults.baseURL);
+    }
+    
     const response = await api.post("/auth/login", { email, password });
     if (response.data.token) {
       await AsyncStorage.setItem("userToken", response.data.token);
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
-    console.log('✅ Email login successful');
+    
+    if (__DEV__) {
+      console.log('✅ Email login successful');
+    }
+    
     return response.data;
-  } catch (error) {
-    console.error('❌ Email login error details:');
-    console.error('  Code:', error.code);
-    console.error('  Message:', error.message);
-    console.error('  Base URL:', api.defaults.baseURL);
+  }).catch(error => {
+    if (__DEV__) {
+      console.error('❌ Email login error details:');
+      console.error('  Code:', error.code);
+      console.error('  Message:', error.message);
+      console.error('  Base URL:', api.defaults.baseURL);
+    }
     
     // Handle timeout and network errors
     if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
@@ -35,13 +123,16 @@ export const signInWithEmail = async (email, password) => {
         code: "CONNECTION_ERROR",
       };
     }
-    throw error.response ? error.response.data : error;
-  }
+    throw error;
+  });
 };
 
 export const createAccountWithEmail = async (email, password, displayName) => {
-  try {
-    console.log('🔍 Account creation to:', api.defaults.baseURL);
+  return executeWithRetry(async () => {
+    if (__DEV__) {
+      console.log('🔍 Account creation to:', api.defaults.baseURL);
+    }
+    
     const response = await api.post("/auth/register", {
       email,
       password,
@@ -51,13 +142,19 @@ export const createAccountWithEmail = async (email, password, displayName) => {
       await AsyncStorage.setItem("userToken", response.data.token);
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
-    console.log('✅ Account created successfully');
+    
+    if (__DEV__) {
+      console.log('✅ Account created successfully');
+    }
+    
     return response.data;
-  } catch (error) {
-    console.error('❌ Account creation error details:');
-    console.error('  Code:', error.code);
-    console.error('  Message:', error.message);
-    console.error('  Base URL:', api.defaults.baseURL);
+  }).catch(error => {
+    if (__DEV__) {
+      console.error('❌ Account creation error details:');
+      console.error('  Code:', error.code);
+      console.error('  Message:', error.message);
+      console.error('  Base URL:', api.defaults.baseURL);
+    }
     
     // Handle timeout and network errors
     if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
@@ -77,8 +174,8 @@ export const createAccountWithEmail = async (email, password, displayName) => {
         code: "CONNECTION_ERROR",
       };
     }
-    throw error.response ? error.response.data : error;
-  }
+    throw error;
+  });
 };
 
 export const signOut = async () => {
@@ -86,13 +183,15 @@ export const signOut = async () => {
     await AsyncStorage.removeItem("userToken");
     await AsyncStorage.removeItem("userData");
   } catch (error) {
-    console.error("Error signing out:", error);
+    if (__DEV__) {
+      console.error("Error signing out:", error);
+    }
   }
 };
 
 // Mocking other auth methods for now or implementing if backend supports them
 export const signInWithGoogle = async (googleData) => {
-  try {
+  return executeWithRetry(async () => {
     // Map 'token' to 'idToken' if needed
     const payload = {
       ...googleData,
@@ -105,13 +204,11 @@ export const signInWithGoogle = async (googleData) => {
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
     return response.data;
-  } catch (error) {
-    throw error.response ? error.response.data : error;
-  }
+  });
 };
 
 export const signInWithApple = async (appleData) => {
-  try {
+  return executeWithRetry(async () => {
     // Map 'token' to 'identityToken' if needed, or ensure caller passes 'identityToken'
     const payload = {
       ...appleData,
@@ -124,34 +221,40 @@ export const signInWithApple = async (appleData) => {
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
     return response.data;
-  } catch (error) {
-    throw error.response ? error.response.data : error;
-  }
+  });
 };
 
 export const signInWithPhoneNumber = async (phoneNumber) => {
-  try {
-    console.log('🔍 Attempting phone auth to:', api.defaults.baseURL);
-    console.log('🔍 Full endpoint:', `${api.defaults.baseURL}/auth/phone/send`);
-    console.log('🔍 Phone number:', phoneNumber);
+  return executeWithRetry(async () => {
+    if (__DEV__) {
+      console.log('🔍 Attempting phone auth to:', api.defaults.baseURL);
+      console.log('🔍 Full endpoint:', `${api.defaults.baseURL}/auth/phone/send`);
+      console.log('🔍 Phone number:', phoneNumber);
+    }
     
     const response = await api.post("/auth/phone/send", { phoneNumber });
-    console.log('✅ Phone auth response:', response.data);
+    
+    if (__DEV__) {
+      console.log('✅ Phone auth response:', response.data);
+    }
+    
     return response.data;
-  } catch (error) {
-    console.error('❌ Phone auth error - Full details:');
-    console.error('  Code:', error.code);
-    console.error('  Message:', error.message);
-    console.error('  Response:', error.response?.data);
-    console.error('  Status:', error.response?.status);
-    console.error('  Config URL:', error.config?.url);
-    console.error('  Base URL:', error.config?.baseURL);
-    throw error.response ? error.response.data : error;
-  }
+  }).catch(error => {
+    if (__DEV__) {
+      console.error('❌ Phone auth error - Full details:');
+      console.error('  Code:', error.code);
+      console.error('  Message:', error.message);
+      console.error('  Response:', error.response?.data);
+      console.error('  Status:', error.response?.status);
+      console.error('  Config URL:', error.config?.url);
+      console.error('  Base URL:', error.config?.baseURL);
+    }
+    throw error;
+  });
 };
 
 export const verifyPhoneOTP = async (phoneNumber, code) => {
-  try {
+  return executeWithRetry(async () => {
     const response = await api.post("/auth/phone/verify", {
       phoneNumber,
       code,
@@ -161,28 +264,22 @@ export const verifyPhoneOTP = async (phoneNumber, code) => {
       await AsyncStorage.setItem("userData", JSON.stringify(response.data));
     }
     return response.data;
-  } catch (error) {
-    throw error.response ? error.response.data : error;
-  }
+  });
 };
 
 export const requestPasswordReset = async (email) => {
-  try {
+  return executeWithRetry(async () => {
     const response = await api.post("/auth/reset-password", { email });
     return response.data;
-  } catch (error) {
-    throw error.response ? error.response.data : error;
-  }
+  });
 };
 
 export const confirmPasswordReset = async (resetToken, newPassword) => {
-  try {
+  return executeWithRetry(async () => {
     const response = await api.post("/auth/reset-password/confirm", {
       resetToken,
       newPassword,
     });
     return response.data;
-  } catch (error) {
-    throw error.response ? error.response.data : error;
-  }
+  });
 };

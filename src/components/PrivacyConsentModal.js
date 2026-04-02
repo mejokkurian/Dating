@@ -40,6 +40,7 @@ const PrivacyConsentModal = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      presentationStyle="overFullScreen"
     >
       <View style={styles.overlay}>
         <GlassCard style={styles.modalContent}>

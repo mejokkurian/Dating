@@ -15,6 +15,7 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const verificationRoutes = require('./routes/verificationRoutes');
 const locationRoutes = require('./routes/locationRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const chatHandler = require('./socket/chatHandler');
 const locationHandler = require('./socket/locationHandler');
 
@@ -55,6 +56,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Health Check
 app.get('/', (req, res) => {

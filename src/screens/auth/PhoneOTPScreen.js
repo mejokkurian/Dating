@@ -19,6 +19,9 @@ import GlassCard from '../../components/GlassCard';
 import theme from '../../theme/theme';
 import api from '../../services/api/config';
 import { verifyPhoneOTP, signInWithPhoneNumber } from '../../services/api/auth';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import * as authAnalytics from '../../services/authAnalytics';
+import { AUTH_ERROR_MESSAGES, getAuthErrorMessage } from '../../utils/authErrorMessages';
 
 const PhoneOTPScreen = ({ route, navigation }) => {
   const { phoneNumber, confirmation } = route.params;
@@ -28,6 +31,7 @@ const PhoneOTPScreen = ({ route, navigation }) => {
   const inputRefs = useRef(null);
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { login } = useAuth();
+  const { isOffline } = useNetworkStatus();
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -59,17 +63,24 @@ const PhoneOTPScreen = ({ route, navigation }) => {
   const handleVerify = async (otpCodeInput) => {
     const otpCode = otpCodeInput || code.join('');
     if (otpCode.length !== 6) {
-      showAlert('Error', 'Please enter the complete 6-digit code', 'error');
+      showAlert('Error', AUTH_ERROR_MESSAGES.OTP_REQUIRED, 'error');
+      return;
+    }
+
+    if (isOffline) {
+      showAlert('Error', AUTH_ERROR_MESSAGES.NO_INTERNET, 'error');
       return;
     }
 
     try {
       setLoading(true);
+      loadingRef.current = true;
 
       // Verify OTP via Twilio backend
       const response = await verifyPhoneOTP(phoneNumber, otpCode);
 
       if (response && response.token) {
+        authAnalytics.trackOTPVerify(true);
         // Authenticate the user
         await login(response); // This will update the auth context
         
@@ -77,10 +88,14 @@ const PhoneOTPScreen = ({ route, navigation }) => {
         // If user already exists (onboardingComplete is true), login will take care of redirect
         // But we want to be explicit about new users
         if (response.onboardingCompleted) {
-          console.log('User already completed onboarding');
+          if (__DEV__) {
+            console.log('User already completed onboarding');
+          }
           // No need to do anything, AuthContext will redirect to Main
         } else {
-          console.log('New user or incomplete onboarding');
+          if (__DEV__) {
+            console.log('New user or incomplete onboarding');
+          }
           // Pass phone number to next screen
           navigation.navigate('AgeVerification', {
              phoneNumber: phoneNumber
@@ -88,32 +103,85 @@ const PhoneOTPScreen = ({ route, navigation }) => {
         }
       } else {
         // Fallback if no token (shouldn't happen with correct API response)
-        showAlert('Error', 'Verification failed. Please try again.', 'error');
+        authAnalytics.trackOTPVerify(false, 'No token in response');
+        showAlert('Error', AUTH_ERROR_MESSAGES.OTP_VERIFY_FAILED, 'error');
       }
     } catch (error) {
-      console.error('Verify error:', error);
-      console.log('Error details:', error.response?.data);
-      const message = error.response?.data?.message || 'Invalid verification code';
+      const message = getAuthErrorMessage(error, AUTH_ERROR_MESSAGES.OTP_VERIFY_FAILED);
+      authAnalytics.trackOTPVerify(false, message);
+      authAnalytics.trackAuthError('phone_otp', message, error.code);
+      if (__DEV__) {
+        console.error('Verify error:', error);
+        console.log('Error details:', error.response?.data);
+      }
       showAlert('Error', message, 'error');
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
+  // Restore loading state on mount if needed
+  useEffect(() => {
+    if (loadingRef.current && !loading) {
+      setLoading(true);
+    }
+  }, []);
+
+  // OTP Resend cooldown timer
+  useEffect(() => {
+    let interval = null;
+    if (resendCooldown > 0) {
+      interval = setInterval(() => {
+        resendCooldownRef.current = resendCooldownRef.current - 1;
+        setResendCooldown(resendCooldownRef.current);
+        if (resendCooldownRef.current <= 0) {
+          clearInterval(interval);
+        }
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [resendCooldown]);
+
   const handleResend = async () => {
+    if (isOffline) {
+      showAlert('Error', AUTH_ERROR_MESSAGES.NO_INTERNET, 'error');
+      return;
+    }
+
+    // Check cooldown
+    if (resendCooldown > 0) {
+      showAlert('Error', AUTH_ERROR_MESSAGES.OTP_RESEND_COOLDOWN, 'error');
+      return;
+    }
+
     try {
       setLoading(true);
+      loadingRef.current = true;
       await signInWithPhoneNumber(phoneNumber);
+      authAnalytics.trackOTPSend(true);
       showAlert('Success', 'Verification code resent!', 'success');
+      
+      // Set cooldown
+      resendCooldownRef.current = RESEND_COOLDOWN_SECONDS;
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       
       // Clear existing code and refocus
       setCode(['', '', '', '', '', '']);
       setTimeout(() => inputRefs.current?.focus(), 100);
     } catch (error) {
-      console.error('Resend error:', error);
-      showAlert('Error', error.message || 'Failed to resend OTP', 'error');
+      const errorMessage = getAuthErrorMessage(error, AUTH_ERROR_MESSAGES.OTP_RESEND_FAILED);
+      authAnalytics.trackOTPSend(false, errorMessage);
+      authAnalytics.trackAuthError('phone_otp_resend', errorMessage, error.code);
+      if (__DEV__) {
+        console.error('Resend error:', error);
+      }
+      showAlert('Error', errorMessage, 'error');
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
@@ -151,6 +219,12 @@ const PhoneOTPScreen = ({ route, navigation }) => {
               Enter the 6-digit code sent to
             </Text>
             <Text style={styles.phoneNumber}>{phoneNumber}</Text>
+            {isOffline && (
+              <View style={styles.offlineBanner}>
+                <Ionicons name="cloud-offline-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.offlineBannerText}>No Internet Connection</Text>
+              </View>
+            )}
           </View>
 
           {/* OTP Input Section */}
@@ -184,6 +258,9 @@ const PhoneOTPScreen = ({ route, navigation }) => {
               maxLength={6}
               caretHidden={true}
               autoFocus={true}
+              accessibilityLabel="OTP code input"
+              accessibilityHint="Enter the 6-digit verification code sent to your phone"
+              accessibilityRole="textbox"
             />
 
             {/* Visual Digit Boxes */}
@@ -205,6 +282,10 @@ const PhoneOTPScreen = ({ route, navigation }) => {
             style={[styles.verifyButton, loading && styles.buttonDisabled]}
             onPress={() => handleVerify()}
             disabled={loading}
+            accessibilityLabel="Verify code button"
+            accessibilityHint="Verifies the 6-digit code you entered"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: loading }}
           >
             {loading ? (
               <ActivityIndicator color="#000000" />
@@ -382,6 +463,22 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
     opacity: 0.8,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF5252',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  offlineBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

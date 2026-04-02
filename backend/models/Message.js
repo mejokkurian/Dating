@@ -109,6 +109,30 @@ const messageSchema = new mongoose.Schema({
   deletedAt: {
     type: Date,
   },
+  // Edit functionality
+  isEdited: {
+    type: Boolean,
+    default: false,
+  },
+  editedAt: {
+    type: Date,
+  },
+  // Reaction functionality
+  reactions: [{
+    emoji: {
+      type: String,
+      required: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  }],
   read: {
     type: Boolean,
     default: false,

@@ -89,71 +89,88 @@ exports.getLivenessSessionResults = async (req, res) => {
         }
 
         // 2. Security Check 2: Is it the RIGHT human? (Face Match)
-        if (response.ReferenceImage) {
-             const user = await User.findById(userId).select('photos mainPhotoIndex');
-             if (!user || (!user.photos?.length && !user.profilePhotoKey)) {
-                 return res.status(400).json({ success: false, message: 'No profile photo to match against.' });
-             }
-
-             const targetIndex = user.mainPhotoIndex || 0;
-             const profilePhotoUrl = user.photos[targetIndex];
-             
-             // Prepare Source Image (The Live Reference)
-             let sourceImage = {};
-             if (response.ReferenceImage.Bytes) {
-                 sourceImage = { Bytes: Buffer.from(response.ReferenceImage.Bytes) };
-             } else if (response.ReferenceImage.S3Object) {
-                 sourceImage = { S3Object: response.ReferenceImage.S3Object };
-             } else {
-                 return res.json({ success: false, message: "Liveness succeeded but no reference image captured." });
-             }
-
-             // Prepare Target Image (The Stored Profile Photo)
-             // Ideally use S3 Object if you store keys, but here we fetch the URL as bytes
-             let targetImage = {};
-             try {
-                const imageResponse = await axios.get(profilePhotoUrl, { responseType: 'arraybuffer' });
-                targetImage = { Bytes: Buffer.from(imageResponse.data) };
-             } catch (err) {
-                 return res.status(400).json({ success: false, message: 'Failed to retrieve profile photo.' });
-             }
-
-             // Call AWS Rekognition CompareFaces
-             const compareCommand = new CompareFacesCommand({
-                SourceImage: sourceImage,
-                TargetImage: targetImage,
-                SimilarityThreshold: 95 // STRICT Security Match
-             });
-
-             const compareData = await rekognition.send(compareCommand);
-             const matches = compareData.FaceMatches;
-             
-             if (matches && matches.length > 0 && matches[0].Similarity >= 95) {
-                 // Success!
-                 await User.findByIdAndUpdate(userId, {
-                    isVerified: true,
-                    verificationMethod: 'aws-liveness',
-                    verificationDate: new Date(),
-                    verificationStatus: 'approved'
-                 });
-
-                 return res.json({
-                     success: true,
-                     verified: true,
-                     confidence: matches[0].Similarity,
-                     message: "Identity verified successfully with Liveness!"
-                 });
-             } else {
-                 console.log(`❌ Face Match Failed for user ${userId}. Best Match: ${matches?.[0]?.Similarity || 0}%`);
-                 return res.json({
-                     success: false,
-                     verified: false,
-                     message: "Identity verification failed. Face does not match profile photo."
-                 });
-             }
+        // Check if ReferenceImage is available
+        if (!response.ReferenceImage) {
+            // If liveness succeeded but no reference image, check if user already has verification
+            // This can happen if the signature was captured but not immediately available
+            const user = await User.findById(userId).select('isVerified verificationStatus photos');
+            if (user && user.isVerified) {
+                // User is already verified, return success
+                return res.json({
+                    success: true,
+                    verified: true,
+                    message: "Identity verified successfully!"
+                });
+            }
+            // If not verified yet, return error
+            return res.json({ 
+                success: false, 
+                message: "Liveness check completed, but signature verification is required. Please try again." 
+            });
         }
 
-        res.json({ success: false, message: "No reference image available from Liveness session." });
+        // ReferenceImage is available, proceed with face matching
+        const user = await User.findById(userId).select('photos mainPhotoIndex');
+        if (!user || (!user.photos?.length && !user.profilePhotoKey)) {
+            return res.status(400).json({ success: false, message: 'No profile photo to match against.' });
+        }
+
+        const targetIndex = user.mainPhotoIndex || 0;
+        const profilePhotoUrl = user.photos[targetIndex];
+        
+        // Prepare Source Image (The Live Reference)
+        let sourceImage = {};
+        if (response.ReferenceImage.Bytes) {
+            sourceImage = { Bytes: Buffer.from(response.ReferenceImage.Bytes) };
+        } else if (response.ReferenceImage.S3Object) {
+            sourceImage = { S3Object: response.ReferenceImage.S3Object };
+        } else {
+            return res.json({ success: false, message: "Liveness succeeded but no reference image captured." });
+        }
+
+        // Prepare Target Image (The Stored Profile Photo)
+        // Ideally use S3 Object if you store keys, but here we fetch the URL as bytes
+        let targetImage = {};
+        try {
+           const imageResponse = await axios.get(profilePhotoUrl, { responseType: 'arraybuffer' });
+           targetImage = { Bytes: Buffer.from(imageResponse.data) };
+        } catch (err) {
+            return res.status(400).json({ success: false, message: 'Failed to retrieve profile photo.' });
+        }
+
+        // Call AWS Rekognition CompareFaces
+        const compareCommand = new CompareFacesCommand({
+           SourceImage: sourceImage,
+           TargetImage: targetImage,
+           SimilarityThreshold: 95 // STRICT Security Match
+        });
+
+        const compareData = await rekognition.send(compareCommand);
+        const matches = compareData.FaceMatches;
+        
+        if (matches && matches.length > 0 && matches[0].Similarity >= 95) {
+            // Success!
+            await User.findByIdAndUpdate(userId, {
+               isVerified: true,
+               verificationMethod: 'aws-liveness',
+               verificationDate: new Date(),
+               verificationStatus: 'approved'
+            });
+
+            return res.json({
+                success: true,
+                verified: true,
+                confidence: matches[0].Similarity,
+                message: "Identity verified successfully with Liveness!"
+            });
+        } else {
+            console.log(`❌ Face Match Failed for user ${userId}. Best Match: ${matches?.[0]?.Similarity || 0}%`);
+            return res.json({
+                success: false,
+                verified: false,
+                message: "Identity verification failed. Face does not match profile photo."
+            });
+        }
 
     } catch (error) {
         console.error("Error getting liveness results:", error);

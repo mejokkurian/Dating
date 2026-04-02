@@ -45,10 +45,14 @@ const userSchema = new mongoose.Schema({
   // Status & Flags
   onboardingCompleted: { type: Boolean, default: false },
   isPremium: { type: Boolean, default: false },
+  subscriptionTier: { type: String, enum: ['free', 'gold', 'platinum'], default: 'free' },
   subscriptionPlan: { type: String, enum: ['monthly', 'yearly', 'lifetime', null], default: null },
   subscriptionExpiryDate: { type: Date },
   subscriptionPurchaseDate: { type: Date },
   subscriptionProductId: { type: String }, // Store IAP product ID
+  // Daily swipe tracking (reset at midnight UTC)
+  dailySwipeCount: { type: Number, default: 0 },
+  dailySwipeDate: { type: String, default: null }, // YYYY-MM-DD UTC
   isVerified: { type: Boolean, default: false },
   verificationMethod: { type: String, enum: ['kyc', 'image', 'aws-rekognition', 'aws-liveness', 'aws-livness', 'manual', null], default: null },
   verificationDate: { type: Date },

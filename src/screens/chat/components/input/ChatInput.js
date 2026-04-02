@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../../styles';
@@ -24,7 +24,21 @@ const ChatInput = ({
   stopRecording,
   showHoldToRecordHint,
   onAttachmentPress,
+  disabled = false,
+  isEditing = false,
 }) => {
+  const textInputRef = useRef(null);
+
+  // Auto-focus input when editing starts
+  useEffect(() => {
+    if (isEditing && textInputRef.current) {
+      // Small delay to ensure the component is fully rendered
+      setTimeout(() => {
+        textInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isEditing]);
+
   return (
     <View style={styles.inputWrapper}>
       <View style={styles.inputContainer}>
@@ -80,27 +94,41 @@ const ChatInput = ({
           </>
         ) : (
           <>
-            <TouchableOpacity onPress={onAttachmentPress} style={styles.cameraButton}>
+            <TouchableOpacity 
+              onPress={onAttachmentPress} 
+              style={[styles.cameraButton, disabled && { opacity: 0.5 }]}
+              disabled={disabled}
+            >
               <Ionicons name="add-circle-outline" size={28} color="#000" />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={pickImage} style={styles.cameraButton}>
+            <TouchableOpacity 
+              onPress={pickImage} 
+              style={[styles.cameraButton, disabled && { opacity: 0.5 }]}
+              disabled={disabled}
+            >
               <Ionicons name="camera" size={28} color="#000" />
             </TouchableOpacity>
 
             {/* Text Input with Sticker Icon Inside */}
             <View style={styles.textInputContainer}>
               <TextInput
-                style={styles.input}
-                placeholder="Message"
+                ref={textInputRef}
+                style={[styles.input, disabled && { opacity: 0.5 }]}
+                placeholder={isEditing ? "Edit message..." : "Message"}
                 placeholderTextColor="#999"
                 value={inputText}
                 onChangeText={handleTyping}
                 multiline
+                editable={!disabled}
+                accessible={true}
+                accessibilityLabel={isEditing ? "Edit message input" : "Message input"}
+                accessibilityHint={isEditing ? "Edit your message here" : "Type your message here"}
               />
               <TouchableOpacity 
                 onPress={() => setStickerPickerVisible(true)} 
-                style={styles.stickerButtonInside}
+                style={[styles.stickerButtonInside, disabled && { opacity: 0.5 }]}
+                disabled={disabled}
               >
                 <Ionicons name="albums-outline" size={28} color="#000" />
               </TouchableOpacity>
@@ -108,18 +136,30 @@ const ChatInput = ({
 
             {/* Send or Mic Button */}
             {inputText.trim().length > 0 ? (
-              <TouchableOpacity style={styles.sendButton} onPress={() => handleSend()}>
+              <TouchableOpacity 
+                style={[styles.sendButton, disabled && { opacity: 0.5 }]} 
+                onPress={() => handleSend()}
+                disabled={disabled}
+                accessible={true}
+                accessibilityLabel="Send message"
+                accessibilityHint="Tap to send your message"
+                accessibilityRole="button"
+              >
                 <Ionicons name="send" size={24} color="#000" />
               </TouchableOpacity>
             ) : (
-              <View
-                onTouchStart={handleMicPressIn}
-                onTouchMove={handleMicMove}
-                onTouchEnd={() => handleMicPressOut(handleAudioSend, showHoldToRecordHint)}
-                style={styles.micButton}
+              <TouchableOpacity
+                onPressIn={disabled ? undefined : handleMicPressIn}
+                onPressOut={disabled ? undefined : () => handleMicPressOut(handleAudioSend, showHoldToRecordHint)}
+                style={[styles.micButton, disabled && { opacity: 0.5 }]}
+                disabled={disabled}
+                accessible={true}
+                accessibilityLabel="Record audio message"
+                accessibilityHint="Press and hold to record an audio message"
+                accessibilityRole="button"
               >
                 <Ionicons name="mic" size={28} color="#000" />
-              </View>
+              </TouchableOpacity>
             )}
           </>
         )}

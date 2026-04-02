@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import GradientButton from './GradientButton';
+import InfoCard from './InfoCard';
 import theme from '../theme/theme';
 
 const { width } = Dimensions.get('window');
@@ -71,7 +72,7 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
              styles.iconWrapper, 
              { opacity: idleOpacity, transform: [{ scale: idleScale }] }
           ]}>
-            <MaterialCommunityIcons name="account-search-outline" size={80} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="account-search-outline" size={60} color={theme.colors.primary} />
           </Animated.View>
 
           {/* Refreshing Icon (Person) */}
@@ -79,7 +80,7 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
              styles.iconWrapper, 
              { opacity: refreshOpacity, transform: [{ scale: refreshScale }] }
           ]}>
-            <MaterialCommunityIcons name="account" size={60} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="account" size={50} color={theme.colors.primary} />
           </Animated.View>
         </LinearGradient>
       </View>
@@ -93,6 +94,19 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
           ? "Looking for new people who match your preferences."
           : "Expand your search filters or check back later to discover more people."}
       </Text>
+
+      {!isRefreshing && (
+        <View style={styles.infoCardWrapper}>
+          <InfoCard
+            title="💡 Tips to find more matches"
+            items={[
+              { icon: 'options-outline', text: 'Adjust your filters to expand your search radius' },
+              { icon: 'time-outline', text: 'Check back later - new people join every day' },
+              { icon: 'location-outline', text: 'Try visiting different areas to discover more profiles' },
+            ]}
+          />
+        </View>
+      )}
 
       <View style={styles.buttonContainer}>
         {onFilter && !isRefreshing && (
@@ -127,13 +141,16 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
-    padding: 30,
-    width: width,
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: 160,
+    width: '100%',
   },
   iconContainer: {
-    marginBottom: 30,
+    marginTop: 0,
+    marginBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -144,9 +161,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBackground: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -158,10 +175,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
     color: theme.colors.text.primary,
-    marginBottom: 12,
+    marginBottom: 4,
     textAlign: "center",
     letterSpacing: -0.5,
   },
@@ -169,18 +186,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 12,
     lineHeight: 24,
     maxWidth: '80%',
   },
   buttonContainer: {
     width: '100%',
-    gap: 16,
+    gap: 12,
     alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 20,
   },
   button: {
     width: '100%',
     maxWidth: 280,
+    alignSelf: 'center',
   },
   outlineButton: {
     width: '100%',
@@ -193,6 +213,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.lg,
+    alignSelf: 'center',
     ...theme.shadows.sm,
   },
   disabledButton: {
@@ -203,7 +224,12 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold,
     color: theme.colors.primary,
-  }
+  },
+  infoCardWrapper: {
+    width: '100%',
+    marginTop: 12,
+    marginBottom: 20,
+  },
 });
 
 export default EmptyCardState;

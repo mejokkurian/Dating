@@ -18,8 +18,9 @@ import { INTEREST_ICONS, DEFAULT_INTEREST_ICON, getInterestIcon } from '../const
 import CustomAlert from '../components/CustomAlert';
 import MatchSuccessBottomSheet from '../components/MatchSuccessBottomSheet';
 import { useCustomAlert } from '../hooks/useCustomAlert';
-
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { recordInteraction } from '../services/api/match';
+import { sanitizeText } from '../utils/inputSanitization';
 
 const LikeProfileScreen = ({ route, navigation }) => {
   const { user, matchId, fromConnectNow } = route.params;
@@ -28,6 +29,11 @@ const LikeProfileScreen = ({ route, navigation }) => {
   const [showMatchSheet, setShowMatchSheet] = useState(false);
   const { width, height } = useWindowDimensions();
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
+  const { isOffline } = useNetworkStatus();
+  
+  // Rate limiting for actions
+  const lastActionTime = React.useRef(0);
+  const ACTION_DEBOUNCE_MS = 1000; // 1 second debounce
   
   // Animated heart for loading state
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -109,11 +115,43 @@ const LikeProfileScreen = ({ route, navigation }) => {
   const organizedPhotos = organizePhotos();
 
   const handleMatch = async () => {
+    if (isOffline) {
+      showAlert('No Connection', 'Please check your internet connection and try again.', 'error');
+      return;
+    }
+    
+    // Rate limiting: prevent rapid clicks
+    const now = Date.now();
+    if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
+      return; // Ignore if clicked too soon
+    }
+    lastActionTime.current = now;
+    
+    // Input validation
+    if (matchId) {
+      // Validate matchId format (should be a non-empty string)
+      if (typeof matchId !== 'string' || matchId.trim().length === 0) {
+        showAlert('Invalid Match', 'The match ID is invalid. Please try again.', 'error');
+        return;
+      }
+    } else {
+      // Validate user._id exists for generic interaction
+      const userId = user._id || user.id;
+      if (!userId) {
+        showAlert('Invalid User', 'User information is missing. Please try again.', 'error');
+        return;
+      }
+      // Validate userId format (should be a non-empty string)
+      if (typeof userId !== 'string' || userId.trim().length === 0) {
+        showAlert('Invalid User', 'User ID is invalid. Please try again.', 'error');
+        return;
+      }
+    }
+    
     try {
       setLoading(true);
       
-      if (matchId) { // Assuming `matchId` implies a match object is available in context, or this is a placeholder for `match.isSuperLike` logic
-        console.log(`[LikesYouScreen] Navigating to Super Like Chat with: ${user?.displayName} (${user?._id})`); // Adjusted to use `user` from props
+      if (matchId) {
         // Super Like -> Chat screen (Accept/Decline flow)
         await api.post(`/matches/${matchId}/respond`, {
           action: 'accept',
@@ -125,14 +163,87 @@ const LikeProfileScreen = ({ route, navigation }) => {
 
       setLoading(false);
       setShowMatchSheet(true);
-    } catch (error) {
-      console.error('Match error:', error);
+    } catch (err) {
+      if (__DEV__) {
+        console.error('Match error:', err);
+      }
       setLoading(false);
-      showAlert('Error', 'Failed to create match. Please try again.', 'error');
+      
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to create match. Please try again.';
+      let errorTitle = 'Error';
+      
+      if (err.response) {
+        const status = err.response.status;
+        const serverMessage = err.response.data?.message;
+        
+        if (status === 401) {
+          errorTitle = 'Authentication Required';
+          errorMessage = 'Please log in again to continue.';
+        } else if (status === 403) {
+          errorTitle = 'Permission Denied';
+          errorMessage = 'You don\'t have permission to perform this action.';
+        } else if (status === 404) {
+          errorTitle = 'Match Not Found';
+          errorMessage = 'This match is no longer available.';
+        } else if (status === 409) {
+          errorTitle = 'Already Matched';
+          errorMessage = 'You are already matched with this user.';
+        } else if (status === 429) {
+          errorTitle = 'Too Many Requests';
+          errorMessage = 'Please wait a moment before trying again.';
+        } else if (status >= 500) {
+          errorTitle = 'Server Error';
+          errorMessage = 'Our servers are experiencing issues. Please try again later.';
+        } else if (serverMessage) {
+          errorMessage = serverMessage;
+        }
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        errorTitle = 'Connection Timeout';
+        errorMessage = 'The request took too long. Please check your connection and try again.';
+      } else if (err.code === 'ECONNREFUSED' || err.message?.includes('Network Error')) {
+        errorTitle = 'No Connection';
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      showAlert(errorTitle, errorMessage, 'error');
     }
   };
 
   const handlePass = async () => {
+    if (isOffline) {
+      showAlert('No Connection', 'Please check your internet connection and try again.', 'error');
+      return;
+    }
+    
+    // Rate limiting: prevent rapid clicks
+    const now = Date.now();
+    if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
+      return; // Ignore if clicked too soon
+    }
+    lastActionTime.current = now;
+    
+    // Input validation
+    if (matchId) {
+      // Validate matchId format (should be a non-empty string)
+      if (typeof matchId !== 'string' || matchId.trim().length === 0) {
+        showAlert('Invalid Match', 'The match ID is invalid. Please try again.', 'error');
+        return;
+      }
+    } else {
+      // Validate user._id exists for generic interaction
+      const userId = user._id || user.id;
+      if (!userId) {
+        showAlert('Invalid User', 'User information is missing. Please try again.', 'error');
+        return;
+      }
+      // Validate userId format (should be a non-empty string)
+      if (typeof userId !== 'string' || userId.trim().length === 0) {
+        showAlert('Invalid User', 'User ID is invalid. Please try again.', 'error');
+        return;
+      }
+    }
+    
     try {
       setShowPassAnimation(true);
       setLoading(true);
@@ -181,14 +292,50 @@ const LikeProfileScreen = ({ route, navigation }) => {
       } else {
         navigation.navigate('Discover');
       }
-    } catch (error) {
-      console.error('Pass error:', error);
+    } catch (err) {
+      if (__DEV__) {
+        console.error('Pass error:', err);
+      }
       setLoading(false);
       setShowPassAnimation(false);
       passIconScale.setValue(1);
       passIconY.setValue(0);
       passOverlayOpacity.setValue(0);
-      showAlert('Error', 'Failed to decline. Please try again.', 'error');
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to decline. Please try again.';
+      let errorTitle = 'Error';
+      
+      if (err.response) {
+        const status = err.response.status;
+        const serverMessage = err.response.data?.message;
+        
+        if (status === 401) {
+          errorTitle = 'Authentication Required';
+          errorMessage = 'Please log in again to continue.';
+        } else if (status === 403) {
+          errorTitle = 'Permission Denied';
+          errorMessage = 'You don\'t have permission to perform this action.';
+        } else if (status === 404) {
+          errorTitle = 'Match Not Found';
+          errorMessage = 'This match is no longer available.';
+        } else if (status === 429) {
+          errorTitle = 'Too Many Requests';
+          errorMessage = 'Please wait a moment before trying again.';
+        } else if (status >= 500) {
+          errorTitle = 'Server Error';
+          errorMessage = 'Our servers are experiencing issues. Please try again later.';
+        } else if (serverMessage) {
+          errorMessage = serverMessage;
+        }
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        errorTitle = 'Connection Timeout';
+        errorMessage = 'The request took too long. Please check your connection and try again.';
+      } else if (err.code === 'ECONNREFUSED' || err.message?.includes('Network Error')) {
+        errorTitle = 'No Connection';
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      showAlert(errorTitle, errorMessage, 'error');
     }
   };
 
@@ -277,7 +424,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About Me</Text>
               <Text style={styles.bioTextPlain}>
-                {user.bio}
+                {sanitizeText(user.bio)}
               </Text>
             </View>
           )}
@@ -290,19 +437,19 @@ const LikeProfileScreen = ({ route, navigation }) => {
                 {user.budget && (
                   <View style={styles.statRow}>
                     <Ionicons name="heart-outline" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{user.budget}</Text>
+                    <Text style={styles.bioTextPlain}>{sanitizeText(user.budget)}</Text>
                   </View>
                 )}
                 {user.relationshipType && (
                   <View style={styles.statRow}>
                     <Ionicons name="people-circle-outline" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{user.relationshipType}</Text>
+                    <Text style={styles.bioTextPlain}>{sanitizeText(user.relationshipType)}</Text>
                   </View>
                 )}
                 {user.preferences && (
                   <View style={styles.statRow}>
                     <Ionicons name="male-female" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>Interested in {user.preferences}</Text>
+                    <Text style={styles.bioTextPlain}>Interested in {sanitizeText(user.preferences)}</Text>
                   </View>
                 )}
               </View>
@@ -325,55 +472,55 @@ const LikeProfileScreen = ({ route, navigation }) => {
               {user.occupation && (
                 <View style={styles.statRow}>
                   <MaterialCommunityIcons name="briefcase-outline" size={18} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.occupation}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.occupation)}</Text>
                 </View>
               )}
               {user.education && (
                 <View style={styles.statRow}>
                   <MaterialCommunityIcons name="school-outline" size={18} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.education}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.education)}</Text>
                 </View>
               )}
               {user.schoolUniversity && (
                 <View style={styles.statRow}>
                   <FontAwesome5 name="university" size={14} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.schoolUniversity}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.schoolUniversity)}</Text>
                 </View>
               )}
               {user.weight && (
                 <View style={styles.statRow}>
                   <FontAwesome5 name="weight" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.weight} kg</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(String(user.weight))} kg</Text>
                 </View>
               )}
               {user.zodiac && (
                 <View style={styles.statRow}>
                   <Ionicons name="sparkles" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.zodiac}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.zodiac)}</Text>
                 </View>
               )}
               {user.ethnicity && (
                 <View style={styles.statRow}>
                   <Ionicons name="people" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.ethnicity}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.ethnicity)}</Text>
                 </View>
               )}
               {user.children && (
                 <View style={styles.statRow}>
                   <Ionicons name="person" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.children}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.children)}</Text>
                 </View>
               )}
               {user.religion && (
                 <View style={styles.statRow}>
                   <Ionicons name="book" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.religion}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.religion)}</Text>
                 </View>
               )}
               {user.politics && (
                 <View style={styles.statRow}>
                   <FontAwesome5 name="landmark" size={14} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{user.politics}</Text>
+                  <Text style={styles.bioTextPlain}>{sanitizeText(user.politics)}</Text>
                 </View>
               )}
             </View>
@@ -390,19 +537,19 @@ const LikeProfileScreen = ({ route, navigation }) => {
                 {user.drinking && (
                   <View style={styles.statRow}>
                     <MaterialCommunityIcons name="glass-wine" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{user.drinking}</Text>
+                    <Text style={styles.bioTextPlain}>{sanitizeText(user.drinking)}</Text>
                   </View>
                 )}
                 {user.smoking && (
                   <View style={styles.statRow}>
                     <MaterialCommunityIcons name="smoking" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{user.smoking}</Text>
+                    <Text style={styles.bioTextPlain}>{sanitizeText(user.smoking)}</Text>
                   </View>
                 )}
                 {user.drugs && (
                   <View style={styles.statRow}>
                     <MaterialCommunityIcons name="leaf" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{user.drugs}</Text>
+                    <Text style={styles.bioTextPlain}>{sanitizeText(user.drugs)}</Text>
                   </View>
                 )}
               </View>
@@ -415,7 +562,10 @@ const LikeProfileScreen = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Interests</Text>
               <View style={styles.interestsContainer}>
                 {user.interests.map((interest, index) => {
-                  const iconConfig = getInterestIcon(interest);
+                  const sanitizedInterest = sanitizeText(interest);
+                  if (!sanitizedInterest) return null; // Skip empty/invalid interests
+                  
+                  const iconConfig = getInterestIcon(sanitizedInterest);
                   const IconComponent = iconConfig.library === "FontAwesome5" ? FontAwesome5 : Ionicons;
                   
                   return (
@@ -426,7 +576,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
                         color={theme.colors.text.secondary}
                         style={styles.interestIcon}
                       />
-                      <Text style={styles.bioTextPlain}>{interest}</Text>
+                      <Text style={styles.bioTextPlain}>{sanitizedInterest}</Text>
                     </View>
                   );
                 })}
@@ -444,7 +594,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Deal-breakers</Text>
               <Text style={styles.bioTextPlain}>
-                {user.dealBreakers}
+                {sanitizeText(user.dealBreakers)}
               </Text>
             </View>
           )}
@@ -472,7 +622,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={[styles.actionButton]}
             onPress={handleMatch}
-            disabled={loading}
+            disabled={loading || isOffline}
           >
             {loading ? (
               <View style={[styles.actionButtonCircle, styles.likeCircle]}>

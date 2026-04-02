@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import theme from '../theme/theme';
@@ -30,9 +31,10 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, on
 
   const isIncomingRequest = isPendingMatch && userInitiatorId && userInitiatorId !== currentUserIdStr;
   const isOutgoingRequest = isPendingMatch && userInitiatorId && userInitiatorId === currentUserIdStr;
-  console.log('isPendingMatch', isPendingMatch);
-  console.log('userInitiatorId', userInitiatorId);
-  console.log('currentUserIdStr', currentUserIdStr);
+  
+  // Image loading state
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   const handleCardPress = () => {
     if (isOutgoingRequest && onPendingRequestPress) {
       onPendingRequestPress(user);
@@ -52,12 +54,33 @@ const NearbyUserCard = ({ user, onPress, onSayHello, onViewProfile, onAccept, on
       <View style={styles.content}>
         {/* Profile Image */}
         <View style={styles.imageContainer}>
-          {profileImage ? (
-            <Image 
-              key={profileImage} // Force re-render when image URL changes
-              source={{ uri: profileImage }} 
-              style={styles.profileImage} 
-            />
+          {profileImage && !imageError ? (
+            <View style={styles.profileImage}>
+              {imageLoading && (
+                <View style={styles.imageLoadingOverlay}>
+                  <ActivityIndicator size="small" color="#D4AF37" />
+                </View>
+              )}
+              <Image 
+                key={profileImage} // Force re-render when image URL changes
+                source={{ uri: profileImage }} 
+                style={styles.profileImage}
+                resizeMode="cover"
+                // React Native Image automatically caches images
+                onLoadStart={() => {
+                  setImageLoading(true);
+                  setImageError(false);
+                }}
+                onLoadEnd={() => {
+                  setImageLoading(false);
+                }}
+                onError={(error) => {
+                  console.warn('Image load error:', error.nativeEvent.error);
+                  setImageError(true);
+                  setImageLoading(false);
+                }}
+              />
+            </View>
           ) : (
             <View style={[styles.profileImage, styles.placeholderImage]}>
               <Ionicons name="person" size={30} color="#ccc" />
@@ -167,6 +190,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     borderWidth: 3,
     borderColor: theme.colors.primary,
+    overflow: 'hidden',
+  },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(240, 240, 240, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
   placeholderImage: {
     justifyContent: 'center',

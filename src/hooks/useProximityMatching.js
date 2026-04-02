@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getNearbyUsers } from '../services/api/connectNow';
 import socketService from '../services/socket';
 import { formatDistance } from '../constants/location';
+import * as connectNowAnalytics from '../services/connectNowAnalytics';
 
 /**
  * Custom hook for managing nearby users and proximity matching
@@ -19,10 +20,14 @@ export const useProximityMatching = (enabled = false) => {
       return;
     }
 
+    const startTime = Date.now();
+
     try {
       setLoading(true);
       setError(null);
       const users = await getNearbyUsers();
+      
+      const duration = Date.now() - startTime;
       
       // Format users with distance display, preserving match information
       const formattedUsers = users.map(user => ({
@@ -37,9 +42,23 @@ export const useProximityMatching = (enabled = false) => {
       }));
 
       setNearbyUsers(formattedUsers);
+      
+      // Track successful load
+      connectNowAnalytics.trackNearbyUsersLoaded(formattedUsers.length, duration, {
+        nearbyCount: formattedUsers.filter(u => u.matchStatus !== 'pending').length,
+        requestsCount: formattedUsers.filter(u => u.matchStatus === 'pending').length,
+      });
     } catch (err) {
       console.error('Error loading nearby users:', err);
-      setError(err.response?.data?.message || err.message);
+      const duration = Date.now() - startTime;
+      const errorMessage = err.response?.data?.message || err.message;
+      setError(errorMessage);
+      
+      // Track error
+      connectNowAnalytics.trackNearbyUsersLoaded(0, duration, {
+        error: errorMessage,
+        success: false,
+      });
     } finally {
       setLoading(false);
     }

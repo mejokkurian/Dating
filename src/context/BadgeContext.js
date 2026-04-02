@@ -3,6 +3,8 @@ import { useAuth } from './AuthContext';
 import { getMyMatches } from '../services/api/match';
 import { getConversations } from '../services/api/chat';
 import socketService from '../services/socket';
+import { cacheMessage } from '../services/MessageCache';
+import { normalizeContent } from '../utils/messageContent';
 
 const BadgeContext = createContext({});
 
@@ -70,6 +72,31 @@ export const BadgeProvider = ({ children }) => {
     const handleNewMessage = (message) => {
       updateBadgeCounts();
       
+      // CRITICAL: Always cache messages globally, even when ChatScreen is not open
+      // This ensures messages are available when the user opens the chat screen later
+      if (message && message._id) {
+        try {
+          // Normalize message content before caching
+          const normalizedMessage = {
+            ...message,
+            content: normalizeContent(message.content)
+          };
+          
+          // Cache the message so it's available when ChatScreen opens
+          cacheMessage(normalizedMessage);
+          
+          if (__DEV__) {
+            console.log('✅ Global message cached:', {
+              messageId: message._id,
+              conversationId: message.conversationId,
+              senderId: message.senderId?._id || message.senderId
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error caching message globally:', error);
+        }
+      }
+      
       // Global delivery acknowledgment:
       // If we receive a message and we are the recipient, acknowledge it as delivered immediately
       // This ensures 2 ticks appear even if user is not on the specific chat screen
@@ -77,7 +104,9 @@ export const BadgeProvider = ({ children }) => {
           const senderId = message.senderId._id || message.senderId;
           // Check if we are the recipient (sender is not us)
           if (senderId && senderId.toString() !== user._id.toString()) {
-               console.log(`Global Ack: Delivering message ${message._id} from ${senderId}`);
+               if (__DEV__) {
+                 console.log(`Global Ack: Delivering message ${message._id} from ${senderId}`);
+               }
                socketService.ackDelivered(message._id, senderId.toString());
           }
       }

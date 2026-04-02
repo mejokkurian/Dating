@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const ImageMessage = ({ imageUrl, isViewOnce, viewed, isMine, onPress, onLongPress }) => {
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   if (isViewOnce) {
     if (viewed) {
       return (
@@ -42,11 +44,33 @@ const ImageMessage = ({ imageUrl, isViewOnce, viewed, isMine, onPress, onLongPre
       onLongPress={onLongPress}
       style={styles.imageMessageContainer}
     >
-      <Image 
-        source={{ uri: imageUrl }} 
-        style={styles.messageImage} 
-        resizeMode="cover"
-      />
+      {imageError ? (
+        <View style={[styles.messageImage, styles.errorContainer]}>
+          <Ionicons name="image-outline" size={40} color={isMine ? '#FFFFFF' : '#666666'} />
+          <Text style={[styles.errorText, isMine ? styles.myMessageText : styles.theirMessageText]}>
+            Failed to load image
+          </Text>
+        </View>
+      ) : (
+        <>
+          {imageLoading && (
+            <View style={[styles.messageImage, styles.loadingOverlay]}>
+              <ActivityIndicator size="small" color={isMine ? '#FFFFFF' : '#D4AF37'} />
+            </View>
+          )}
+          <Image 
+            source={{ uri: imageUrl }} 
+            style={styles.messageImage} 
+            resizeMode="cover"
+            onLoadStart={() => setImageLoading(true)}
+            onLoadEnd={() => setImageLoading(false)}
+            onError={() => {
+              setImageLoading(false);
+              setImageError(true);
+            }}
+          />
+        </>
+      )}
     </TouchableOpacity>
   );
 };
@@ -98,6 +122,23 @@ const styles = StyleSheet.create({
   },
   theirMessageText: {
     color: '#000',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

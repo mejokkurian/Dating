@@ -612,6 +612,141 @@ module.exports = (io) => {
       }
     });
 
+    // Handle message edit
+    socket.on('message_edit', async (data) => {
+      try {
+        const { messageId, content } = data;
+        const userId = socket.userId;
+
+        const message = await Message.findById(messageId);
+        
+        if (!message) {
+          throw new Error('Message not found');
+        }
+
+        // Check if user is the sender
+        const isSender = message.senderId.toString() === userId.toString();
+        if (!isSender) {
+          throw new Error('Can only edit own messages');
+        }
+
+        // Check if message is already edited (optional: prevent multiple edits)
+        // For now, we allow multiple edits
+
+        // Check time constraint (15 minutes)
+        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+        if (message.createdAt < fifteenMinutesAgo) {
+          throw new Error('Can only edit messages within 15 minutes');
+        }
+
+        // Check if message is text type
+        if (message.messageType !== 'text') {
+          throw new Error('Can only edit text messages');
+        }
+
+        // Update the message
+        const updatedMessage = await Message.findByIdAndUpdate(
+          messageId,
+          {
+            content: content.trim(),
+            isEdited: true,
+            editedAt: new Date(),
+          },
+          { new: true }
+        );
+
+        if (!updatedMessage) {
+          throw new Error('Failed to update message');
+        }
+
+        // Notify both users
+        const otherUserId = message.receiverId.toString();
+        const editData = {
+          messageId,
+          content: updatedMessage.content,
+          editedAt: updatedMessage.editedAt,
+        };
+
+        // Emit to sender (confirmation)
+        socket.emit('message_edited', editData);
+        
+        // Emit to receiver
+        io.to(otherUserId).emit('message_edited', editData);
+
+      } catch (error) {
+        console.error('Message edit error:', error);
+        socket.emit('message_error', { error: error.message });
+      }
+    });
+
+    // Handle message reaction
+    socket.on('message_reaction', async (data) => {
+      try {
+        const { messageId, emoji } = data;
+        const userId = socket.userId;
+
+        const message = await Message.findById(messageId);
+        
+        if (!message) {
+          throw new Error('Message not found');
+        }
+
+        // Only allow reactions on received messages (not sent by current user)
+        if (message.senderId.toString() === userId.toString()) {
+          throw new Error('Cannot react to your own message');
+        }
+
+        // Remove existing reaction from this user for this message
+        await Message.findByIdAndUpdate(
+          messageId,
+          { $pull: { reactions: { userId } } }
+        );
+
+        // Add new reaction if emoji is provided
+        if (emoji) {
+          await Message.findByIdAndUpdate(
+            messageId,
+            {
+              $push: {
+                reactions: {
+                  emoji,
+                  userId,
+                  createdAt: new Date(),
+                },
+              },
+            }
+          );
+        }
+
+        // Get updated message with reactions
+        const updatedMessage = await Message.findById(messageId);
+
+        // Notify both users
+        const otherUserId = message.senderId.toString() === userId.toString()
+          ? message.receiverId
+          : message.senderId;
+
+        const reactionData = {
+          messageId,
+          reactions: updatedMessage.reactions || [],
+        };
+
+        // Emit to both users using their userId rooms
+        const senderUserId = message.senderId.toString();
+        const receiverUserId = message.receiverId.toString();
+        
+        // Emit to sender
+        io.to(senderUserId).emit('message_reacted', reactionData);
+        
+        // Emit to receiver
+        io.to(receiverUserId).emit('message_reacted', reactionData);
+
+      } catch (error) {
+        console.error('Message reaction error:', error);
+        socket.emit('message_error', { error: error.message });
+      }
+    });
+
     // ============ WebRTC Signaling Handlers ============
     
     // Initiate a call
