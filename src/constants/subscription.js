@@ -116,7 +116,7 @@ export const TIER_LIMITS = {
 export const GOLD_FEATURES = [
   { icon: 'infinite-outline',      label: 'Unlimited Swipes',       desc: 'Never run out of daily swipes' },
   { icon: 'heart-outline',         label: 'See Who Liked You',       desc: 'Know exactly who wants to meet you' },
-  { icon: 'star-outline',          label: '5 SuperLikes / Day',      desc: 'Stand out from the crowd' },
+  { icon: 'star-outline',          label: '5 Adores / Day',          desc: 'Stand out from the crowd' },
   { icon: 'refresh-outline',       label: '1 Rewind / Day',          desc: 'Undo your last swipe' },
   { icon: 'flash-outline',         label: 'Top Picks',               desc: 'See your 5 best daily matches' },
   { icon: 'eye-off-outline',       label: 'Hide Last Seen',          desc: 'Browse completely privately' },
@@ -125,7 +125,7 @@ export const GOLD_FEATURES = [
 export const PLATINUM_FEATURES = [
   { icon: 'infinite-outline',      label: 'Unlimited Swipes',        desc: 'Never run out of daily swipes' },
   { icon: 'heart-outline',         label: 'See Who Liked You',        desc: 'Know exactly who wants to meet you' },
-  { icon: 'star-outline',          label: 'Unlimited SuperLikes',     desc: 'Super Like as many as you want' },
+  { icon: 'star-outline',          label: 'Unlimited Adores',         desc: 'Adore as many as you want' },
   { icon: 'refresh-outline',       label: 'Unlimited Rewinds',        desc: 'Undo any swipe, anytime' },
   { icon: 'flash-outline',         label: 'Unlimited Top Picks',      desc: 'See all of your best matches' },
   { icon: 'rocket-outline',        label: 'Priority Listing',         desc: 'Appear first in Discover' },

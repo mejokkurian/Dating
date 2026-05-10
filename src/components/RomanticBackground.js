@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import { View, StyleSheet, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 
 const FloatingHeart = ({ delay, duration, startX }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+  
   const translateY = useRef(new Animated.Value(height)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -78,6 +82,8 @@ const FloatingHeart = ({ delay, duration, startX }) => {
 };
 
 const RomanticBackground = () => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const gradientAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -107,7 +113,7 @@ const RomanticBackground = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#FFFFFF', '#F8F9FA', '#FFFFFF']}
+        colors={colors.gradients.background}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -129,7 +135,7 @@ const RomanticBackground = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -138,7 +144,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: colors.surface + '80',
   },
 });
 

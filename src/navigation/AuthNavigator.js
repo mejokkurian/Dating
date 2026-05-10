@@ -5,11 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { ActivityIndicator, View, StyleSheet, Animated, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import PaywallModal from '../components/PaywallModal';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import PhoneOTPScreen from '../screens/auth/PhoneOTPScreen';
+import PhoneNumberScreen from '../screens/auth/PhoneNumberScreen';
 import AgeVerificationScreen from '../screens/auth/AgeVerificationScreen';
 
 // Onboarding
@@ -26,34 +28,44 @@ import KYCUploadScreen from '../screens/verification/KYCUploadScreen';
 import VerifyAccountScreen from '../screens/verification/VerifyAccountScreen';
 import PremiumScreen from '../screens/subscription/PremiumScreen';
 
-// Main App (placeholder - to be implemented)
+// Main App
 import TabNavigator from './TabNavigator';
 import ChatScreen from '../screens/chat/ChatScreen';
 import ViewUserProfileScreen from '../screens/profile/ViewUserProfileScreen';
 import LikeProfileScreen from '../screens/LikeProfileScreen';
+import UserProfileScreen from '../screens/profile/UserProfileScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
+import ProfilePreviewScreen from '../screens/profile/ProfilePreviewScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
+import NotificationSettingsScreen from '../screens/settings/NotificationSettingsScreen';
+import EditEmailScreen from '../screens/settings/EditEmailScreen';
 
 const Stack = createStackNavigator();
 
 const AuthNavigator = ({ navigationRef }) => {
   const { user, loading, onboardingComplete } = useAuth();
   
-  // Custom Transition: Slide from Left + Fade
+  // Custom Transition: Slide from Right (standard iOS) with swipe-back support
   const authTransition = {
     animationEnabled: true,
-    cardStyleInterpolator: ({ current, layouts }) => {
+    gestureEnabled: true,
+    gestureDirection: 'horizontal',
+    cardStyleInterpolator: ({ current, next, layouts }) => {
       return {
         cardStyle: {
           transform: [
             {
               translateX: current.progress.interpolate({
                 inputRange: [0, 1],
-                outputRange: [-layouts.screen.width, 0],
+                outputRange: [layouts.screen.width, 0],
               }),
             },
           ],
+        },
+        overlayStyle: {
           opacity: current.progress.interpolate({
-            inputRange: [0, 0.5, 1],
-            outputRange: [0, 0.5, 1],
+            inputRange: [0, 1],
+            outputRange: [0, 0.5],
           }),
         },
       };
@@ -160,9 +172,12 @@ const AuthNavigator = ({ navigationRef }) => {
 
   return (
     <NavigationContainer ref={navigationRef}>
+      <PaywallModal />
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
+          gestureEnabled: true,
+          gestureDirection: 'horizontal',
         }}
       >
         {!user ? (
@@ -178,8 +193,13 @@ const AuthNavigator = ({ navigationRef }) => {
               component={SignUpScreen}
               options={authTransition}
             />
-            <Stack.Screen 
-              name="PhoneOTP" 
+            <Stack.Screen
+              name="PhoneNumber"
+              component={PhoneNumberScreen}
+              options={authTransition}
+            />
+            <Stack.Screen
+              name="PhoneOTP"
               component={PhoneOTPScreen}
               options={authTransition}
             />
@@ -221,12 +241,45 @@ const AuthNavigator = ({ navigationRef }) => {
                 title: 'ID Verification',
               }}
             />
-            <Stack.Screen 
-              name="VerifyAccount" 
+            <Stack.Screen
+              name="VerifyAccount"
               component={VerifyAccountScreen}
-              options={{
-                headerShown: false,
-              }}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Profile"
+              component={UserProfileScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditProfile"
+              component={EditProfileScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ProfilePreview"
+              component={ProfilePreviewScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="NotificationSettings"
+              component={NotificationSettingsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditEmail"
+              component={EditEmailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Premium"
+              component={PremiumScreen}
+              options={{ headerShown: false }}
             />
           </>
         )}

@@ -33,6 +33,8 @@ const isRetryableError = (error) => {
 
   // Retry on specific HTTP status codes
   const status = error.response?.status;
+  // Don't retry 429 if it's a business-logic limit (e.g. daily swipe cap)
+  if (status === 429 && error.response?.data?.limitReached) return false;
   return RETRY_CONFIG.retryableStatusCodes.includes(status);
 };
 

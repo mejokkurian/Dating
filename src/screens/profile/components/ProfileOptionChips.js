@@ -1,7 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useTheme } from "../../../context/ThemeContext";
 
 const ProfileOptionChips = ({ label, options, selectedValue, onSelect }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.inputWrapper}>
       <Text style={styles.label}>{label}</Text>
@@ -30,14 +33,14 @@ const ProfileOptionChips = ({ label, options, selectedValue, onSelect }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   inputWrapper: {
     marginBottom: 20,
   },
   label: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#000000",
+    color: colors.text.primary,
     marginBottom: 10,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -52,9 +55,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -62,17 +65,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   neuOptionChipActive: {
-    backgroundColor: "#000000",
-    borderColor: "#000000",
+    backgroundColor: colors.text.primary,
+    borderColor: colors.text.primary,
     shadowOpacity: 0.2,
   },
   neuOptionText: {
     fontSize: 14,
-    color: "#666666",
+    color: colors.text.secondary,
     fontWeight: "500",
   },
   neuOptionTextActive: {
-    color: "#FFFFFF",
+    color: colors.text.inverse,
     fontWeight: "600",
   },
 });

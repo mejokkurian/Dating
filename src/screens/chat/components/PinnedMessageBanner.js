@@ -2,10 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { normalizeContent } from '../../../utils/messageContent';
-import styles from '../styles';
+import createChatStyles from '../styles';
+import { useTheme } from '../../../context/ThemeContext';
 import socketService from '../../../services/socket';
 
 const PinnedMessageBanner = ({ pinnedMessage, userData, scrollToMessage }) => {
+  const { colors } = useTheme();
+  const styles = createChatStyles(colors);
   if (!pinnedMessage) return null;
 
   const canUnpin = pinnedMessage.pinnedBy && 

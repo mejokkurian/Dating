@@ -1,41 +1,70 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Canvas, Rect, RoundedRect, BackdropBlur, Fill, rrect, rect, Shadow, Group } from '@shopify/react-native-skia';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import Animated, { 
-  useSharedValue, 
-  withSpring, 
+import React from "react";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  Canvas,
+  RoundedRect,
+  BackdropBlur,
+  Fill,
+  rrect,
+  rect,
+  Shadow,
+} from "@shopify/react-native-skia";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import Animated, {
+  useSharedValue,
+  withSpring,
+  withTiming,
   useDerivedValue,
-} from 'react-native-reanimated';
+  useAnimatedStyle,
+} from "react-native-reanimated";
+import { useTheme } from "../context/ThemeContext";
+import { useTabBar } from "../context/TabBarContext";
 
-const TAB_WIDTH = 350;
-const TAB_HEIGHT = 65;
-const BORDER_RADIUS = 32.5;
+const TAB_WIDTH = 338;
+const TAB_HEIGHT = 66;
+const BORDER_RADIUS = 33;
 
-export const LiquidGlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+export const LiquidGlassTabBar: React.FC<BottomTabBarProps> = ({
+  state,
+  descriptors,
+  navigation,
+}) => {
   const insets = useSafeAreaInsets();
-  
-  // Apply visual filter for hidden tabs same as before to ensure alignment
+  const { colors } = useTheme();
+  const tabBarCtx = useTabBar();
+  const tabBarTranslateY = tabBarCtx?.tabBarTranslateY;
+
+  const animatedContainerStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY: tabBarTranslateY
+          ? withTiming(tabBarTranslateY.value, { duration: 250 })
+          : 0,
+      },
+    ],
+  }));
+
   const visibleRoutes = state.routes.filter((route) => {
     const { options } = descriptors[route.key];
     if (options.tabBarButton) return false;
     const itemStyle = StyleSheet.flatten(options.tabBarItemStyle);
-    if (itemStyle?.display === 'none') return false;
+    if (itemStyle?.display === "none") return false;
     return true;
   });
 
   const activeRoute = state.routes[state.index];
-  const activeIndexInVisible = visibleRoutes.findIndex(r => r.key === activeRoute.key);
+  const activeIndexInVisible = visibleRoutes.findIndex(
+    (r) => r.key === activeRoute.key,
+  );
 
   const focusedOptions = descriptors[state.routes[state.index].key].options;
   const tabBarStyle = StyleSheet.flatten(focusedOptions.tabBarStyle) as any;
-  if (tabBarStyle?.display === 'none') {
-    return null;
-  }
-  
-  // Re-add Animated Logic for Liquid Indicator
-  const activeTab = useSharedValue(activeIndexInVisible >= 0 ? activeIndexInVisible : 0);
+  const isHidden = tabBarStyle?.display === "none";
+
+  const activeTab = useSharedValue(
+    activeIndexInVisible >= 0 ? activeIndexInVisible : 0,
+  );
 
   React.useEffect(() => {
     if (activeIndexInVisible >= 0) {
@@ -49,57 +78,58 @@ export const LiquidGlassTabBar: React.FC<BottomTabBarProps> = ({ state, descript
 
   const tabWidth = TAB_WIDTH / (visibleRoutes.length || 1);
 
-  // Derived value for the indicator alignment
-  const indicatorX = useDerivedValue(() => {
-    return activeTab.value * tabWidth;
-  });
-  
-  // Derived value for opacity of indicator
-  const indicatorOpacity = useDerivedValue(() => {
-     return withSpring(activeIndexInVisible >= 0 ? 1 : 0);
-  });
-  
-  // The Glass Pill Shape
-  // We center it horizontally
-  const roundedRect = rrect(rect(0, 0, TAB_WIDTH, TAB_HEIGHT), BORDER_RADIUS, BORDER_RADIUS);
+  const indicatorX = useDerivedValue(() => activeTab.value * tabWidth);
+  const indicatorOpacity = useDerivedValue(() =>
+    withSpring(activeIndexInVisible >= 0 ? 1 : 0),
+  );
+  const indicatorXOffset = useDerivedValue(() => indicatorX.value + 4);
 
-  // Bottom positioning: Apple standard usually floats, we use 30 offset
-  const bottomOffset = 30; 
+  if (isHidden) return null;
+
+  const roundedRect = rrect(
+    rect(0, 0, TAB_WIDTH, TAB_HEIGHT),
+    BORDER_RADIUS,
+    BORDER_RADIUS,
+  );
 
   return (
-    <View style={[styles.container, { bottom: bottomOffset }]}>
-      {/* 1. THE GLASS BACKGROUND (Clean, no inner boxes) */}
+    <Animated.View
+      style={[styles.container, { bottom: 30 }, animatedContainerStyle]}
+    >
+      {/* Glass background — all color values driven by theme */}
       <Canvas style={styles.canvas}>
+        {/* Outer gold glow shadow */}
         <RoundedRect rect={roundedRect} color="transparent">
-           <Shadow dx={0} dy={3} blur={12} color="rgba(0,0,0,0.12)" />
+          <Shadow dx={0} dy={6} blur={20} color="rgba(212,175,55,0.18)" />
+          <Shadow dx={0} dy={2} blur={8} color="rgba(0,0,0,0.28)" />
         </RoundedRect>
 
-        {/* Blur & Fill - Extra white background */}
+        {/* Frosted glass fill */}
         <BackdropBlur blur={30} clip={roundedRect}>
-           <Fill color="rgba(255, 255, 255, 0.95)" />
+          <Fill color={colors.tabBarFill} />
         </BackdropBlur>
 
-        {/* The Hairline Border (The "Apple" stroke) */}
+        {/* Gold hairline border */}
         <RoundedRect
           rect={roundedRect}
           style="stroke"
           strokeWidth={1}
-          color="rgba(0, 0, 0, 0.1)" 
+          color={colors.tabBarBorder}
         />
-        
-        {/* Active Indicator (Liquid Effect) - Restored */}
-        <RoundedRect 
-            x={useDerivedValue(() => indicatorX.value + 4)} 
-            y={12} 
-            width={tabWidth - 8} 
-            height={TAB_HEIGHT - 24} 
-            r={(TAB_HEIGHT - 24) / 2} 
-            color="rgba(0, 0, 0, 0.05)" 
-            opacity={indicatorOpacity}
+
+        {/* Liquid active indicator */}
+        <RoundedRect
+          x={indicatorXOffset}
+          y={13}
+          width={tabWidth - 10}
+          height={TAB_HEIGHT - 26}
+          r={(TAB_HEIGHT - 26) / 2}
+          color={colors.tabBarIndicator}
+          opacity={indicatorOpacity}
         />
       </Canvas>
 
-      {/* 2. THE ICONS (Standard Apple Layout) */}
+      {/* Icons */}
       <View style={styles.iconContainer}>
         {visibleRoutes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -107,11 +137,10 @@ export const LiquidGlassTabBar: React.FC<BottomTabBarProps> = ({ state, descript
 
           const onPress = () => {
             const event = navigation.emit({
-              type: 'tabPress',
+              type: "tabPress",
               target: route.key,
               canPreventDefault: true,
             });
-
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
@@ -124,46 +153,50 @@ export const LiquidGlassTabBar: React.FC<BottomTabBarProps> = ({ state, descript
               style={styles.tabButton}
               activeOpacity={0.7}
             >
-              {options.tabBarIcon ? options.tabBarIcon({ 
-                 focused: isFocused, 
-                 color: isFocused ? '#000000' : '#A0A0A0', 
-                 size: 28 
-              }) : null}
+              {options.tabBarIcon
+                ? options.tabBarIcon({
+                    focused: isFocused,
+                    color: isFocused
+                      ? colors.tabIconActive
+                      : colors.tabIconInactive,
+                    size: 28,
+                  })
+                : null}
             </TouchableOpacity>
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    alignSelf: 'center',
+    position: "absolute",
+    alignSelf: "center",
     width: TAB_WIDTH,
     height: TAB_HEIGHT,
-    elevation: 6, // Android shadow
-    shadowColor: '#000', // iOS shadow
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    elevation: 10,
+    shadowColor: "#D4AF37",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
   },
   canvas: {
     flex: 1,
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   iconContainer: {
     ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
   },
   tabButton: {
     width: 60,
     height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

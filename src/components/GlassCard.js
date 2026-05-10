@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import theme from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 
 const GlassCard = ({
   children,
@@ -9,14 +10,15 @@ const GlassCard = ({
   blur = 10,
   borderWidth = 1,
 }) => {
+  const { colors } = useTheme();
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: theme.colors.glass.background,
+          backgroundColor: colors.overlayLight,
           borderWidth,
-          borderColor: theme.colors.glass.border,
+          borderColor: colors.border,
         },
         style,
       ]}

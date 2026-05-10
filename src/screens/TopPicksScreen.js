@@ -12,12 +12,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { getTopPicks } from '../services/api/match';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useTheme } from '../context/ThemeContext';
 import { sanitizeText } from '../utils/inputSanitization';
 import * as topPicksAnalytics from '../services/topPicksAnalytics';
 
@@ -87,6 +89,8 @@ const ProfileCard = React.memo(({ profile, onPress }) => {
 const TopPicksScreen = ({ navigation }) => {
   const { userData } = useAuth();
   const { isPremium, showPaywall } = useSubscription();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [picks, setPicks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -451,13 +455,23 @@ const TopPicksScreen = ({ navigation }) => {
 
             {/* Blurred placeholder cards */}
             <View style={styles.blurredCardsRow}>
-              {[0, 1].map((i) => (
+              {[
+                'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=600&fit=crop',
+              ].map((uri, i) => (
                 <View key={i} style={[styles.card, styles.blurredCard]}>
-                  <View style={styles.blurredCardInner}>
-                    <Ionicons name="person" size={40} color="rgba(184,134,11,0.4)" />
-                  </View>
-                  <View style={styles.blurredOverlay}>
-                    <Ionicons name="lock-closed" size={20} color="#B8860B" />
+                  <Image
+                    source={{ uri }}
+                    style={styles.image}
+                    resizeMode="cover"
+                  />
+                  <BlurView
+                    intensity={70}
+                    tint="dark"
+                    style={styles.blurredOverlay}
+                  />
+                  <View style={styles.lockBadge}>
+                    <Ionicons name="lock-closed" size={22} color="#D4AF37" />
                   </View>
                 </View>
               ))}
@@ -514,25 +528,26 @@ const TopPicksScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     paddingTop: 60,
   },
   header: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginBottom: 8,
   },
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#000000',
+    color: colors.text.primary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: colors.text.secondary,
     lineHeight: 22,
   },
   grid: {
@@ -547,7 +562,7 @@ const styles = StyleSheet.create({
     height: CARD_WIDTH * 1.4,
     borderRadius: 16,
     marginBottom: 16,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.surface2,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -602,18 +617,18 @@ const styles = StyleSheet.create({
   upgradeCard: {
     width: '100%',
     padding: 24,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: colors.border,
     marginTop: 8,
   },
   iconContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -624,12 +639,12 @@ const styles = StyleSheet.create({
   upgradeTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.text.primary,
     marginBottom: 8,
   },
   upgradeSubtitle: {
     fontSize: 14,
-    color: '#666666',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -644,12 +659,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: colors.text.primary,
   },
   loadingSubtext: {
     marginTop: 8,
     fontSize: 14,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
   },
   errorContainer: {
@@ -663,14 +678,14 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#333',
+    color: colors.text.primary,
     marginTop: 20,
     marginBottom: 8,
     textAlign: 'center',
   },
   errorText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
@@ -700,14 +715,14 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#333',
+    color: colors.text.primary,
     marginTop: 20,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
@@ -737,7 +752,7 @@ const styles = StyleSheet.create({
   },
   cacheIndicatorText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.text.secondary,
     fontStyle: 'italic',
   },
   imageLoadingOverlay: {
@@ -754,7 +769,7 @@ const styles = StyleSheet.create({
   imageErrorContainer: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.surface2,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -779,12 +794,12 @@ const styles = StyleSheet.create({
   gateTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#111',
+    color: colors.text.primary,
     marginBottom: 8,
   },
   gateSubtitle: {
     fontSize: 15,
-    color: '#777',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
@@ -795,22 +810,27 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   blurredCard: {
-    backgroundColor: '#F5F0E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  blurredCardInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#111',
   },
   blurredOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(255,248,225,0.6)',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -20 }, { translateY: -20 }],
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(212,175,55,0.6)',
   },
   unlockButton: {
     width: '100%',
@@ -837,7 +857,7 @@ const styles = StyleSheet.create({
   },
   gateCaption: {
     fontSize: 12,
-    color: '#AAA',
+    color: colors.text.tertiary,
   },
 });
 

@@ -38,12 +38,12 @@ const DraggablePill = ({ option, onDrop, swipeAnimatedValue }) => {
     })
     .onEnd((event) => {
       runOnJS(setIsDragging)(false);
-      const draggedDown = event.translationY > 150; 
-      
+      const draggedDown = event.translationY > 150;
+
       if (draggedDown) {
-         runOnJS(onDrop)(resetPosition, option);
+        runOnJS(onDrop)(resetPosition, option);
       } else {
-         runOnJS(resetPosition)();
+        runOnJS(resetPosition)();
       }
     });
 
@@ -60,23 +60,25 @@ const DraggablePill = ({ option, onDrop, swipeAnimatedValue }) => {
 
   // Opacity based on swipe up
   const containerAnimatedStyle = useAnimatedStyle(() => {
-      if (!swipeAnimatedValue) return {};
-      
-      const opacity = interpolate(
-          swipeAnimatedValue.value,
-          [-150, -50, 0], 
-          [0, 0.5, 1],
-          Extrapolate.CLAMP
-      );
-      
-      return { opacity };
+    if (!swipeAnimatedValue) return {};
+
+    const opacity = interpolate(
+      swipeAnimatedValue.value,
+      [-150, -50, 0],
+      [0, 0.5, 1],
+      Extrapolate.CLAMP,
+    );
+
+    return { opacity };
   });
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.pillContainer, animatedStyle, containerAnimatedStyle]}>
+      <Animated.View
+        style={[styles.pillContainer, animatedStyle, containerAnimatedStyle]}
+      >
         <LinearGradient
-          colors={["rgba(20,20,20,0.9)", "rgba(40,40,40,0.8)"]} // Dark Premium Gradient
+          colors={["rgba(15,12,8,0.95)", "rgba(35,28,15,0.92)"]} // Rich dark gold-tinted gradient
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradient}
@@ -86,7 +88,7 @@ const DraggablePill = ({ option, onDrop, swipeAnimatedValue }) => {
           </View>
           <Text style={styles.text}>{option.label}</Text>
           <View style={styles.dragIndicator}>
-              <Ionicons name="chevron-down" size={10} color="#D4AF37" />
+            <Ionicons name="chevron-down" size={10} color="#D4AF37" />
           </View>
         </LinearGradient>
       </Animated.View>
@@ -95,22 +97,22 @@ const DraggablePill = ({ option, onDrop, swipeAnimatedValue }) => {
 };
 
 const DATE_OPTIONS = [
-  { 
-    id: 'coffee', 
-    label: 'Coffee', 
-    icon: 'cafe', 
+  {
+    id: "coffee",
+    label: "Coffee",
+    icon: "cafe",
     message: "☕ Let's grab a coffee!",
   },
-  { 
-    id: 'drinks', 
-    label: 'Drinks', 
-    icon: 'wine', 
+  {
+    id: "drinks",
+    label: "Drinks",
+    icon: "wine",
     message: "🍷 Grab a drink?",
   },
-  { 
-    id: 'dinner', 
-    label: 'Dinner', 
-    icon: 'restaurant', 
+  {
+    id: "dinner",
+    label: "Dinner",
+    icon: "restaurant",
     message: "🍽️ Dinner sometime?",
   },
 ];
@@ -121,11 +123,11 @@ const DateCallToAction = ({ onDrop, visible = true, swipeAnimatedValue }) => {
   return (
     <View style={styles.container}>
       {DATE_OPTIONS.map((option) => (
-        <DraggablePill 
-            key={option.id} 
-            option={option} 
-            onDrop={onDrop} 
-            swipeAnimatedValue={swipeAnimatedValue}
+        <DraggablePill
+          key={option.id}
+          option={option}
+          onDrop={onDrop}
+          swipeAnimatedValue={swipeAnimatedValue}
         />
       ))}
     </View>
@@ -135,45 +137,47 @@ const DateCallToAction = ({ onDrop, visible = true, swipeAnimatedValue }) => {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 95, 
-    alignSelf: "center",
+    top: 105,
+    left: 15,
+    right: 15,
     zIndex: 100,
-    flexDirection: "row", // Horizontal layout
-    gap: 8, // Space between pills
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
   },
   pillContainer: {
-    shadowColor: "#D4AF37", // Golden shadow (subtle)
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-    borderRadius: 20,
+    // shadowColor: "#D4AF37",
+    // shadowOffset: { width: 0, height: 6 },
+    // shadowOpacity: 0.35,
+    // shadowRadius: 12,
+    elevation: 8,
+    // borderRadius: 26,
   },
   gradient: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6, 
-    paddingHorizontal: 12, 
-    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 26,
     gap: 6,
     borderWidth: 1,
-    borderColor: "rgba(212, 175, 55, 0.4)", // Subtle Gold Border
+    borderColor: "rgba(212, 175, 55, 0.6)",
   },
   iconContainer: {
-    backgroundColor: "rgba(212, 175, 55, 0.1)", // Gold tint background
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: "rgba(212, 175, 55, 0.2)",
+    borderRadius: 14,
+    padding: 5,
   },
   text: {
-    color: "#F5F5F5", // Off-white
-    fontWeight: "600",
+    color: "#F5E6C0",
+    fontWeight: "700",
     fontSize: 12,
-    letterSpacing: 0.5,
+    letterSpacing: 1.0,
   },
   dragIndicator: {
-    marginLeft: 2,
-    opacity: 0.8
-  }
+    marginLeft: 1,
+    opacity: 0.9,
+  },
 });
 
 export default DateCallToAction;

@@ -17,8 +17,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNotification } from "../../context/NotificationContext";
 import { openSettings } from "../../services/notifications/pushNotificationService";
+import { useTheme } from "../../context/ThemeContext";
 
 const NotificationSettingsScreen = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+
   const {
     permissionStatus,
     expoPushToken,
@@ -147,7 +151,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
       case "denied":
         return "#FF3B30"; // Red
       default:
-        return "#8E8E93"; // Gray
+        return colors.text.tertiary;
     }
   };
 
@@ -161,12 +165,11 @@ const NotificationSettingsScreen = ({ navigation }) => {
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => {
-              // Navigate back to Settings (which will then navigate to Profile)
               navigation.navigate("Settings");
             }}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={24} color="#000" />
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Notification Settings</Text>
           <View style={styles.headerSpacer} />
@@ -184,7 +187,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
               <View style={styles.iconContainer}>
-                <Ionicons name="notifications" size={24} color="#000" />
+                <Ionicons name="notifications" size={24} color={colors.text.primary} />
               </View>
               <View style={styles.settingTextContainer}>
                 <Text style={styles.settingTitle}>Push Notifications</Text>
@@ -196,14 +199,14 @@ const NotificationSettingsScreen = ({ navigation }) => {
               </View>
             </View>
             {checkingStatus || notificationLoading ? (
-              <ActivityIndicator size="small" color="#000" />
+              <ActivityIndicator size="small" color={colors.text.primary} />
             ) : (
               <Switch
                 value={isEnabled}
                 onValueChange={handleToggle}
-                trackColor={{ false: "#E5E5EA", true: "#D1D1D6" }}
-                thumbColor={isEnabled ? "#000" : "#FFFFFF"}
-                ios_backgroundColor="#E5E5EA"
+                trackColor={{ false: colors.inputBg, true: colors.surface2 }}
+                thumbColor={isEnabled ? colors.text.primary : colors.background}
+                ios_backgroundColor={colors.inputBg}
               />
             )}
           </View>
@@ -235,7 +238,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
               style={styles.settingsButton}
               onPress={handleOpenSettings}
             >
-              <Ionicons name="settings-outline" size={20} color="#000" />
+              <Ionicons name="settings-outline" size={20} color={colors.text.inverse} />
               <Text style={styles.settingsButtonText}>
                 Open Device Settings
               </Text>
@@ -269,15 +272,15 @@ const NotificationSettingsScreen = ({ navigation }) => {
           </Text>
           <View style={styles.notificationTypes}>
             <View style={styles.notificationType}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#000" />
+              <Ionicons name="chatbubble-ellipses" size={20} color={colors.text.primary} />
               <Text style={styles.notificationTypeText}>New Messages</Text>
             </View>
             <View style={styles.notificationType}>
-              <Ionicons name="heart" size={20} color="#000" />
+              <Ionicons name="heart" size={20} color={colors.text.primary} />
               <Text style={styles.notificationTypeText}>New Matches</Text>
             </View>
             <View style={styles.notificationType}>
-              <Ionicons name="location" size={20} color="#000" />
+              <Ionicons name="location" size={20} color={colors.text.primary} />
               <Text style={styles.notificationTypeText}>Nearby Users</Text>
             </View>
           </View>
@@ -289,10 +292,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingTop: 20,
@@ -311,7 +314,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#000",
+    color: colors.text.primary,
   },
   headerSpacer: {
     width: 32,
@@ -323,12 +326,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#000",
+    color: colors.text.primary,
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    color: "#666",
+    color: colors.text.secondary,
     marginBottom: 20,
     lineHeight: 20,
   },
@@ -336,7 +339,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F9F9F9",
+    backgroundColor: colors.surface,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -350,7 +353,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#000",
+    color: colors.text.primary,
     marginBottom: 4,
   },
   settingStatus: {
@@ -402,30 +405,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#000",
+    backgroundColor: colors.text.primary,
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
     marginTop: 8,
   },
   settingsButtonText: {
-    color: "#FFFFFF",
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
   },
   retryButton: {
-    backgroundColor: "#F9F9F9",
+    backgroundColor: colors.surface,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#E5E5EA",
+    borderColor: colors.border,
   },
   retryButtonText: {
-    color: "#000",
+    color: colors.text.primary,
     fontSize: 15,
     fontWeight: "600",
   },
@@ -435,17 +438,16 @@ const styles = StyleSheet.create({
   notificationType: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9F9F9",
+    backgroundColor: colors.surface,
     padding: 16,
     borderRadius: 12,
   },
   notificationTypeText: {
     fontSize: 15,
-    color: "#000",
+    color: colors.text.primary,
     marginLeft: 12,
     fontWeight: "500",
   },
 });
 
 export default NotificationSettingsScreen;
-

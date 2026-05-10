@@ -11,11 +11,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import GlassCard from '../../components/GlassCard';
-import theme from '../../theme/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ProfilePreviewScreen = ({ navigation, route }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { profileData } = route.params || {};
 
   if (!profileData) {
@@ -52,7 +54,7 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
-          <Ionicons name="close" size={28} color={theme.colors.text.primary} />
+          <Ionicons name="close" size={28} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile Preview</Text>
         <View style={{ width: 40 }} />
@@ -116,7 +118,7 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
             
             {profileData.location && (
               <View style={styles.locationRow}>
-                <Ionicons name="location" size={16} color={theme.colors.text.secondary} />
+                <Ionicons name="location" size={16} color={colors.text.secondary} />
                 <Text style={styles.location}>{profileData.location}</Text>
               </View>
             )}
@@ -136,19 +138,19 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
           <View style={styles.statsRow}>
             {profileData.occupation && (
               <GlassCard style={styles.statCard} opacity={0.1}>
-                <FontAwesome5 name="briefcase" size={16} color={theme.colors.text.secondary} />
+                <FontAwesome5 name="briefcase" size={16} color={colors.text.secondary} />
                 <Text style={styles.statText}>{profileData.occupation}</Text>
               </GlassCard>
             )}
             {profileData.height && (
               <GlassCard style={styles.statCard} opacity={0.1}>
-                <FontAwesome5 name="ruler-vertical" size={16} color={theme.colors.text.secondary} />
+                <FontAwesome5 name="ruler-vertical" size={16} color={colors.text.secondary} />
                 <Text style={styles.statText}>{profileData.height} cm</Text>
               </GlassCard>
             )}
             {profileData.education && (
               <GlassCard style={styles.statCard} opacity={0.1}>
-                <FontAwesome5 name="graduation-cap" size={16} color={theme.colors.text.secondary} />
+                <FontAwesome5 name="graduation-cap" size={16} color={colors.text.secondary} />
                 <Text style={styles.statText}>{profileData.education}</Text>
               </GlassCard>
             )}
@@ -175,19 +177,19 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
               <View style={styles.lifestyleGrid}>
                 {profileData.drinking && (
                   <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                    <FontAwesome5 name="wine-glass-alt" size={16} color={theme.colors.text.secondary} />
+                    <FontAwesome5 name="wine-glass-alt" size={16} color={colors.text.secondary} />
                     <Text style={styles.lifestyleText}>Drinks: {profileData.drinking}</Text>
                   </GlassCard>
                 )}
                 {profileData.smoking && (
                   <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                    <FontAwesome5 name="smoking" size={16} color={theme.colors.text.secondary} />
+                    <FontAwesome5 name="smoking" size={16} color={colors.text.secondary} />
                     <Text style={styles.lifestyleText}>Smokes: {profileData.smoking}</Text>
                   </GlassCard>
                 )}
                 {profileData.drugs && (
                   <GlassCard style={styles.lifestyleItem} opacity={0.1}>
-                    <FontAwesome5 name="cannabis" size={16} color={theme.colors.text.secondary} />
+                    <FontAwesome5 name="cannabis" size={16} color={colors.text.secondary} />
                     <Text style={styles.lifestyleText}>Weed: {profileData.drugs}</Text>
                   </GlassCard>
                 )}
@@ -224,10 +226,10 @@ const ProfilePreviewScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -236,9 +238,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.glass.border,
+    borderBottomColor: colors.border,
   },
   closeButton: {
     padding: 8,
@@ -246,7 +248,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
   },
   scrollView: {
     flex: 1,
@@ -268,7 +270,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
-    ...theme.shadows.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
   photo: {
     width: '100%',
@@ -285,11 +291,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.text.tertiary,
+    backgroundColor: colors.text.tertiary,
     opacity: 0.3,
   },
   activeIndicator: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.accent,
     opacity: 1,
     width: 20,
   },
@@ -308,7 +314,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
   },
   badgesRow: {
     flexDirection: 'row',
@@ -335,7 +341,7 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 14,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
   },
   section: {
     marginBottom: 24,
@@ -343,7 +349,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     marginBottom: 12,
   },
   card: {
@@ -351,7 +357,7 @@ const styles = StyleSheet.create({
   },
   bioText: {
     fontSize: 15,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     lineHeight: 24,
   },
   statsRow: {
@@ -369,7 +375,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 14,
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -382,7 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   tagText: {
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     fontSize: 14,
   },
   lifestyleGrid: {
@@ -400,7 +406,7 @@ const styles = StyleSheet.create({
   },
   lifestyleText: {
     fontSize: 14,
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
   },
   actionBar: {
     position: 'absolute',

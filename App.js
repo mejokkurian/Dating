@@ -1,11 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider } from './src/context/AuthContext';
 import { CallProvider, useCall } from './src/context/CallContext';
 import { BadgeProvider } from './src/context/BadgeContext';
 import { NotificationProvider } from './src/context/NotificationContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import Toast from 'react-native-toast-message';
 import { initCache } from './src/services/MessageCache';
@@ -138,6 +141,12 @@ const AppContent = ({ navigationRef }) => {
   return null;
 };
 
+// Reads isDark from ThemeContext and sets the status bar style accordingly
+const ThemedStatusBar = () => {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+};
+
 export default function App() {
   const navigationRef = useRef(null);
 
@@ -192,16 +201,21 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <AuthProvider>
-          <BadgeProvider>
-            <NotificationProvider navigationRef={navigationRef}>
-              <CallProvider>
-                <AppContent navigationRef={navigationRef} />
-                <AuthNavigator navigationRef={navigationRef} />
-              </CallProvider>
-            </NotificationProvider>
-          </BadgeProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <ThemedStatusBar />
+          <AuthProvider>
+            <SubscriptionProvider>
+              <BadgeProvider>
+                <NotificationProvider navigationRef={navigationRef}>
+                  <CallProvider>
+                    <AppContent navigationRef={navigationRef} />
+                    <AuthNavigator navigationRef={navigationRef} />
+                  </CallProvider>
+                </NotificationProvider>
+              </BadgeProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </GestureHandlerRootView>
       <Toast />
     </SafeAreaProvider>

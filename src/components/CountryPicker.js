@@ -79,7 +79,7 @@ const COUNTRIES = [
   { name: 'Ukraine', code: 'UA', dialCode: '+380', flag: '🇺🇦' },
 ];
 
-const CountryPicker = ({ selectedCountry, onSelect }) => {
+const CountryPicker = ({ selectedCountry, onSelect, textColor = '#000' }) => {
   const [visible, setVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -102,8 +102,8 @@ const CountryPicker = ({ selectedCountry, onSelect }) => {
         onPress={() => setVisible(true)}
       >
         <Text style={styles.flag}>{selectedCountry.flag}</Text>
-        <Text style={styles.dialCode}>{selectedCountry.dialCode}</Text>
-        <Ionicons name="chevron-down" size={16} color="#000" />
+        <Text style={[styles.dialCode, { color: textColor }]}>{selectedCountry.dialCode}</Text>
+        <Ionicons name="chevron-down" size={16} color={textColor} />
       </TouchableOpacity>
 
       <Modal

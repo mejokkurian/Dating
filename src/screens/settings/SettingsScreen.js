@@ -9,22 +9,27 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Switch,
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import ProfileSection from "../profile/components/ProfileSection";
 import { updateUserDocument, deleteUserAccount } from "../../services/api/user";
 import DeleteAccountBottomSheet from "./components/DeleteAccountBottomSheet";
 
 const SettingsScreen = ({ navigation }) => {
   const { userData, user, setUserData, logout } = useAuth();
+  const { colors, mode, setMode } = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = makeStyles(colors);
+
   const [profileVisible, setProfileVisible] = useState(
-    userData?.isVisibleToOthers !== false
+    userData?.isVisibleToOthers !== false,
   );
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -50,15 +55,13 @@ const SettingsScreen = ({ navigation }) => {
         value
           ? "Your profile is now visible to other users in discovery."
           : "Your profile is now hidden. Other users won't see you in discovery.",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
     } catch (error) {
       console.error("Error updating visibility:", error);
-      Alert.alert(
-        "Error",
-        "Failed to update visibility. Please try again.",
-        [{ text: "OK" }]
-      );
+      Alert.alert("Error", "Failed to update visibility. Please try again.", [
+        { text: "OK" },
+      ]);
       // Revert toggle on error
       setProfileVisible(!value);
     } finally {
@@ -72,7 +75,7 @@ const SettingsScreen = ({ navigation }) => {
     subtitle,
     onPress,
     showChevron = true,
-    badge = null
+    badge = null,
   ) => (
     <TouchableOpacity
       style={styles.menuItem}
@@ -80,14 +83,20 @@ const SettingsScreen = ({ navigation }) => {
       activeOpacity={0.7}
     >
       <View style={styles.menuIconContainer}>
-        <Ionicons name={icon} size={20} color="#000" />
+        <Ionicons name={icon} size={20} color={colors.text.primary} />
       </View>
       <View style={styles.menuTextContainer}>
         <Text style={styles.menuTitle}>{title}</Text>
         {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
       </View>
       {badge && <View style={styles.badge}>{badge}</View>}
-      {showChevron && <Ionicons name="chevron-forward" size={20} color="#999" />}
+      {showChevron && (
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={colors.text.tertiary}
+        />
+      )}
     </TouchableOpacity>
   );
 
@@ -125,7 +134,7 @@ const SettingsScreen = ({ navigation }) => {
           },
         },
       ],
-      { cancelable: true }
+      { cancelable: true },
     );
   };
 
@@ -139,25 +148,30 @@ const SettingsScreen = ({ navigation }) => {
     try {
       setDeleting(true);
       await deleteUserAccount(userData?._id);
-      
+
       setShowDeleteSheet(false);
       await logout(); // Logout handles navigation to Auth
-      
     } catch (error) {
       console.error("Error deleting account:", error);
       Alert.alert(
         "Error",
-        "Failed to delete account. Please try again or contact support."
+        "Failed to delete account. Please try again or contact support.",
       );
       setDeleting(false);
     }
   };
 
+  const APPEARANCE_OPTIONS = [
+    { label: "Light", value: "light", icon: "sunny-outline" },
+    { label: "Auto", value: "system", icon: "phone-portrait-outline" },
+    { label: "Dark", value: "dark", icon: "moon-outline" },
+  ];
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24 }]}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -168,11 +182,48 @@ const SettingsScreen = ({ navigation }) => {
             }}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={24} color="#000" />
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Settings</Text>
           <View style={styles.headerSpacer} />
         </View>
+
+        {/* APPEARANCE Section */}
+        <ProfileSection icon="color-palette-outline" title="APPEARANCE">
+          <View style={styles.appearanceRow}>
+            {APPEARANCE_OPTIONS.map((opt) => {
+              const isActive = mode === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.appearanceChip,
+                    isActive && styles.appearanceChipActive,
+                  ]}
+                  onPress={() => setMode(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={opt.icon}
+                    size={18}
+                    color={
+                      isActive ? colors.text.inverse : colors.text.secondary
+                    }
+                    style={{ marginBottom: 4 }}
+                  />
+                  <Text
+                    style={[
+                      styles.appearanceChipLabel,
+                      isActive && styles.appearanceChipLabelActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ProfileSection>
 
         {/* NOTIFICATIONS Section */}
         <ProfileSection icon="notifications-outline" title="NOTIFICATIONS">
@@ -180,7 +231,7 @@ const SettingsScreen = ({ navigation }) => {
             "notifications-outline",
             "Notification Preferences",
             "Manage push notifications and alerts",
-            () => navigation.navigate("NotificationSettings")
+            () => navigation.navigate("NotificationSettings"),
           )}
         </ProfileSection>
 
@@ -192,8 +243,10 @@ const SettingsScreen = ({ navigation }) => {
             `Currently using: ${getLoginMethod()}`,
             () => {
               // Show current login method info (can be expanded to change method later)
-              alert(`Current login method: ${getLoginMethod()}\n\nLogin method changes coming soon.`);
-            }
+              alert(
+                `Current login method: ${getLoginMethod()}\n\nLogin method changes coming soon.`,
+              );
+            },
           )}
           {renderMenuItem(
             "camera-outline",
@@ -207,7 +260,7 @@ const SettingsScreen = ({ navigation }) => {
               <View style={styles.verificationBadge}>
                 <Text style={styles.verificationBadgeText}>!</Text>
               </View>
-            ) : null
+            ) : null,
           )}
         </ProfileSection>
 
@@ -216,7 +269,11 @@ const SettingsScreen = ({ navigation }) => {
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
               <View style={styles.menuIconContainer}>
-                <Ionicons name="eye-outline" size={20} color="#000" />
+                <Ionicons
+                  name="eye-outline"
+                  size={20}
+                  color={colors.text.primary}
+                />
               </View>
               <View style={styles.settingTextContainer}>
                 <Text style={styles.menuTitle}>Profile Visibility</Text>
@@ -228,13 +285,13 @@ const SettingsScreen = ({ navigation }) => {
               </View>
             </View>
             {updating ? (
-              <ActivityIndicator size="small" color="#000" />
+              <ActivityIndicator size="small" color={colors.text.primary} />
             ) : (
               <Switch
                 value={profileVisible}
                 onValueChange={handleVisibilityToggle}
                 trackColor={{ false: "#E5E5EA", true: "#D1D1D6" }}
-                thumbColor={profileVisible ? "#000" : "#FFFFFF"}
+                thumbColor={profileVisible ? colors.text.primary : "#FFFFFF"}
                 ios_backgroundColor="#E5E5EA"
               />
             )}
@@ -250,7 +307,7 @@ const SettingsScreen = ({ navigation }) => {
             },
             true,
             null,
-            true
+            true,
           )}
         </ProfileSection>
 
@@ -262,7 +319,7 @@ const SettingsScreen = ({ navigation }) => {
                 <Ionicons
                   name={userData?.isPremium ? "diamond" : "diamond-outline"}
                   size={20}
-                  color={userData?.isPremium ? "#D4AF37" : "#000"}
+                  color={userData?.isPremium ? "#D4AF37" : colors.text.primary}
                 />
               </View>
               <View style={styles.settingTextContainer}>
@@ -278,7 +335,10 @@ const SettingsScreen = ({ navigation }) => {
                 </Text>
                 {userData?.isPremium && userData?.subscriptionExpiryDate && (
                   <Text style={styles.expiryText}>
-                    Expires: {new Date(userData.subscriptionExpiryDate).toLocaleDateString()}
+                    Expires:{" "}
+                    {new Date(
+                      userData.subscriptionExpiryDate,
+                    ).toLocaleDateString()}
                   </Text>
                 )}
               </View>
@@ -301,27 +361,27 @@ const SettingsScreen = ({ navigation }) => {
                 Alert.alert(
                   "Restore Purchases",
                   "Checking for previous purchases...",
-                  [{ text: "OK" }]
+                  [{ text: "OK" }],
                 );
                 // TODO: Implement actual restore purchases logic
                 // This would typically use expo-in-app-purchases or similar
                 Alert.alert(
                   "Restore Purchases",
                   "No previous purchases found, or restore feature coming soon.",
-                  [{ text: "OK" }]
+                  [{ text: "OK" }],
                 );
               } catch (error) {
                 console.error("Error restoring purchases:", error);
                 Alert.alert(
                   "Error",
                   "Failed to restore purchases. Please try again.",
-                  [{ text: "OK" }]
+                  [{ text: "OK" }],
                 );
               }
             },
             true,
             null,
-            true
+            true,
           )}
         </ProfileSection>
 
@@ -330,7 +390,11 @@ const SettingsScreen = ({ navigation }) => {
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
               <View style={styles.menuIconContainer}>
-                <Ionicons name="mail-outline" size={20} color="#000" />
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={colors.text.primary}
+                />
               </View>
               <View style={styles.settingTextContainer}>
                 <Text style={styles.menuTitle}>Email</Text>
@@ -343,13 +407,21 @@ const SettingsScreen = ({ navigation }) => {
               onPress={() => navigation.navigate("EditEmail")}
               style={styles.editButton}
             >
-              <Ionicons name="create-outline" size={18} color="#666" />
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={colors.text.secondary}
+              />
             </TouchableOpacity>
           </View>
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
               <View style={styles.menuIconContainer}>
-                <Ionicons name="call-outline" size={20} color="#000" />
+                <Ionicons
+                  name="call-outline"
+                  size={20}
+                  color={colors.text.primary}
+                />
               </View>
               <View style={styles.settingTextContainer}>
                 <Text style={styles.menuTitle}>Phone Number</Text>
@@ -363,26 +435,27 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* HELP Section */}
         <ProfileSection icon="help-buoy-outline" title="HELP & SUPPORT">
-           {renderMenuItem(
+          {renderMenuItem(
             "school-outline",
             "Reset App Guide",
             "Show the onboarding tutorial again",
             async () => {
-               if (userData?._id) {
-                   await AsyncStorage.removeItem(`hasSeenTutorial_${userData._id}`);
-               }
-               // Also remove legacy key for cleanup
-               await AsyncStorage.removeItem('hasSeenTutorial');
-               
-               Alert.alert(
-                 "Guide Reset", 
-                 "The onboarding guide will appear next time you visit the home screen.",
-                 [{ text: "OK" }]
-               );
-            }
+              if (userData?._id) {
+                await AsyncStorage.removeItem(
+                  `hasSeenTutorial_${userData._id}`,
+                );
+              }
+              // Also remove legacy key for cleanup
+              await AsyncStorage.removeItem("hasSeenTutorial");
+
+              Alert.alert(
+                "Guide Reset",
+                "The onboarding guide will appear next time you visit the home screen.",
+                [{ text: "OK" }],
+              );
+            },
           )}
         </ProfileSection>
-
 
         <ProfileSection icon="document-text-outline" title="LEGAL">
           {renderMenuItem(
@@ -394,9 +467,9 @@ const SettingsScreen = ({ navigation }) => {
               Alert.alert(
                 "Terms of Service",
                 "Terms of Service screen will be implemented soon.",
-                [{ text: "OK" }]
+                [{ text: "OK" }],
               );
-            }
+            },
           )}
           {renderMenuItem(
             "shield-checkmark-outline",
@@ -407,9 +480,9 @@ const SettingsScreen = ({ navigation }) => {
               Alert.alert(
                 "Privacy Policy",
                 "Privacy Policy screen will be implemented soon.",
-                [{ text: "OK" }]
+                [{ text: "OK" }],
               );
-            }
+            },
           )}
           {renderMenuItem(
             "information-circle-outline",
@@ -420,9 +493,9 @@ const SettingsScreen = ({ navigation }) => {
               Alert.alert(
                 "Cookie Policy",
                 "Cookie Policy screen will be implemented soon.",
-                [{ text: "OK" }]
+                [{ text: "OK" }],
               );
-            }
+            },
           )}
           {renderMenuItem(
             "code-outline",
@@ -433,12 +506,12 @@ const SettingsScreen = ({ navigation }) => {
               Alert.alert(
                 "Open Source Licenses",
                 "Licenses screen will be implemented soon.",
-                [{ text: "OK" }]
+                [{ text: "OK" }],
               );
             },
             true,
             null,
-            true
+            true,
           )}
         </ProfileSection>
 
@@ -466,7 +539,6 @@ const SettingsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Delete Account Confirmation Bottom Sheet */}
@@ -476,148 +548,183 @@ const SettingsScreen = ({ navigation }) => {
         onConfirm={handleConfirmDelete}
         loading={deleting}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F0F0F0",
-  },
-  scrollContent: {
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#000",
-    letterSpacing: -0.5,
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
-  },
-  menuItemLast: {
-    borderBottomWidth: 0,
-  },
-  settingItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
-  },
-  settingLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  settingTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  menuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#F0F0F0",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  menuTextContainer: {
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 2,
-  },
-  menuSubtitle: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "400",
-  },
-  badge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#FF3B30",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
-  },
-  verificationBadgeText: {
-    color: "#FFF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  expiryText: {
-    fontSize: 11,
-    color: "#999",
-    marginTop: 2,
-    fontStyle: "italic",
-  },
-  upgradeButton: {
-    backgroundColor: "#D4AF37",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  upgradeButtonText: {
-    color: "#000",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  editButton: {
-    padding: 8,
-  },
-  actionButtonsContainer: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-    gap: 8,
-  },
-  actionTextButton: {
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  logoutButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#666",
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#FF3B30",
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {},
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      marginBottom: 20,
+    },
+    backButton: {
+      padding: 8,
+    },
+    headerTitle: {
+      fontSize: 32,
+      fontWeight: "800",
+      color: colors.text.primary,
+      letterSpacing: -0.5,
+    },
+    headerSpacer: {
+      width: 32,
+    },
+    appearanceRow: {
+      flexDirection: "row",
+      paddingVertical: 12,
+      paddingHorizontal: 4,
+      gap: 10,
+    },
+    appearanceChip: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    appearanceChipActive: {
+      backgroundColor: colors.text.primary,
+      borderColor: colors.text.primary,
+    },
+    appearanceChipLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.text.secondary,
+    },
+    appearanceChipLabelActive: {
+      color: colors.text.inverse,
+    },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 14,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    menuItemLast: {
+      borderBottomWidth: 0,
+    },
+    settingItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 14,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    settingLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    settingTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    menuIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.surface2,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    menuTextContainer: {
+      flex: 1,
+    },
+    menuTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text.primary,
+      marginBottom: 2,
+    },
+    menuSubtitle: {
+      fontSize: 12,
+      color: colors.text.secondary,
+      fontWeight: "400",
+    },
+    badge: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: "#FF3B30",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 8,
+    },
+    verificationBadge: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: "#FF3B30",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 8,
+    },
+    verificationBadgeText: {
+      color: "#FFF",
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    expiryText: {
+      fontSize: 11,
+      color: colors.text.tertiary,
+      marginTop: 2,
+      fontStyle: "italic",
+    },
+    upgradeButton: {
+      backgroundColor: "#D4AF37",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    upgradeButtonText: {
+      color: "#000",
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    editButton: {
+      padding: 8,
+    },
+    actionButtonsContainer: {
+      paddingHorizontal: 20,
+      marginTop: 8,
+      gap: 8,
+    },
+    actionTextButton: {
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    logoutButtonText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: colors.text.secondary,
+    },
+    deleteButtonText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: "#FF3B30",
+    },
+  });
 
 export default SettingsScreen;

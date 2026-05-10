@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../theme/theme";
+import { useTheme } from "../context/ThemeContext";
 
 // Components
 import ParallaxProfileCard from "../components/ParallaxProfileCard";
@@ -40,6 +40,7 @@ import * as discoverAnalytics from "../services/discoverAnalytics";
 import { recordInteraction } from "../services/api/match";
 
 const MainScreen = ({ navigation, route }) => {
+  const { colors } = useTheme();
   // --- 1. State & Data Hook ---
   const {
       profiles,
@@ -69,7 +70,9 @@ const MainScreen = ({ navigation, route }) => {
       handleLike,
       isActionLoading,
       animationState,
-      triggerLikeAnimation
+      triggerLikeAnimation,
+      isLimitReachedShared,
+      showPaywall,
   } = useCardInteractions(
       profiles, 
       currentIndex, 
@@ -208,14 +211,14 @@ const MainScreen = ({ navigation, route }) => {
   if (loading) {
     return (
       <LinearGradient
-        colors={theme.colors.gradients.background}
+        colors={colors.gradients.background}
         style={[
           styles.gradient,
           { justifyContent: "center", alignItems: "center" },
         ]}
       >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading profiles...</Text>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading profiles...</Text>
       </LinearGradient>
     );
   }
@@ -224,7 +227,7 @@ const MainScreen = ({ navigation, route }) => {
   if (error && profiles.length === 0) {
     return (
       <LinearGradient
-        colors={theme.colors.gradients.background}
+        colors={colors.gradients.background}
         style={styles.gradient}
       >
         <View style={styles.container}>
@@ -294,7 +297,7 @@ const MainScreen = ({ navigation, route }) => {
 
   return (
     <LinearGradient
-      colors={theme.colors.gradients.background}
+      colors={colors.gradients.background}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -333,7 +336,7 @@ const MainScreen = ({ navigation, route }) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={theme.colors.primary}
+              tintColor={colors.accent}
             />
           }
           scrollEnabled={false}
@@ -348,8 +351,10 @@ const MainScreen = ({ navigation, route }) => {
               onSwipeUp={handleSwipeUp}
               onCardPress={handleCardPress}
               disabled={showBottomSheet || showMatchModal || showSuperLikeModal || isOffline || isActionLoading}
-              swipeAnimatedValue={swipeY} 
+              swipeAnimatedValue={swipeY}
               cardOpacity={cardOpacity}
+              isLimitReachedShared={isLimitReachedShared}
+              onSwipeLimited={() => showPaywall('swipes')}
               accessibilityLabel={`Profile card for ${currentProfile.displayName || currentProfile.name || 'user'}`}
               accessibilityHint="Double tap to view full profile, swipe up to pass"
             />
@@ -456,7 +461,7 @@ const MainScreen = ({ navigation, route }) => {
             },
             {
                 title: "Make Your Move",
-                message: "Use the buttons below to Match, Super Like, or Pass.",
+                message: "Use the buttons below to Match, Adore, or Pass.",
                 icon: "heart-circle",
                 position: "bottom-sheet"
             },
@@ -515,15 +520,15 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     paddingHorizontal: 15,
-    paddingBottom: 140,
-    justifyContent: "flex-start", // Move cards up
+    paddingBottom: 110,
+    justifyContent: "flex-start",
     alignItems: "center",
-    paddingTop: 20, // Reduced buffer for empty state
+    paddingTop: 58, // Push card below the date pills (pills end ~135px from top, header ~95px + 58 = 153px)
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: theme.colors.text || "#666",
+    color: "#666",
   },
   errorContainer: {
     flex: 1,
@@ -551,7 +556,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary || "#D4AF37",
+    backgroundColor: "#D4AF37",
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 25,

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TextInput } from "react-native";
+import { useTheme } from "../../../context/ThemeContext";
 
 const ProfileTextInput = ({
   label,
@@ -10,6 +11,8 @@ const ProfileTextInput = ({
   keyboardType = "default",
   numberOfLines = 1,
 }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.inputWrapper}>
       <Text style={styles.label}>{label}</Text>
@@ -24,7 +27,7 @@ const ProfileTextInput = ({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#999999"
+          placeholderTextColor={colors.placeholder}
           multiline={multiline}
           numberOfLines={numberOfLines}
           keyboardType={keyboardType}
@@ -35,20 +38,20 @@ const ProfileTextInput = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   inputWrapper: {
     marginBottom: 20,
   },
   label: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#000000",
+    color: colors.text.primary,
     marginBottom: 10,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   neuInputContainer: {
-    backgroundColor: "#F0F0F0",
+    backgroundColor: colors.surface2,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
   },
   neuInput: {
     fontSize: 16,
-    color: "#000000",
+    color: colors.text.primary,
     fontWeight: "400",
     padding: 0,
   },

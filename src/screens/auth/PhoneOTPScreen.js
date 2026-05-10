@@ -8,55 +8,34 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import RomanticBackground from '../../components/RomanticBackground';
-import GlassCard from '../../components/GlassCard';
-import theme from '../../theme/theme';
-import api from '../../services/api/config';
 import { verifyPhoneOTP, signInWithPhoneNumber } from '../../services/api/auth';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import * as authAnalytics from '../../services/authAnalytics';
 import { AUTH_ERROR_MESSAGES, getAuthErrorMessage } from '../../utils/authErrorMessages';
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 const PhoneOTPScreen = ({ route, navigation }) => {
   const { phoneNumber, confirmation } = route.params;
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [confirmationObj, setConfirmationObj] = useState(confirmation);
   const inputRefs = useRef(null);
+  const loadingRef = useRef(false);
+  const resendCooldownRef = useRef(RESEND_COOLDOWN_SECONDS);
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { login } = useAuth();
   const { isOffline } = useNetworkStatus();
 
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-
   useEffect(() => {
-    // Animate on mount
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Auto-focus input shortly after mounting
     const timer = setTimeout(() => {
       inputRefs.current?.focus();
-    }, 500);
-
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -76,33 +55,19 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       setLoading(true);
       loadingRef.current = true;
 
-      // Verify OTP via Twilio backend
       const response = await verifyPhoneOTP(phoneNumber, otpCode);
 
       if (response && response.token) {
         authAnalytics.trackOTPVerify(true);
-        // Authenticate the user
-        await login(response); // This will update the auth context
-        
-        // Check user status and navigate accordingly
-        // If user already exists (onboardingComplete is true), login will take care of redirect
-        // But we want to be explicit about new users
+        await login(response);
+
         if (response.onboardingCompleted) {
-          if (__DEV__) {
-            console.log('User already completed onboarding');
-          }
-          // No need to do anything, AuthContext will redirect to Main
+          if (__DEV__) console.log('User already completed onboarding');
         } else {
-          if (__DEV__) {
-            console.log('New user or incomplete onboarding');
-          }
-          // Pass phone number to next screen
-          navigation.navigate('AgeVerification', {
-             phoneNumber: phoneNumber
-          });
+          if (__DEV__) console.log('New user or incomplete onboarding');
+          navigation.navigate('AgeVerification', { phoneNumber });
         }
       } else {
-        // Fallback if no token (shouldn't happen with correct API response)
         authAnalytics.trackOTPVerify(false, 'No token in response');
         showAlert('Error', AUTH_ERROR_MESSAGES.OTP_VERIFY_FAILED, 'error');
       }
@@ -110,23 +75,13 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       const message = getAuthErrorMessage(error, AUTH_ERROR_MESSAGES.OTP_VERIFY_FAILED);
       authAnalytics.trackOTPVerify(false, message);
       authAnalytics.trackAuthError('phone_otp', message, error.code);
-      if (__DEV__) {
-        console.error('Verify error:', error);
-        console.log('Error details:', error.response?.data);
-      }
+      if (__DEV__) console.error('Verify error:', error);
       showAlert('Error', message, 'error');
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
   };
-
-  // Restore loading state on mount if needed
-  useEffect(() => {
-    if (loadingRef.current && !loading) {
-      setLoading(true);
-    }
-  }, []);
 
   // OTP Resend cooldown timer
   useEffect(() => {
@@ -135,14 +90,10 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       interval = setInterval(() => {
         resendCooldownRef.current = resendCooldownRef.current - 1;
         setResendCooldown(resendCooldownRef.current);
-        if (resendCooldownRef.current <= 0) {
-          clearInterval(interval);
-        }
+        if (resendCooldownRef.current <= 0) clearInterval(interval);
       }, 1000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => { if (interval) clearInterval(interval); };
   }, [resendCooldown]);
 
   const handleResend = async () => {
@@ -150,8 +101,6 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       showAlert('Error', AUTH_ERROR_MESSAGES.NO_INTERNET, 'error');
       return;
     }
-
-    // Check cooldown
     if (resendCooldown > 0) {
       showAlert('Error', AUTH_ERROR_MESSAGES.OTP_RESEND_COOLDOWN, 'error');
       return;
@@ -163,21 +112,17 @@ const PhoneOTPScreen = ({ route, navigation }) => {
       await signInWithPhoneNumber(phoneNumber);
       authAnalytics.trackOTPSend(true);
       showAlert('Success', 'Verification code resent!', 'success');
-      
-      // Set cooldown
+
       resendCooldownRef.current = RESEND_COOLDOWN_SECONDS;
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
-      
-      // Clear existing code and refocus
+
       setCode(['', '', '', '', '', '']);
       setTimeout(() => inputRefs.current?.focus(), 100);
     } catch (error) {
       const errorMessage = getAuthErrorMessage(error, AUTH_ERROR_MESSAGES.OTP_RESEND_FAILED);
       authAnalytics.trackOTPSend(false, errorMessage);
       authAnalytics.trackAuthError('phone_otp_resend', errorMessage, error.code);
-      if (__DEV__) {
-        console.error('Resend error:', error);
-      }
+      if (__DEV__) console.error('Resend error:', error);
       showAlert('Error', errorMessage, 'error');
     } finally {
       setLoading(false);
@@ -185,138 +130,78 @@ const PhoneOTPScreen = ({ route, navigation }) => {
     }
   };
 
+  // Determine which box is "active" (next to be filled)
+  const filledCount = code.filter(d => d !== '').length;
+  const activeIndex = Math.min(filledCount, 5);
+
   return (
-    <View style={styles.gradient}>
-      <RomanticBackground />
+    <View style={styles.overlay}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          {/* Back Button */}
-          <TouchableOpacity
-            style={styles.backButtonTop}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#000000" />
-          </TouchableOpacity>
+        <View style={styles.sheet}>
+          {/* Drag handle */}
+          <View style={styles.handle} />
 
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="mail-outline" size={48} color="#D4AF37" />
-            </View>
-            <Text style={styles.title}>Verify Your Number</Text>
-            <Text style={styles.subtitle}>
-              Enter the 6-digit code sent to
-            </Text>
-            <Text style={styles.phoneNumber}>{phoneNumber}</Text>
-            {isOffline && (
-              <View style={styles.offlineBanner}>
-                <Ionicons name="cloud-offline-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.offlineBannerText}>No Internet Connection</Text>
-              </View>
-            )}
-          </View>
+          <Text style={styles.title}>Enter OTP to verify</Text>
+          <Text style={styles.subtitle}>Sent to {phoneNumber}</Text>
 
-          {/* OTP Input Section */}
+          <Text style={styles.inputLabel}>ENTER THE 6 DIGIT OTP</Text>
+
+          {/* OTP Boxes */}
           <View style={styles.codeContainer}>
-            {/* HIDDEN MASTER INPUT - Handles typing, pasting, and OS autofill */}
+            {/* Hidden master input */}
             <TextInput
               ref={inputRefs}
-              style={styles.hiddenInputOverlay}
+              style={styles.hiddenInput}
               value={code.join('')}
               onChangeText={(text) => {
-                // Filter non-numeric input and limit length
                 const cleanText = text.replace(/[^0-9]/g, '').slice(0, 6);
-                
-                // Update array representation for visual boxes
                 const newCode = cleanText.split('');
-                while (newCode.length < 6) {
-                  newCode.push('');
-                }
-                
+                while (newCode.length < 6) newCode.push('');
                 setCode(newCode);
-
-                // If full code entered/pasted, trigger verify
-                if (cleanText.length === 6) {
-                  handleVerify(cleanText); 
-                }
+                if (cleanText.length === 6) handleVerify(cleanText);
               }}
               keyboardType="number-pad"
-              textContentType="oneTimeCode" // iOS Autofill
-              autoComplete="sms-otp" // Android Autofill
-              importantForAutofill="yes" // Android accessibility
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              importantForAutofill="yes"
               maxLength={6}
               caretHidden={true}
               autoFocus={true}
-              accessibilityLabel="OTP code input"
-              accessibilityHint="Enter the 6-digit verification code sent to your phone"
-              accessibilityRole="textbox"
             />
 
-            {/* Visual Digit Boxes */}
             {code.map((digit, index) => (
               <View
                 key={index}
-                style={styles.codeBoxWrapper}
-                pointerEvents="none" // Pass touches through to the TextInput
+                style={[
+                  styles.box,
+                  index === activeIndex && styles.boxActive,
+                ]}
+                pointerEvents="none"
               >
-                <GlassCard style={styles.codeInputCard} opacity={0.9}>
-                  <Text style={styles.codeDigit}>{digit}</Text>
-                </GlassCard>
+                {loading && digit === '' && index === activeIndex ? (
+                  <ActivityIndicator size="small" color="#D4AF37" />
+                ) : (
+                  <Text style={styles.boxDigit}>{digit}</Text>
+                )}
               </View>
             ))}
           </View>
 
-          {/* Verify Button */}
-          <TouchableOpacity
-            style={[styles.verifyButton, loading && styles.buttonDisabled]}
-            onPress={() => handleVerify()}
-            disabled={loading}
-            accessibilityLabel="Verify code button"
-            accessibilityHint="Verifies the 6-digit code you entered"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: loading }}
-          >
-            {loading ? (
-              <ActivityIndicator color="#000000" />
-            ) : (
-              <View style={styles.buttonContent}>
-                <Text style={styles.verifyButtonText}>Verify Code</Text>
-                <Ionicons name="checkmark-circle" size={20} color="#000000" />
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Resend Code */}
-          <TouchableOpacity
-            style={styles.resendButton}
-            onPress={handleResend}
-            disabled={loading}
-          >
-            <Text style={styles.resendText}>
-              Didn't receive the code?{' '}
-              <Text style={styles.resendTextBold}>Resend</Text>
+          {/* Resend */}
+          {resendCooldown > 0 ? (
+            <Text style={styles.resendCountdown}>
+              <Text style={styles.resendBold}>Resend</Text>
+              {` in ${resendCooldown} seconds`}
             </Text>
-          </TouchableOpacity>
-
-          {/* Change Number */}
-          <TouchableOpacity
-            style={styles.changeNumberButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.changeNumberText}>Change Phone Number</Text>
-          </TouchableOpacity>
-        </Animated.View>
+          ) : (
+            <TouchableOpacity onPress={handleResend} disabled={loading}>
+              <Text style={styles.resendActive}>Resend OTP</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </KeyboardAvoidingView>
 
       <CustomAlert
@@ -332,153 +217,93 @@ const PhoneOTPScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  gradient: {
+  overlay: {
     flex: 1,
+    backgroundColor: '#0A0A0A',
+    justifyContent: 'flex-end',
   },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: theme.spacing.lg,
+  keyboardView: {
+    justifyContent: 'flex-end',
   },
-  content: {
-    width: '100%',
+  sheet: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 48,
   },
-  backButtonTop: {
-    position: 'absolute',
-    top: -200,
-    left: 0,
-    padding: 12,
-    zIndex: 10,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: theme.spacing['3xl'],
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(212, 175, 55, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.lg,
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#3A3A3A',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 24,
   },
   title: {
-    fontSize: theme.typography.fontSize['4xl'],
-    fontWeight: theme.typography.fontWeight.extraBold,
-    color: '#000000',
-    marginBottom: theme.spacing.xs,
-    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    opacity: 0.8,
-    textAlign: 'center',
-    marginTop: theme.spacing.sm,
+    fontSize: 14,
+    color: '#888888',
+    marginBottom: 28,
   },
-  phoneNumber: {
-    fontSize: theme.typography.fontSize.base,
-    color: '#D4AF37',
-    fontWeight: theme.typography.fontWeight.semiBold,
-    marginTop: theme.spacing.xs,
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666666',
+    letterSpacing: 1,
+    marginBottom: 12,
   },
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing['2xl'],
     gap: 8,
     position: 'relative',
+    marginBottom: 28,
   },
-  hiddenInputOverlay: {
+  hiddenInput: {
     position: 'absolute',
     width: '100%',
     height: '100%',
     opacity: 0.01,
     zIndex: 10,
   },
-  codeBoxWrapper: {
+  box: {
     flex: 1,
-    height: 64,
-  },
-  codeInputCard: {
-    flex: 1,
-    padding: 0,
+    height: 56,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#333333',
+    backgroundColor: '#252525',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
   },
-  codeDigit: {
-    fontSize: 28,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: '#000000',
+  boxActive: {
+    borderColor: '#D4AF37',
+    borderWidth: 2,
   },
-  verifyButton: {
-    backgroundColor: '#D4AF37',
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.lg,
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  verifyButtonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  resendButton: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-  },
-  resendText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-  },
-  resendTextBold: {
-    color: '#D4AF37',
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
-  changeNumberButton: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  changeNumberText: {
-    color: theme.colors.text.primary,
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    opacity: 0.8,
-  },
-  offlineBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF5252',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    gap: 6,
-  },
-  offlineBannerText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+  boxDigit: {
+    fontSize: 22,
     fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  resendCountdown: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  resendBold: {
+    fontWeight: '700',
+    color: '#AAAAAA',
+  },
+  resendActive: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D4AF37',
   },
 });
 

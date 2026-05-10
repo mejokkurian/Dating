@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,20 +9,30 @@ import {
   Animated,
   useWindowDimensions,
   Easing,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
-import api from '../services/api/config';
-import theme from '../theme/theme';
-import { INTEREST_ICONS, DEFAULT_INTEREST_ICON, getInterestIcon } from '../constants/interestIcons';
-import CustomAlert from '../components/CustomAlert';
-import MatchSuccessBottomSheet from '../components/MatchSuccessBottomSheet';
-import { useCustomAlert } from '../hooks/useCustomAlert';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { recordInteraction } from '../services/api/match';
-import { sanitizeText } from '../utils/inputSanitization';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  Ionicons,
+  FontAwesome5,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import api from "../services/api/config";
+import { useTheme } from "../context/ThemeContext";
+import {
+  INTEREST_ICONS,
+  DEFAULT_INTEREST_ICON,
+  getInterestIcon,
+} from "../constants/interestIcons";
+import CustomAlert from "../components/CustomAlert";
+import MatchSuccessBottomSheet from "../components/MatchSuccessBottomSheet";
+import { useCustomAlert } from "../hooks/useCustomAlert";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { recordInteraction } from "../services/api/match";
+import { sanitizeText } from "../utils/inputSanitization";
 
 const LikeProfileScreen = ({ route, navigation }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { user, matchId, fromConnectNow } = route.params;
   const [loading, setLoading] = useState(false);
   const [showPassAnimation, setShowPassAnimation] = useState(false);
@@ -30,16 +40,16 @@ const LikeProfileScreen = ({ route, navigation }) => {
   const { width, height } = useWindowDimensions();
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { isOffline } = useNetworkStatus();
-  
+
   // Rate limiting for actions
   const lastActionTime = React.useRef(0);
   const ACTION_DEBOUNCE_MS = 1000; // 1 second debounce
-  
+
   // Animated heart for loading state
   const heartScale = useRef(new Animated.Value(1)).current;
   const heartRotate = useRef(new Animated.Value(0)).current;
   const heartPump = useRef(new Animated.Value(1)).current;
-  
+
   // Pass button animation
   const passIconScale = useRef(new Animated.Value(1)).current;
   const passIconX = useRef(new Animated.Value(0)).current;
@@ -62,7 +72,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
             duration: 800,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       ).start();
     } else {
       heartPump.setValue(1);
@@ -90,7 +100,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
             duration: 800,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       ).start();
     } else {
       heartScale.setValue(1);
@@ -116,141 +126,182 @@ const LikeProfileScreen = ({ route, navigation }) => {
 
   const handleMatch = async () => {
     if (isOffline) {
-      showAlert('No Connection', 'Please check your internet connection and try again.', 'error');
+      showAlert(
+        "No Connection",
+        "Please check your internet connection and try again.",
+        "error",
+      );
       return;
     }
-    
+
     // Rate limiting: prevent rapid clicks
     const now = Date.now();
     if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
       return; // Ignore if clicked too soon
     }
     lastActionTime.current = now;
-    
+
     // Input validation
     if (matchId) {
       // Validate matchId format (should be a non-empty string)
-      if (typeof matchId !== 'string' || matchId.trim().length === 0) {
-        showAlert('Invalid Match', 'The match ID is invalid. Please try again.', 'error');
+      if (typeof matchId !== "string" || matchId.trim().length === 0) {
+        showAlert(
+          "Invalid Match",
+          "The match ID is invalid. Please try again.",
+          "error",
+        );
         return;
       }
     } else {
       // Validate user._id exists for generic interaction
       const userId = user._id || user.id;
       if (!userId) {
-        showAlert('Invalid User', 'User information is missing. Please try again.', 'error');
+        showAlert(
+          "Invalid User",
+          "User information is missing. Please try again.",
+          "error",
+        );
         return;
       }
       // Validate userId format (should be a non-empty string)
-      if (typeof userId !== 'string' || userId.trim().length === 0) {
-        showAlert('Invalid User', 'User ID is invalid. Please try again.', 'error');
+      if (typeof userId !== "string" || userId.trim().length === 0) {
+        showAlert(
+          "Invalid User",
+          "User ID is invalid. Please try again.",
+          "error",
+        );
         return;
       }
     }
-    
+
     try {
       setLoading(true);
-      
+
       if (matchId) {
         // Super Like -> Chat screen (Accept/Decline flow)
         await api.post(`/matches/${matchId}/respond`, {
-          action: 'accept',
+          action: "accept",
         });
       } else {
         // Handle generic interaction (e.g. from ConnectNow)
-        await recordInteraction(user._id || user.id, 'LIKE');
+        await recordInteraction(user._id || user.id, "LIKE");
       }
 
       setLoading(false);
       setShowMatchSheet(true);
     } catch (err) {
       if (__DEV__) {
-        console.error('Match error:', err);
+        console.error("Match error:", err);
       }
       setLoading(false);
-      
+
       // Provide specific error messages based on error type
-      let errorMessage = 'Failed to create match. Please try again.';
-      let errorTitle = 'Error';
-      
+      let errorMessage = "Failed to create match. Please try again.";
+      let errorTitle = "Error";
+
       if (err.response) {
         const status = err.response.status;
         const serverMessage = err.response.data?.message;
-        
+
         if (status === 401) {
-          errorTitle = 'Authentication Required';
-          errorMessage = 'Please log in again to continue.';
+          errorTitle = "Authentication Required";
+          errorMessage = "Please log in again to continue.";
         } else if (status === 403) {
-          errorTitle = 'Permission Denied';
-          errorMessage = 'You don\'t have permission to perform this action.';
+          errorTitle = "Permission Denied";
+          errorMessage = "You don't have permission to perform this action.";
         } else if (status === 404) {
-          errorTitle = 'Match Not Found';
-          errorMessage = 'This match is no longer available.';
+          errorTitle = "Match Not Found";
+          errorMessage = "This match is no longer available.";
         } else if (status === 409) {
-          errorTitle = 'Already Matched';
-          errorMessage = 'You are already matched with this user.';
+          errorTitle = "Already Matched";
+          errorMessage = "You are already matched with this user.";
         } else if (status === 429) {
-          errorTitle = 'Too Many Requests';
-          errorMessage = 'Please wait a moment before trying again.';
+          errorTitle = "Too Many Requests";
+          errorMessage = "Please wait a moment before trying again.";
         } else if (status >= 500) {
-          errorTitle = 'Server Error';
-          errorMessage = 'Our servers are experiencing issues. Please try again later.';
+          errorTitle = "Server Error";
+          errorMessage =
+            "Our servers are experiencing issues. Please try again later.";
         } else if (serverMessage) {
           errorMessage = serverMessage;
         }
-      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        errorTitle = 'Connection Timeout';
-        errorMessage = 'The request took too long. Please check your connection and try again.';
-      } else if (err.code === 'ECONNREFUSED' || err.message?.includes('Network Error')) {
-        errorTitle = 'No Connection';
-        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      } else if (
+        err.code === "ECONNABORTED" ||
+        err.message?.includes("timeout")
+      ) {
+        errorTitle = "Connection Timeout";
+        errorMessage =
+          "The request took too long. Please check your connection and try again.";
+      } else if (
+        err.code === "ECONNREFUSED" ||
+        err.message?.includes("Network Error")
+      ) {
+        errorTitle = "No Connection";
+        errorMessage =
+          "Unable to connect to the server. Please check your internet connection.";
       }
-      
-      showAlert(errorTitle, errorMessage, 'error');
+
+      showAlert(errorTitle, errorMessage, "error");
     }
   };
 
   const handlePass = async () => {
     if (isOffline) {
-      showAlert('No Connection', 'Please check your internet connection and try again.', 'error');
+      showAlert(
+        "No Connection",
+        "Please check your internet connection and try again.",
+        "error",
+      );
       return;
     }
-    
+
     // Rate limiting: prevent rapid clicks
     const now = Date.now();
     if (now - lastActionTime.current < ACTION_DEBOUNCE_MS) {
       return; // Ignore if clicked too soon
     }
     lastActionTime.current = now;
-    
+
     // Input validation
     if (matchId) {
       // Validate matchId format (should be a non-empty string)
-      if (typeof matchId !== 'string' || matchId.trim().length === 0) {
-        showAlert('Invalid Match', 'The match ID is invalid. Please try again.', 'error');
+      if (typeof matchId !== "string" || matchId.trim().length === 0) {
+        showAlert(
+          "Invalid Match",
+          "The match ID is invalid. Please try again.",
+          "error",
+        );
         return;
       }
     } else {
       // Validate user._id exists for generic interaction
       const userId = user._id || user.id;
       if (!userId) {
-        showAlert('Invalid User', 'User information is missing. Please try again.', 'error');
+        showAlert(
+          "Invalid User",
+          "User information is missing. Please try again.",
+          "error",
+        );
         return;
       }
       // Validate userId format (should be a non-empty string)
-      if (typeof userId !== 'string' || userId.trim().length === 0) {
-        showAlert('Invalid User', 'User ID is invalid. Please try again.', 'error');
+      if (typeof userId !== "string" || userId.trim().length === 0) {
+        showAlert(
+          "Invalid User",
+          "User ID is invalid. Please try again.",
+          "error",
+        );
         return;
       }
     }
-    
+
     try {
       setShowPassAnimation(true);
       setLoading(true);
-      
+
       // Small delay to ensure state is set
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Animate cross icon to center
       await new Promise((resolve) => {
         Animated.parallel([
@@ -267,7 +318,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
           }),
         ]).start(resolve);
       });
-      
+
       // Perform API call and Animation in parallel
       // Ensure we wait for at least one full spin (1000ms)
       const animationPromise = new Promise((resolve) => {
@@ -279,9 +330,9 @@ const LikeProfileScreen = ({ route, navigation }) => {
         }).start(resolve);
       });
 
-      const apiPromise = matchId 
-        ? api.post(`/matches/${matchId}/respond`, { action: 'decline' })
-        : recordInteraction(user._id || user.id, 'PASS');
+      const apiPromise = matchId
+        ? api.post(`/matches/${matchId}/respond`, { action: "decline" })
+        : recordInteraction(user._id || user.id, "PASS");
 
       // Wait for both to complete
       await Promise.all([animationPromise, apiPromise]);
@@ -290,11 +341,11 @@ const LikeProfileScreen = ({ route, navigation }) => {
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
-        navigation.navigate('Discover');
+        navigation.navigate("Discover");
       }
     } catch (err) {
       if (__DEV__) {
-        console.error('Pass error:', err);
+        console.error("Pass error:", err);
       }
       setLoading(false);
       setShowPassAnimation(false);
@@ -302,40 +353,49 @@ const LikeProfileScreen = ({ route, navigation }) => {
       passIconY.setValue(0);
       passOverlayOpacity.setValue(0);
       // Provide specific error messages based on error type
-      let errorMessage = 'Failed to decline. Please try again.';
-      let errorTitle = 'Error';
-      
+      let errorMessage = "Failed to decline. Please try again.";
+      let errorTitle = "Error";
+
       if (err.response) {
         const status = err.response.status;
         const serverMessage = err.response.data?.message;
-        
+
         if (status === 401) {
-          errorTitle = 'Authentication Required';
-          errorMessage = 'Please log in again to continue.';
+          errorTitle = "Authentication Required";
+          errorMessage = "Please log in again to continue.";
         } else if (status === 403) {
-          errorTitle = 'Permission Denied';
-          errorMessage = 'You don\'t have permission to perform this action.';
+          errorTitle = "Permission Denied";
+          errorMessage = "You don't have permission to perform this action.";
         } else if (status === 404) {
-          errorTitle = 'Match Not Found';
-          errorMessage = 'This match is no longer available.';
+          errorTitle = "Match Not Found";
+          errorMessage = "This match is no longer available.";
         } else if (status === 429) {
-          errorTitle = 'Too Many Requests';
-          errorMessage = 'Please wait a moment before trying again.';
+          errorTitle = "Too Many Requests";
+          errorMessage = "Please wait a moment before trying again.";
         } else if (status >= 500) {
-          errorTitle = 'Server Error';
-          errorMessage = 'Our servers are experiencing issues. Please try again later.';
+          errorTitle = "Server Error";
+          errorMessage =
+            "Our servers are experiencing issues. Please try again later.";
         } else if (serverMessage) {
           errorMessage = serverMessage;
         }
-      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        errorTitle = 'Connection Timeout';
-        errorMessage = 'The request took too long. Please check your connection and try again.';
-      } else if (err.code === 'ECONNREFUSED' || err.message?.includes('Network Error')) {
-        errorTitle = 'No Connection';
-        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      } else if (
+        err.code === "ECONNABORTED" ||
+        err.message?.includes("timeout")
+      ) {
+        errorTitle = "Connection Timeout";
+        errorMessage =
+          "The request took too long. Please check your connection and try again.";
+      } else if (
+        err.code === "ECONNREFUSED" ||
+        err.message?.includes("Network Error")
+      ) {
+        errorTitle = "No Connection";
+        errorMessage =
+          "Unable to connect to the server. Please check your internet connection.";
       }
-      
-      showAlert(errorTitle, errorMessage, 'error');
+
+      showAlert(errorTitle, errorMessage, "error");
     }
   };
 
@@ -343,12 +403,16 @@ const LikeProfileScreen = ({ route, navigation }) => {
   const renderFullWidthPhoto = (photoUri, index, showBadge = false) => (
     <View key={`photo-${index}`} style={styles.embeddedPhotoContainer}>
       <Image
-        source={{ uri: photoUri || 'https://via.placeholder.com/400x600' }}
+        source={{ uri: photoUri || "https://via.placeholder.com/400x600" }}
         style={styles.embeddedPhoto}
       />
       {showBadge && (
         <View style={styles.verifiedBadgeContainer}>
-          <MaterialCommunityIcons name="check-decagram" size={32} color="#4CAF50" />
+          <MaterialCommunityIcons
+            name="check-decagram"
+            size={32}
+            color="#4CAF50"
+          />
         </View>
       )}
     </View>
@@ -357,33 +421,34 @@ const LikeProfileScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <SafeAreaView style={styles.header} edges={['top']}>
+      <SafeAreaView style={styles.header} edges={["top"]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
             if (navigation.canGoBack()) {
               navigation.goBack();
             } else {
-              navigation.navigate('Discover');
+              navigation.navigate("Discover");
             }
           }}
         >
-          <Ionicons name="arrow-back" size={28} color="#000" />
+          <Ionicons name="arrow-back" size={28} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {user.displayName || user.name || 'Profile'}
+          {user.displayName || user.name || "Profile"}
         </Text>
         <View style={{ width: 28 }} />
       </SafeAreaView>
 
       {/* Scrollable Content */}
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Primary Photo */}
-        {organizedPhotos.length > 0 && renderFullWidthPhoto(organizedPhotos[0], 0, user.isVerified)}
+        {organizedPhotos.length > 0 &&
+          renderFullWidthPhoto(organizedPhotos[0], 0, user.isVerified)}
 
         {/* Profile Info */}
         <View style={styles.content}>
@@ -394,26 +459,32 @@ const LikeProfileScreen = ({ route, navigation }) => {
                 {user.displayName || user.name}, {user.age}
               </Text>
               {user.gender && (
-                <MaterialCommunityIcons 
-                  name={user.gender === 'Female' ? 'gender-female' : 'gender-male'} 
-                  size={24} 
-                  color={theme.colors.text.secondary} 
+                <MaterialCommunityIcons
+                  name={
+                    user.gender === "Female" ? "gender-female" : "gender-male"
+                  }
+                  size={24}
+                  color={colors.text.secondary}
                   style={{ marginLeft: 8 }}
                 />
               )}
               {user.isVerified && (
-                <MaterialCommunityIcons 
-                  name="check-decagram" 
-                  size={24} 
-                  color="#4CAF50" 
+                <MaterialCommunityIcons
+                  name="check-decagram"
+                  size={24}
+                  color="#4CAF50"
                   style={{ marginLeft: 8 }}
                 />
               )}
             </View>
-            
+
             {user.location && (
               <View style={styles.locationRow}>
-                <Ionicons name="location-sharp" size={16} color={theme.colors.text.secondary} />
+                <Ionicons
+                  name="location-sharp"
+                  size={16}
+                  color={colors.text.secondary}
+                />
                 <Text style={styles.locationText}>{user.location}</Text>
               </View>
             )}
@@ -423,9 +494,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
           {user.bio && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About Me</Text>
-              <Text style={styles.bioTextPlain}>
-                {sanitizeText(user.bio)}
-              </Text>
+              <Text style={styles.bioTextPlain}>{sanitizeText(user.bio)}</Text>
             </View>
           )}
 
@@ -436,20 +505,38 @@ const LikeProfileScreen = ({ route, navigation }) => {
               <View style={styles.statsGridContainer}>
                 {user.budget && (
                   <View style={styles.statRow}>
-                    <Ionicons name="heart-outline" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{sanitizeText(user.budget)}</Text>
+                    <Ionicons
+                      name="heart-outline"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.bioTextPlain}>
+                      {sanitizeText(user.budget)}
+                    </Text>
                   </View>
                 )}
                 {user.relationshipType && (
                   <View style={styles.statRow}>
-                    <Ionicons name="people-circle-outline" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{sanitizeText(user.relationshipType)}</Text>
+                    <Ionicons
+                      name="people-circle-outline"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.bioTextPlain}>
+                      {sanitizeText(user.relationshipType)}
+                    </Text>
                   </View>
                 )}
                 {user.preferences && (
                   <View style={styles.statRow}>
-                    <Ionicons name="male-female" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>Interested in {sanitizeText(user.preferences)}</Text>
+                    <Ionicons
+                      name="male-female"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.bioTextPlain}>
+                      Interested in {sanitizeText(user.preferences)}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -457,7 +544,8 @@ const LikeProfileScreen = ({ route, navigation }) => {
           )}
 
           {/* Photo 2 */}
-          {organizedPhotos.length > 1 && renderFullWidthPhoto(organizedPhotos[1], 1)}
+          {organizedPhotos.length > 1 &&
+            renderFullWidthPhoto(organizedPhotos[1], 1)}
 
           {/* Essentials & Lifestyle Combined */}
           <View style={styles.section}>
@@ -465,69 +553,128 @@ const LikeProfileScreen = ({ route, navigation }) => {
             <View style={styles.statsGridContainer}>
               {user.height && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="ruler" size={18} color={theme.colors.text.secondary} />
+                  <MaterialCommunityIcons
+                    name="ruler"
+                    size={18}
+                    color={colors.text.secondary}
+                  />
                   <Text style={styles.bioTextPlain}>{user.height} cm</Text>
                 </View>
               )}
               {user.occupation && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="briefcase-outline" size={18} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.occupation)}</Text>
+                  <MaterialCommunityIcons
+                    name="briefcase-outline"
+                    size={18}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.occupation)}
+                  </Text>
                 </View>
               )}
               {user.education && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="school-outline" size={18} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.education)}</Text>
+                  <MaterialCommunityIcons
+                    name="school-outline"
+                    size={18}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.education)}
+                  </Text>
                 </View>
               )}
               {user.schoolUniversity && (
                 <View style={styles.statRow}>
-                  <FontAwesome5 name="university" size={14} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.schoolUniversity)}</Text>
+                  <FontAwesome5
+                    name="university"
+                    size={14}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.schoolUniversity)}
+                  </Text>
                 </View>
               )}
               {user.weight && (
                 <View style={styles.statRow}>
-                  <FontAwesome5 name="weight" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(String(user.weight))} kg</Text>
+                  <FontAwesome5
+                    name="weight"
+                    size={16}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(String(user.weight))} kg
+                  </Text>
                 </View>
               )}
               {user.zodiac && (
                 <View style={styles.statRow}>
-                  <Ionicons name="sparkles" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.zodiac)}</Text>
+                  <Ionicons
+                    name="sparkles"
+                    size={16}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.zodiac)}
+                  </Text>
                 </View>
               )}
               {user.ethnicity && (
                 <View style={styles.statRow}>
-                  <Ionicons name="people" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.ethnicity)}</Text>
+                  <Ionicons
+                    name="people"
+                    size={16}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.ethnicity)}
+                  </Text>
                 </View>
               )}
               {user.children && (
                 <View style={styles.statRow}>
-                  <Ionicons name="person" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.children)}</Text>
+                  <Ionicons
+                    name="person"
+                    size={16}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.children)}
+                  </Text>
                 </View>
               )}
               {user.religion && (
                 <View style={styles.statRow}>
-                  <Ionicons name="book" size={16} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.religion)}</Text>
+                  <Ionicons
+                    name="book"
+                    size={16}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.religion)}
+                  </Text>
                 </View>
               )}
               {user.politics && (
                 <View style={styles.statRow}>
-                  <FontAwesome5 name="landmark" size={14} color={theme.colors.text.secondary} />
-                  <Text style={styles.bioTextPlain}>{sanitizeText(user.politics)}</Text>
+                  <FontAwesome5
+                    name="landmark"
+                    size={14}
+                    color={colors.text.secondary}
+                  />
+                  <Text style={styles.bioTextPlain}>
+                    {sanitizeText(user.politics)}
+                  </Text>
                 </View>
               )}
             </View>
           </View>
 
           {/* Photo 3 */}
-          {organizedPhotos.length > 2 && renderFullWidthPhoto(organizedPhotos[2], 2)}
+          {organizedPhotos.length > 2 &&
+            renderFullWidthPhoto(organizedPhotos[2], 2)}
 
           {/* Lifestyle */}
           {(user.drinking || user.smoking || user.drugs) && (
@@ -536,20 +683,38 @@ const LikeProfileScreen = ({ route, navigation }) => {
               <View style={styles.statsGridContainer}>
                 {user.drinking && (
                   <View style={styles.statRow}>
-                    <MaterialCommunityIcons name="glass-wine" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{sanitizeText(user.drinking)}</Text>
+                    <MaterialCommunityIcons
+                      name="glass-wine"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.bioTextPlain}>
+                      {sanitizeText(user.drinking)}
+                    </Text>
                   </View>
                 )}
                 {user.smoking && (
                   <View style={styles.statRow}>
-                    <MaterialCommunityIcons name="smoking" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{sanitizeText(user.smoking)}</Text>
+                    <MaterialCommunityIcons
+                      name="smoking"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.bioTextPlain}>
+                      {sanitizeText(user.smoking)}
+                    </Text>
                   </View>
                 )}
                 {user.drugs && (
                   <View style={styles.statRow}>
-                    <MaterialCommunityIcons name="leaf" size={18} color={theme.colors.text.secondary} />
-                    <Text style={styles.bioTextPlain}>{sanitizeText(user.drugs)}</Text>
+                    <MaterialCommunityIcons
+                      name="leaf"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.bioTextPlain}>
+                      {sanitizeText(user.drugs)}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -564,19 +729,24 @@ const LikeProfileScreen = ({ route, navigation }) => {
                 {user.interests.map((interest, index) => {
                   const sanitizedInterest = sanitizeText(interest);
                   if (!sanitizedInterest) return null; // Skip empty/invalid interests
-                  
+
                   const iconConfig = getInterestIcon(sanitizedInterest);
-                  const IconComponent = iconConfig.library === "FontAwesome5" ? FontAwesome5 : Ionicons;
-                  
+                  const IconComponent =
+                    iconConfig.library === "FontAwesome5"
+                      ? FontAwesome5
+                      : Ionicons;
+
                   return (
                     <View key={index} style={styles.interestItemWithIcon}>
                       <IconComponent
                         name={iconConfig.name}
                         size={16}
-                        color={theme.colors.text.secondary}
+                        color={colors.text.secondary}
                         style={styles.interestIcon}
                       />
-                      <Text style={styles.bioTextPlain}>{sanitizedInterest}</Text>
+                      <Text style={styles.bioTextPlain}>
+                        {sanitizedInterest}
+                      </Text>
                     </View>
                   );
                 })}
@@ -599,8 +769,6 @@ const LikeProfileScreen = ({ route, navigation }) => {
             </View>
           )}
 
-
-
           {/* Bottom spacing for action buttons */}
           <View style={{ height: 120 }} />
         </View>
@@ -614,8 +782,14 @@ const LikeProfileScreen = ({ route, navigation }) => {
             onPress={handlePass}
             disabled={loading}
           >
-            <View style={[styles.actionButtonCircle, styles.passButtonCircle, loading && styles.disabledButton]}>
-              <Ionicons name="close" size={32} color="#000" />
+            <View
+              style={[
+                styles.actionButtonCircle,
+                styles.passButtonCircle,
+                loading && styles.disabledButton,
+              ]}
+            >
+              <Ionicons name="close" size={32} color={colors.text.primary} />
             </View>
           </TouchableOpacity>
 
@@ -633,7 +807,7 @@ const LikeProfileScreen = ({ route, navigation }) => {
                       {
                         rotate: heartRotate.interpolate({
                           inputRange: [0, 1],
-                          outputRange: ['0deg', '360deg'],
+                          outputRange: ["0deg", "360deg"],
                         }),
                       },
                     ],
@@ -659,14 +833,22 @@ const LikeProfileScreen = ({ route, navigation }) => {
 
       {/* Waiting Status Banner */}
       {route.params?.isWaiting && (
-        <View style={[styles.actionsContainer, { flexDirection: 'column', gap: 8 }]}>
-           <Ionicons name="time-outline" size={32} color="#D4AF37" />
-           <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.primary }}>
-             Waiting for response
-           </Text>
-           <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
-             You have already liked this profile
-           </Text>
+        <View
+          style={[styles.actionsContainer, { flexDirection: "column", gap: 8 }]}
+        >
+          <Ionicons name="time-outline" size={32} color="#D4AF37" />
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: colors.text.primary,
+            }}
+          >
+            Waiting for response
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text.secondary }}>
+            You have already liked this profile
+          </Text>
         </View>
       )}
 
@@ -679,18 +861,16 @@ const LikeProfileScreen = ({ route, navigation }) => {
         onClose={hideAlert}
         buttons={alertConfig.buttons}
       />
-      
-      
+
       {/* Match Success Bottom Sheet */}
       <MatchSuccessBottomSheet
-        
         visible={showMatchSheet}
         onClose={() => setShowMatchSheet(false)}
         user={user}
         onSendMessage={() => {
           setShowMatchSheet(false);
-          navigation.navigate('MainTab', {
-            screen: 'Messages',
+          navigation.navigate("MainTab", {
+            screen: "Messages",
             params: {
               highlightUserId: user._id || user.id,
             },
@@ -698,8 +878,8 @@ const LikeProfileScreen = ({ route, navigation }) => {
         }}
         onKeepBrowsing={() => {
           setShowMatchSheet(false);
-          navigation.navigate('MainTab', {
-            screen: 'Messages',
+          navigation.navigate("MainTab", {
+            screen: "Messages",
           });
         }}
       />
@@ -715,22 +895,20 @@ const LikeProfileScreen = ({ route, navigation }) => {
         >
           <Animated.View
             style={{
-              transform: [
-                { scale: passIconScale },
-              ],
+              transform: [{ scale: passIconScale }],
             }}
           >
             <View style={styles.passAnimationIcon}>
-              <Ionicons name="close" size={32} color="#000" />
+              <Ionicons name="close" size={32} color={colors.text.primary} />
               {loading && (
                 <Animated.View
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     transform: [
                       {
                         rotate: passSpinnerRotate.interpolate({
                           inputRange: [0, 1],
-                          outputRange: ['0deg', '360deg'],
+                          outputRange: ["0deg", "360deg"],
                         }),
                       },
                     ],
@@ -747,271 +925,272 @@ const LikeProfileScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: theme.colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  embeddedPhotoContainer: {
-    width: '100%',
-    marginVertical: 20,
-    paddingHorizontal: 16,
-  },
-  embeddedPhoto: {
-    width: '100%',
-    height: 480,
-    resizeMode: 'cover',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-    marginBottom: 16,
-    letterSpacing: -0.5,
-  },
-  bioTextPlain: {
-    fontSize: 16,
-    color: theme.colors.text.secondary,
-    lineHeight: 26,
-    marginTop: 4,
-    letterSpacing: 0.2,
-  },
-  statsGridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    width: '48%',
-  },
-  statIcon: {
-    width: 20,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  interestItem: {
-    width: '48%',
-  },
-  interestItemWithIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    width: '48%',
-  },
-  interestIcon: {
-    width: 20,
-  },
-  tag: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-  },
-  tagText: {
-    color: theme.colors.text.primary,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  lifestyleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  lifestyleTextContainer: {
-    gap: 8,
-  },
-  lifestyleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  lifestyleIcon: {
-    width: 20,
-  },
-  lifestyleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: '45%',
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    borderRadius: 12,
-  },
-  lifestyleText: {
-    fontSize: 15,
-    color: theme.colors.text.primary,
-    fontWeight: '500',
-  },
-  basicInfoSection: {
-    marginBottom: 24,
-    marginTop: 8,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  nameText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: theme.colors.text.primary,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  locationText: {
-    fontSize: 16,
-    color: theme.colors.text.secondary,
-  },
-  expectationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  actionsContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  actionButton: {
-    width: 64,
-    height: 64,
-  },
-  actionButtonCircle: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  passButtonCircle: {
-    backgroundColor: '#F5F5F5',
-    borderWidth: 2,
-    borderColor: '#E5E5EA',
-  },
-  likeCircle: {
-    backgroundColor: '#D4AF37',
-    borderWidth: 0,
-    shadowColor: '#D4AF37',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  passAnimationOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-    elevation: 9999,
-  },
-  passAnimationIcon: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  verifiedBadgeContainer: {
-    position: 'absolute',
-    bottom: 24, // Positioned near bottom
-    right: 24,  // Positioned near right
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 2,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      padding: 4,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.text.primary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 20,
+    },
+    embeddedPhotoContainer: {
+      width: "100%",
+      marginVertical: 20,
+      paddingHorizontal: 16,
+    },
+    embeddedPhoto: {
+      width: "100%",
+      height: 480,
+      resizeMode: "cover",
+      backgroundColor: colors.surface2,
+      borderRadius: 24,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+    },
+    section: {
+      marginBottom: 32,
+    },
+    sectionTitle: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: colors.text.primary,
+      marginBottom: 16,
+      letterSpacing: -0.5,
+    },
+    bioTextPlain: {
+      fontSize: 16,
+      color: colors.text.secondary,
+      lineHeight: 26,
+      marginTop: 4,
+      letterSpacing: 0.2,
+    },
+    statsGridContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    statRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      width: "48%",
+    },
+    statIcon: {
+      width: 20,
+    },
+    tagsContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+    interestsContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    interestItem: {
+      width: "48%",
+    },
+    interestItemWithIcon: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      width: "48%",
+    },
+    interestIcon: {
+      width: 20,
+    },
+    tag: {
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    tagText: {
+      color: colors.text.primary,
+      fontSize: 15,
+      fontWeight: "500",
+    },
+    lifestyleGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+    lifestyleTextContainer: {
+      gap: 8,
+    },
+    lifestyleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    lifestyleIcon: {
+      width: 20,
+    },
+    lifestyleItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      minWidth: "45%",
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+    },
+    lifestyleText: {
+      fontSize: 15,
+      color: colors.text.primary,
+      fontWeight: "500",
+    },
+    basicInfoSection: {
+      marginBottom: 24,
+      marginTop: 8,
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    nameText: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: colors.text.primary,
+    },
+    locationRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    locationText: {
+      fontSize: 16,
+      color: colors.text.secondary,
+    },
+    expectationContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      alignSelf: "flex-start",
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+    },
+    actionsContainer: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 40,
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 10,
+    },
+    actionButton: {
+      width: 64,
+      height: 64,
+    },
+    actionButtonCircle: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 32,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    passButtonCircle: {
+      backgroundColor: colors.surface2,
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    likeCircle: {
+      backgroundColor: "#D4AF37",
+      borderWidth: 0,
+      shadowColor: "#D4AF37",
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    passAnimationOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background,
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+      elevation: 9999,
+    },
+    passAnimationIcon: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+      backgroundColor: colors.card,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    verifiedBadgeContainer: {
+      position: "absolute",
+      bottom: 24, // Positioned near bottom
+      right: 24, // Positioned near right
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 2,
+      elevation: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    },
+  });
 
 export default LikeProfileScreen;

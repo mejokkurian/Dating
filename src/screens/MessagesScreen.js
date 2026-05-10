@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getMyMatches } from '../services/api/match';
 import { useAuth } from '../context/AuthContext';
 import { useBadge } from '../context/BadgeContext';
+import { useTheme } from '../context/ThemeContext';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import socketService from '../services/socket';
 import { getCachedConversations, cacheConversation } from '../services/MessageCache';
@@ -13,6 +14,8 @@ import { getCachedConversations, cacheConversation } from '../services/MessageCa
 const MessagesScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { updateBadgeCounts } = useBadge();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { isOffline } = useNetworkStatus();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -237,7 +240,7 @@ const MessagesScreen = ({ navigation, route }) => {
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
         <TouchableOpacity>
-          <Ionicons name="search" size={24} color="#000" />
+          <Ionicons name="search" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
 
@@ -327,17 +330,17 @@ const MessagesScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     paddingTop: 60,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   emptyContainer: {
     flex: 1,
@@ -349,13 +352,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text.primary,
     marginTop: 20,
     marginBottom: 10,
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -369,7 +372,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#000000',
+    color: colors.text.primary,
   },
   section: {
     marginBottom: 32,
@@ -380,7 +383,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F9F9F9',
+    borderBottomColor: colors.border,
   },
   chatAvatar: {
     width: 60,
@@ -399,15 +402,15 @@ const styles = StyleSheet.create({
   chatName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.text.primary,
   },
   chatTime: {
     fontSize: 12,
-    color: '#999999',
+    color: colors.text.tertiary,
   },
   chatMessage: {
     fontSize: 14,
-    color: '#666666',
+    color: colors.text.secondary,
   },
   unreadBadge: {
     width: 24,
@@ -424,7 +427,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   highlightedChatItem: {
-    backgroundColor: '#FFF9E6',
+    backgroundColor: colors.surface,
     borderLeftWidth: 4,
     borderLeftColor: '#D4AF37',
   },
@@ -457,9 +460,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   errorBanner: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: colors.errorBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFCDD2',
+    borderBottomColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -474,14 +477,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#C62828',
+    color: colors.error,
     marginLeft: 8,
     flex: 1,
   },
   errorRetryButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#FF4444',
+    backgroundColor: colors.error,
     borderRadius: 6,
   },
   errorRetryText: {
@@ -498,13 +501,13 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   errorMessage: {
     fontSize: 14,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -518,20 +521,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  offlineBanner: {
-    backgroundColor: '#FF4444',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  offlineText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
   },
 });
 

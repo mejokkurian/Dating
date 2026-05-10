@@ -29,6 +29,9 @@ export const useCardInteractions = (
     const swipeY = useSharedValue(0);
     const cardOpacity = useSharedValue(1);
 
+    // Shared value so the gesture worklet can read isLimitReached without crossing JS/UI thread boundary
+    const isLimitReachedShared = useSharedValue(false);
+
     // Rate limiting refs
     const lastActionTime = useRef(0);
     const swipeTimestampsRef = useRef([]);
@@ -42,6 +45,11 @@ export const useCardInteractions = (
         }
         return true;
     }, [isLimitReached, showPaywall]);
+
+    // Keep shared value in sync so the gesture worklet can read it
+    useEffect(() => {
+        isLimitReachedShared.value = isLimitReached;
+    }, [isLimitReached]);
 
     // Reset animations when index changes
     // This is crucial for the "Blank Screen" fix
@@ -95,7 +103,12 @@ export const useCardInteractions = (
     // Handle Swipe Up (Pass)
     const handleSwipeUp = useCallback(async (profile) => {
         // Daily swipe limit check (client-side fast path)
-        if (!checkDailyLimit()) return;
+        if (!checkDailyLimit()) {
+            // Reset any in-progress swipe animation so the card doesn't go blank
+            swipeY.value = withTiming(0, { duration: 200 });
+            cardOpacity.value = withTiming(1, { duration: 200 });
+            return;
+        }
 
         // Rate limiting: prevent rapid actions
         const now = Date.now();
@@ -172,8 +185,12 @@ export const useCardInteractions = (
 
     // Handle Like (from Bottom Sheet or specific action)
     const handleLike = useCallback(async (profile, setShowBottomSheet) => {
-        // Daily swipe limit check (client-side fast path)
-        if (!checkDailyLimit()) return;
+        // Daily swipe limit check — close sheet first so paywall is visible
+        if (isLimitReached) {
+            if (setShowBottomSheet) setShowBottomSheet(false);
+            showPaywall('swipes');
+            return;
+        }
 
         // Rate limiting: prevent rapid actions
         const now = Date.now();
@@ -257,8 +274,12 @@ export const useCardInteractions = (
 
     // Handle Super Like
     const handleSuperLike = useCallback(async (profile, comment = "", setShowBottomSheet) => {
-        // Daily swipe limit check (client-side fast path)
-        if (!checkDailyLimit()) return;
+        // Daily swipe limit check — close sheet first so paywall is visible
+        if (isLimitReached) {
+            if (setShowBottomSheet) setShowBottomSheet(false);
+            showPaywall('swipes');
+            return;
+        }
 
         // Rate limiting: prevent rapid actions
         const now = Date.now();
@@ -346,6 +367,8 @@ export const useCardInteractions = (
         handleSuperLike,
         handleLike,
         isActionLoading,
+        isLimitReachedShared,
+        showPaywall,
         // Expose animation states for the Overlay
         animationState: {
             showPassAnimation,

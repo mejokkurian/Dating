@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImage } from "../../services/api/upload";
 import { updateUserDocument } from "../../services/api/user";
@@ -39,6 +40,7 @@ const MANDATORY_PHOTOS = 4;
 
 const EditProfileScreen = ({ navigation }) => {
   const { userData, user } = useAuth();
+  const { colors } = useTheme();
 
   // Initialize form state with user data
   const [formData, setFormData] = useState({
@@ -327,7 +329,7 @@ const EditProfileScreen = ({ navigation }) => {
 
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface2 }]}>
       <ProfileHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -336,7 +338,7 @@ const EditProfileScreen = ({ navigation }) => {
 
       {activeTab === "edit" ? (
         <ScrollView
-          style={styles.container}
+          style={[styles.container, { backgroundColor: colors.surface2 }]}
           showsVerticalScrollIndicator={false}
         >
           <VerificationBanner
@@ -660,7 +662,7 @@ const EditProfileScreen = ({ navigation }) => {
       ) : (
         <ScrollView
           ref={scrollRef}
-          style={styles.container}
+          style={[styles.container, { backgroundColor: colors.surface2 }]}
           showsVerticalScrollIndicator={false}
         >
           <ProfileContent profile={getCurrentProfileData()} />
@@ -686,7 +688,6 @@ const EditProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F0F0",
   },
   verificationBanner: {
     backgroundColor: "#FFF9E6",

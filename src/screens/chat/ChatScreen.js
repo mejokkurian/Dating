@@ -47,7 +47,8 @@ import useMessageActions from './hooks/useMessageActions';
 import useStickers from './hooks/useStickers';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useImagePicker } from './hooks/useImagePicker';
-import styles from './styles';
+import createChatStyles from './styles';
+import { useTheme } from '../../context/ThemeContext';
 import { normalizeContent } from '../../utils/messageContent';
 import { sanitizeText } from '../../utils/inputSanitization';
 
@@ -291,6 +292,8 @@ const ChatScreen = ({ route, navigation }) => {
   const { userData } = useAuth();
   const { startCall, callState } = useCall();
   const { isOffline } = useNetworkStatus();
+  const { colors } = useTheme();
+  const styles = createChatStyles(colors);
   const isMine = userData._id === user._id;
   const insets = useSafeAreaInsets();
 
@@ -1178,7 +1181,7 @@ const ChatScreen = ({ route, navigation }) => {
                    <View style={{ marginBottom: 20, alignItems: 'center', width: '100%' }}>
                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                            <Ionicons name="star" size={24} color="#D4AF37" />
-                           <Text style={{ color: '#D4AF37', fontWeight: 'bold', marginLeft: 6, fontSize: 18 }}>Super Like!</Text>
+                           <Text style={{ color: '#D4AF37', fontWeight: 'bold', marginLeft: 6, fontSize: 18 }}>Adore!</Text>
                        </View>
                        
                        {superLikeMessage && (

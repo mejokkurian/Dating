@@ -1,14 +1,17 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../../context/ThemeContext";
 
 const ProfileHeader = ({ activeTab, onTabChange, onBackPress }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.headerContainer}>
       {/* Single Row with Back Button and Tabs */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         
         {/* Tab Switcher */}
@@ -47,12 +50,12 @@ const ProfileHeader = ({ activeTab, onTabChange, onBackPress }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   headerContainer: {
-    backgroundColor: "#FFFFFF",
-    paddingTop: 50, // Reduced from 60 to save space
+    backgroundColor: colors.background,
+    paddingTop: 50,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: colors.border,
     marginBottom: 20,
   },
   headerRow: {
@@ -69,7 +72,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
@@ -78,16 +81,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  tabActive: {
-    // Active tab styling handled by indicator
-  },
+  tabActive: {},
   tabText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#999999",
+    color: colors.text.tertiary,
   },
   tabTextActive: {
-    color: "#000000",
+    color: colors.text.primary,
     fontWeight: "700",
   },
   tabIndicator: {
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: "#000000",
+    backgroundColor: colors.text.primary,
   },
 });
 

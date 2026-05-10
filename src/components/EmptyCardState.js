@@ -4,11 +4,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import GradientButton from './GradientButton';
 import InfoCard from './InfoCard';
-import theme from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const EmptyCardState = ({ onRefresh, onFilter }) => {
+  const { colors } = useTheme();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current; // 0 = Idle, 1 = Refreshing
 
@@ -69,28 +70,28 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
         >
           {/* Idle Icon (Account Search) */}
           <Animated.View style={[
-             styles.iconWrapper, 
+             styles.iconWrapper,
              { opacity: idleOpacity, transform: [{ scale: idleScale }] }
           ]}>
-            <MaterialCommunityIcons name="account-search-outline" size={60} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="account-search-outline" size={60} color={colors.accent} />
           </Animated.View>
 
           {/* Refreshing Icon (Person) */}
           <Animated.View style={[
-             styles.iconWrapper, 
+             styles.iconWrapper,
              { opacity: refreshOpacity, transform: [{ scale: refreshScale }] }
           ]}>
-            <MaterialCommunityIcons name="account" size={50} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="account" size={50} color={colors.accent} />
           </Animated.View>
         </LinearGradient>
       </View>
 
-      <Text style={styles.title}>
+      <Text style={[styles.title, { color: colors.text.primary }]}>
         {isRefreshing ? "Searching nearby..." : "You've seen everyone nearby!"}
       </Text>
-      
-      <Text style={styles.subtitle}>
-        {isRefreshing 
+
+      <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+        {isRefreshing
           ? "Looking for new people who match your preferences."
           : "Expand your search filters or check back later to discover more people."}
       </Text>
@@ -122,16 +123,16 @@ const EmptyCardState = ({ onRefresh, onFilter }) => {
         
         <TouchableOpacity
           onPress={handleRefresh}
-          style={[styles.outlineButton, isRefreshing && styles.disabledButton]}
+          style={[styles.outlineButton, { backgroundColor: colors.surface, borderColor: colors.accent }, isRefreshing && { opacity: 0.7 }]}
           activeOpacity={0.7}
           disabled={isRefreshing}
         >
           {isRefreshing ? (
-             <ActivityIndicator color={theme.colors.primary} size="small" style={{ marginRight: 8 }} />
+             <ActivityIndicator color={colors.accent} size="small" style={{ marginRight: 8 }} />
           ) : (
-             <Ionicons name="refresh" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+             <Ionicons name="refresh" size={20} color={colors.accent} style={{ marginRight: 8 }} />
           )}
-          <Text style={styles.outlineButtonText}>{isRefreshing ? "Searching..." : "Refresh Feed"}</Text>
+          <Text style={[styles.outlineButtonText, { color: colors.accent }]}>{isRefreshing ? "Searching..." : "Refresh Feed"}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -177,14 +178,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "800",
-    color: theme.colors.text.primary,
     marginBottom: 4,
     textAlign: "center",
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
     textAlign: "center",
     marginBottom: 12,
     lineHeight: 24,
@@ -205,25 +204,22 @@ const styles = StyleSheet.create({
   outlineButton: {
     width: '100%',
     maxWidth: 280,
-    height: 52, // Match medium button height
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF',
     borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 16,
     alignSelf: 'center',
-    ...theme.shadows.sm,
-  },
-  disabledButton: {
-    opacity: 0.7,
-    backgroundColor: '#F5F5F5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   outlineButtonText: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semiBold,
-    color: theme.colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
   },
   infoCardWrapper: {
     width: '100%',

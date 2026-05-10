@@ -13,7 +13,10 @@ import {
   Image,
   Platform,
   Linking,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +29,7 @@ import NearbyUserCard from '../components/NearbyUserCard';
 import PrivacyConsentModal from '../components/PrivacyConsentModal';
 import QuickHelloModal from '../components/QuickHelloModal';
 import NotificationBottomSheet from '../components/NotificationBottomSheet';
-import theme from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 import GlassCard from '../components/GlassCard';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import ConnectNowGuideBottomSheet from '../components/ConnectNowGuideBottomSheet';
@@ -40,6 +43,8 @@ const { width, height } = Dimensions.get('window');
 
 const ConnectNowScreen = ({ navigation }) => {
   const { userData, setUserData } = useAuth();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [connectNowEnabled, setConnectNowEnabled] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showQuickHelloModal, setShowQuickHelloModal] = useState(false);
@@ -56,6 +61,7 @@ const ConnectNowScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('nearby'); // 'nearby' or 'requests'
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   const [showGuideSheet, setShowGuideSheet] = useState(false);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   
   // Rate limiting for Quick Hello
   const quickHelloTimestampsRef = useRef([]);
@@ -573,11 +579,69 @@ const ConnectNowScreen = ({ navigation }) => {
   }, [nearbyUsersFiltered, mapRegion]);
 
 
+  const renderInfoTooltip = () => (
+    <Modal
+      visible={showInfoTooltip}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowInfoTooltip(false)}
+    >
+      <TouchableWithoutFeedback onPress={() => setShowInfoTooltip(false)}>
+        <View style={styles.tooltipOverlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.tooltipCard}>
+              <LinearGradient
+                colors={['#D4AF37', '#B8860B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.tooltipAccent}
+              />
+              <View style={styles.tooltipBody}>
+                <View style={styles.tooltipHeader}>
+                  <Ionicons name="navigate-circle" size={22} color="#D4AF37" />
+                  <Text style={styles.tooltipTitle}>Connect Now</Text>
+                  <TouchableOpacity onPress={() => setShowInfoTooltip(false)} style={styles.tooltipClose}>
+                    <Ionicons name="close" size={18} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.tooltipDesc}>
+                  Discover people around you in real-time. When active, your anonymized location is shared so nearby members can find you.
+                </Text>
+                <View style={styles.tooltipDivider} />
+                <View style={styles.tooltipFeatureRow}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color="#D4AF37" />
+                  <Text style={styles.tooltipFeatureText}>Exact location is never revealed</Text>
+                </View>
+                <View style={styles.tooltipFeatureRow}>
+                  <Ionicons name="flash-outline" size={16} color="#D4AF37" />
+                  <Text style={styles.tooltipFeatureText}>Send Quick Hellos to break the ice</Text>
+                </View>
+                <View style={styles.tooltipFeatureRow}>
+                  <Ionicons name="toggle-outline" size={16} color="#D4AF37" />
+                  <Text style={styles.tooltipFeatureText}>Toggle off anytime to go invisible</Text>
+                </View>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+
   const renderHeader = () => (
     <View style={styles.headerContainer}>
       <View>
         <Text style={styles.screenTitle}>Connect Now</Text>
-        <Text style={styles.screenSubtitle}>Nearby Connections</Text>
+        <TouchableOpacity
+          style={styles.subtitleRow}
+          onPress={() => setShowInfoTooltip(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.screenSubtitle}>Nearby Connections</Text>
+          <View style={styles.infoIconBadge}>
+            <Ionicons name="information-circle" size={15} color="#D4AF37" />
+          </View>
+        </TouchableOpacity>
         {isOffline && (
           <View style={styles.offlineBanner}>
             <Ionicons name="cloud-offline-outline" size={14} color="#FF5252" />
@@ -586,14 +650,16 @@ const ConnectNowScreen = ({ navigation }) => {
         )}
       </View>
       <View style={styles.headerRight}>
-        {/* Connection Toggle */}
-        <View style={styles.toggleWrapper}>
+        <View style={[
+          styles.toggleWrapper,
+          connectNowEnabled && styles.toggleWrapperActive,
+        ]}>
             {loading ? (
                 <ActivityIndicator size="small" color="#D4AF37" style={{ marginRight: 8 }} />
             ) : (
                 <Text style={[
-                    styles.toggleLabel, 
-                    { color: connectNowEnabled ? theme.colors.success : '#666' }
+                    styles.toggleLabel,
+                    { color: connectNowEnabled ? '#D4AF37' : colors.text.secondary }
                 ]}>
                     {connectNowEnabled ? 'Active' : 'Offline'}
                 </Text>
@@ -601,10 +667,7 @@ const ConnectNowScreen = ({ navigation }) => {
             <Switch
                 value={connectNowEnabled}
                 onValueChange={(value) => {
-                  // Prevent toggle change if modal is showing or offline
-                  if (showPrivacyModal) {
-                    return;
-                  }
+                  if (showPrivacyModal) return;
                   if (isOffline) {
                     Alert.alert(
                       'No Internet Connection',
@@ -616,13 +679,14 @@ const ConnectNowScreen = ({ navigation }) => {
                   handleToggleConnectNow(value);
                 }}
                 disabled={loading || showPrivacyModal || isOffline}
-                trackColor={{ false: '#e0e0e0', true: '#D4AF37' }}
-                thumbColor="#fff"
-                ios_backgroundColor="#e0e0e0"
-                style={{ transform: [{ scale: 0.8 }] }}
+                trackColor={{ false: '#333', true: '#D4AF37' }}
+                thumbColor={connectNowEnabled ? '#fff' : '#888'}
+                ios_backgroundColor="#333"
+                style={{ transform: [{ scale: 0.85 }] }}
             />
         </View>
       </View>
+      {renderInfoTooltip()}
     </View>
   );
 
@@ -913,91 +977,87 @@ const ConnectNowScreen = ({ navigation }) => {
                         </View>
                     ) : nearbyUsersFiltered.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                             <Ionicons 
-                                name={activeTab === 'nearby' ? "people-outline" : "mail-unread-outline"} 
-                                size={64} 
-                                color="#ddd" 
-                             />
-                             <Text style={styles.emptyTitle}>
-                                {activeTab === 'nearby' ? "No one around yet" : "No pending requests"}
-                             </Text>
-                             <Text style={styles.emptySub}>
-                                {activeTab === 'nearby' 
-                                    ? "Stay tuned! We'll notify you when someone comes nearby." 
-                                    : "You're all caught up with requests."}
-                             </Text>
-                             
-                             {/* Actionable suggestions for nearby tab */}
-                             {activeTab === 'nearby' && (
-                                 <View style={styles.tipsContainer}>
-                                     <View style={styles.tipsContent}>
-                                         <Text style={styles.suggestionsTitle}>💡 Tips to find more people</Text>
-                                         <View style={styles.suggestionItem}>
-                                             <Ionicons name="walk-outline" size={16} color="#C5A059" />
-                                             <Text style={styles.suggestionText}>Try moving to a different area</Text>
-                                         </View>
-                                         <View style={styles.suggestionItem}>
-                                             <Ionicons name="time-outline" size={16} color="#C5A059" />
-                                             <Text style={styles.suggestionText}>Check back later - people are always joining</Text>
-                                         </View>
-                                         <View style={styles.suggestionItem}>
-                                             <Ionicons name="location-outline" size={16} color="#C5A059" />
-                                             <Text style={styles.suggestionText}>Make sure your location is enabled</Text>
-                                         </View>
-                                     </View>
-                                     
-                                     <TouchableOpacity
-                                         style={styles.refreshButton}
-                                         onPress={refreshNearbyUsers}
-                                         disabled={nearbyUsersLoading}
-                                     >
-                                         <Ionicons 
-                                             name="refresh" 
-                                             size={18} 
-                                             color="#D4AF37" 
-                                             style={{ marginRight: 6 }}
-                                         />
-                                         <Text style={styles.refreshButtonText}>
-                                             {nearbyUsersLoading ? 'Refreshing...' : 'Refresh Now'}
-                                         </Text>
-                                     </TouchableOpacity>
-                                 </View>
-                             )}
-                             
-                             {/* Suggestions for requests tab */}
-                             {activeTab === 'requests' && (
-                                 <View style={styles.tipsContainer}>
-                                     <View style={styles.tipsContent}>
-                                         <Text style={styles.suggestionsTitle}>💡 Keep the momentum going</Text>
-                                         <View style={styles.suggestionItem}>
-                                             <Ionicons name="heart-outline" size={16} color="#C5A059" />
-                                             <Text style={styles.suggestionText}>Send Quick Hellos to nearby users</Text>
-                                         </View>
-                                         <View style={styles.suggestionItem}>
-                                             <Ionicons name="people-outline" size={16} color="#C5A059" />
-                                             <Text style={styles.suggestionText}>Check the "Nearby" tab to discover new people</Text>
-                                         </View>
-                                     </View>
-                                     
-                                     <TouchableOpacity
-                                         style={styles.refreshButton}
-                                         onPress={() => {
-                                             connectNowAnalytics.trackTabFilterChange('nearby', { count: nearbyCount });
-                                             setActiveTab('nearby');
-                                         }}
-                                     >
-                                         <Ionicons 
-                                             name="people" 
-                                             size={18} 
-                                             color="#D4AF37" 
-                                             style={{ marginRight: 6 }}
-                                         />
-                                         <Text style={styles.refreshButtonText}>
-                                             Go to Nearby
-                                         </Text>
-                                     </TouchableOpacity>
-                                 </View>
-                             )}
+                            {/* Premium icon ring */}
+                            <LinearGradient
+                                colors={['rgba(212,175,55,0.18)', 'rgba(212,175,55,0.04)']}
+                                style={styles.emptyIconRing}
+                            >
+                                <View style={styles.emptyIconInner}>
+                                    <Ionicons
+                                        name={activeTab === 'nearby' ? 'navigate-circle-outline' : 'mail-unread-outline'}
+                                        size={52}
+                                        color="#D4AF37"
+                                    />
+                                </View>
+                            </LinearGradient>
+
+                            <Text style={styles.emptyTitle}>
+                                {activeTab === 'nearby' ? 'No one nearby yet' : 'No pending requests'}
+                            </Text>
+                            <Text style={styles.emptySub}>
+                                {activeTab === 'nearby'
+                                    ? "We'll notify you the moment someone comes your way."
+                                    : "You're all caught up. Explore the Nearby tab to connect."}
+                            </Text>
+
+                            {/* Hint pills row */}
+                            {activeTab === 'nearby' && (
+                                <View style={styles.hintPillsRow}>
+                                    <View style={styles.hintPill}>
+                                        <Ionicons name="walk-outline" size={14} color="#D4AF37" />
+                                        <Text style={styles.hintPillText}>Move around</Text>
+                                    </View>
+                                    <View style={styles.hintPill}>
+                                        <Ionicons name="time-outline" size={14} color="#D4AF37" />
+                                        <Text style={styles.hintPillText}>Check back later</Text>
+                                    </View>
+                                    <View style={styles.hintPill}>
+                                        <Ionicons name="location-outline" size={14} color="#D4AF37" />
+                                        <Text style={styles.hintPillText}>Enable location</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* CTA button */}
+                            {activeTab === 'nearby' ? (
+                                <TouchableOpacity
+                                    style={styles.emptyCtaButton}
+                                    onPress={refreshNearbyUsers}
+                                    disabled={nearbyUsersLoading}
+                                    activeOpacity={0.85}
+                                >
+                                    <LinearGradient
+                                        colors={['#F5C842', '#D4AF37', '#B8860B']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.emptyCtaGradient}
+                                    >
+                                        <Ionicons name="refresh" size={16} color="#0D0D0D" />
+                                        <Text style={styles.emptyCtaText}>
+                                            {nearbyUsersLoading ? 'Refreshing…' : 'Refresh Now'}
+                                        </Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.emptyCtaButton}
+                                    onPress={() => {
+                                        connectNowAnalytics.trackTabFilterChange('nearby', { count: nearbyCount });
+                                        setActiveTab('nearby');
+                                    }}
+                                    activeOpacity={0.85}
+                                >
+                                    <LinearGradient
+                                        colors={['#F5C842', '#D4AF37', '#B8860B']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.emptyCtaGradient}
+                                    >
+                                        <Ionicons name="people" size={16} color="#0D0D0D" />
+                                        <Text style={styles.emptyCtaText}>Explore Nearby</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     ) : (
                         <FlatList
@@ -1040,20 +1100,44 @@ const ConnectNowScreen = ({ navigation }) => {
       ) : (
           /* Offline State */
           <View style={styles.offlineContainer}>
-              <View style={[styles.offlineIconCircle, { backgroundColor: '#f5f5f5' }]}>
-                 <Ionicons name="navigate-circle" size={80} color="#D4AF37" />
-              </View>
-              <Text style={styles.offlineTitle}>Enable Connect Now</Text>
+              <LinearGradient
+                colors={['rgba(212,175,55,0.15)', 'rgba(212,175,55,0.04)']}
+                style={styles.offlineIconCircle}
+              >
+                <View style={styles.offlineIconInner}>
+                  <Ionicons name="navigate-circle" size={72} color="#D4AF37" />
+                </View>
+              </LinearGradient>
+              <Text style={styles.offlineTitle}>Connect Now</Text>
               <Text style={styles.offlineDesc}>
-                  Discover matches around you in real-time. Turn on visibility to see who's nearby and let them find you.
+                  Discover members around you in real-time. Turn on visibility to see who's nearby and let them find you.
               </Text>
-              
-              <TouchableOpacity 
+
+              <View style={styles.offlineFeatures}>
+                <View style={styles.offlineFeatureRow}>
+                  <Ionicons name="shield-checkmark" size={15} color="#D4AF37" />
+                  <Text style={styles.offlineFeatureText}>Privacy protected — no exact location</Text>
+                </View>
+                <View style={styles.offlineFeatureRow}>
+                  <Ionicons name="flash" size={15} color="#D4AF37" />
+                  <Text style={styles.offlineFeatureText}>Send Quick Hellos to nearby people</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
                 style={styles.enableButton}
                 onPress={() => handleToggleConnectNow(true)}
+                activeOpacity={0.85}
               >
+                <LinearGradient
+                  colors={['#F5C842', '#D4AF37', '#B8860B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.enableButtonGradient}
+                >
                   <Text style={styles.enableButtonText}>Start Discovering</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  <Ionicons name="arrow-forward" size={18} color="#0D0D0D" />
+                </LinearGradient>
               </TouchableOpacity>
           </View>
       )}
@@ -1113,30 +1197,41 @@ const ConnectNowScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#fff',
+    paddingVertical: 12,
+    backgroundColor: colors.background,
   },
   screenTitle: {
-    fontSize: 24,
-    fontWeight: '800', // Extra Bold
-    color: '#000',
-    letterSpacing: -0.5,
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text.primary,
+    letterSpacing: -0.8,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    gap: 5,
   },
   screenSubtitle: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 2,
+    fontSize: 13,
+    color: colors.text.tertiary,
     fontWeight: '500',
+  },
+  infoIconBadge: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerRight: {
       flexDirection: 'row',
@@ -1145,65 +1240,144 @@ const styles = StyleSheet.create({
   toggleWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#f9f9f9',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 20,
+      backgroundColor: colors.surface2 || colors.surface,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#eee',
+      borderColor: colors.border,
+  },
+  toggleWrapperActive: {
+      borderColor: 'rgba(212,175,55,0.5)',
+      backgroundColor: 'rgba(212,175,55,0.08)',
   },
   toggleLabel: {
       fontSize: 12,
-      fontWeight: '600',
-      marginRight: 6,
-      marginLeft: 4,
+      fontWeight: '700',
+      marginRight: 4,
+      marginLeft: 2,
+      letterSpacing: 0.3,
+  },
+  // Tooltip styles
+  tooltipOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-start',
+      paddingTop: 90,
+      paddingHorizontal: 20,
+  },
+  tooltipCard: {
+      backgroundColor: colors.card || colors.surface,
+      borderRadius: 18,
+      overflow: 'hidden',
+      width: width - 40,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 20,
+      elevation: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(212,175,55,0.2)',
+  },
+  tooltipAccent: {
+      height: 3,
+      width: '100%',
+  },
+  tooltipBody: {
+      padding: 18,
+  },
+  tooltipHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+      gap: 8,
+  },
+  tooltipTitle: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.text.primary,
+      letterSpacing: -0.3,
+  },
+  tooltipClose: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.surface2 || colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  tooltipDesc: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      lineHeight: 19,
+      marginBottom: 14,
+  },
+  tooltipDivider: {
+      height: 1,
+      backgroundColor: 'rgba(212,175,55,0.15)',
+      marginBottom: 14,
+  },
+  tooltipFeatureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 10,
+  },
+  tooltipFeatureText: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      flex: 1,
+      fontWeight: '500',
   },
   viewToggleContainer: {
-     paddingTop: 15,
+     paddingTop: 14,
      paddingBottom: 10,
      paddingHorizontal: 20,
-     backgroundColor: '#fff',
+     backgroundColor: colors.background,
      zIndex: 10,
   },
   segmentedControl: {
       flexDirection: 'row',
-      backgroundColor: '#f0f0f0',
-      borderRadius: 12,
+      backgroundColor: colors.surface2 || '#1a1a1a',
+      borderRadius: 14,
       padding: 4,
+      borderWidth: 1,
+      borderColor: 'rgba(212,175,55,0.12)',
   },
   segmentOption: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 8,
-      borderRadius: 10,
+      paddingVertical: 9,
+      borderRadius: 11,
       gap: 6,
   },
   segmentActive: {
       backgroundColor: '#D4AF37',
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 4,
-      elevation: 3,
+      shadowColor: '#D4AF37',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.35,
+      shadowRadius: 6,
+      elevation: 4,
   },
   segmentText: {
       fontSize: 14,
       fontWeight: '600',
-      color: '#666',
+      color: colors.text.secondary,
   },
   segmentTextActive: {
-      color: '#fff',
+      color: '#0D0D0D',
+      fontWeight: '700',
   },
   tabFilterContainer: {
       flexDirection: 'row',
       marginTop: 15,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
   },
   filterTab: {
-      marginRight: 25,
+      marginRight: 28,
       paddingBottom: 10,
   },
   filterTabActive: {
@@ -1213,10 +1387,11 @@ const styles = StyleSheet.create({
   filterText: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#999',
+      color: colors.text.tertiary,
   },
   filterTextActive: {
       color: '#D4AF37',
+      fontWeight: '700',
   },
   mapContainer: {
       flex: 1,
@@ -1231,7 +1406,7 @@ const styles = StyleSheet.create({
   },
   markerContent: {
       alignItems: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: colors.card,
       padding: 4,
       borderRadius: 12,
       shadowColor: "#000",
@@ -1250,7 +1425,7 @@ const styles = StyleSheet.create({
   markerName: {
       fontSize: 10,
       fontWeight: '700',
-      color: '#000',
+      color: colors.text.primary,
       marginTop: 4,
       maxWidth: 80,
   },
@@ -1264,7 +1439,7 @@ const styles = StyleSheet.create({
       borderTopWidth: 8,
       borderLeftColor: 'transparent',
       borderRightColor: 'transparent',
-      borderTopColor: '#fff', 
+      borderTopColor: colors.card,
       marginTop: -2,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
@@ -1304,12 +1479,12 @@ const styles = StyleSheet.create({
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.9)',
+      backgroundColor: colors.tabBarFill,
   },
   mapOverlayText: {
       fontSize: 13,
       fontWeight: '600',
-      color: '#000',
+      color: colors.text.primary,
   },
   centered: {
       flex: 1,
@@ -1320,13 +1495,13 @@ const styles = StyleSheet.create({
   loadingText: {
       fontSize: 18,
       fontWeight: '600',
-      color: '#333',
+      color: colors.text.primary,
       marginTop: 12,
       textAlign: 'center',
   },
   loadingSubtext: {
       fontSize: 14,
-      color: '#666',
+      color: colors.text.secondary,
       marginTop: 8,
       textAlign: 'center',
       paddingHorizontal: 20,
@@ -1352,7 +1527,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: colors.overlay,
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1000,
@@ -1360,7 +1535,7 @@ const styles = StyleSheet.create({
   mapLoadingContent: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: colors.card,
       paddingVertical: 12,
       paddingHorizontal: 20,
       borderRadius: 25,
@@ -1372,13 +1547,13 @@ const styles = StyleSheet.create({
   },
   mapLoadingText: {
       fontSize: 14,
-      color: '#666',
+      color: colors.text.secondary,
       marginLeft: 8,
       fontWeight: '500',
   },
   listContainer: {
       flex: 1,
-      backgroundColor: '#f8f8f8',
+      backgroundColor: colors.background,
   },
   listContent: {
       paddingBottom: 20,
@@ -1388,134 +1563,162 @@ const styles = StyleSheet.create({
       paddingTop: 50,
       alignItems: 'center',
   },
-  loadingText: {
-      marginTop: 12,
-      color: '#888',
-      fontSize: 14,
-  },
   emptyContainer: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 40,
-      paddingBottom: 100,
+      paddingHorizontal: 36,
+      paddingBottom: 80,
   },
   emptyTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: '#333',
-      marginTop: 20,
+      fontSize: 20,
+      fontWeight: '800',
+      color: colors.text.primary,
       marginBottom: 8,
+      letterSpacing: -0.4,
   },
   emptySub: {
       fontSize: 14,
-      color: '#888',
+      color: colors.text.tertiary,
       textAlign: 'center',
       lineHeight: 20,
-      marginBottom: 24,
+      marginBottom: 22,
+      paddingHorizontal: 8,
   },
-  emptySuggestions: {
-      marginTop: 8,
-      paddingHorizontal: 20,
-      width: '100%',
-      alignItems: 'center',
-  },
-  tipsContainer: {
-      width: '95%',
-      alignSelf: 'center',
-      marginTop: 20,
-  },
-  tipsContent: {
-      backgroundColor: '#F9F9F9',
-      borderRadius: 12,
-      padding: 20,
-      alignItems: 'flex-start',
-  },
-  suggestionsTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: '#333',
-      marginBottom: 16,
-      textAlign: 'left',
-  },
-  suggestionItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 10,
-      marginBottom: 12,
-      width: '100%',
-  },
-  suggestionText: {
-      fontSize: 14,
-      color: '#666',
-      textAlign: 'left',
-      flex: 1,
-      flexWrap: 'wrap',
-  },
-  refreshButton: {
-      flexDirection: 'row',
+  emptyIconRing: {
+      width: 130,
+      height: 130,
+      borderRadius: 65,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 20,
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 25,
-      backgroundColor: '#FFF9E6',
+      marginBottom: 24,
       borderWidth: 1,
-      borderColor: '#D4AF37',
+      borderColor: 'rgba(212,175,55,0.2)',
   },
-  refreshButtonText: {
-      fontSize: 15,
+  emptyIconInner: {
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  hintPillsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 4,
+      marginBottom: 28,
+      paddingHorizontal: 8,
+  },
+  hintPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 20,
+      backgroundColor: 'rgba(212,175,55,0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(212,175,55,0.22)',
+  },
+  hintPillText: {
+      fontSize: 12,
       fontWeight: '600',
       color: '#D4AF37',
   },
-  offlineContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 30,
-      backgroundColor: '#fff',
-  },
-  offlineIconCircle: {
-      width: 140,
-      height: 140,
-      borderRadius: 70,
-      backgroundColor: '#f5f5f5',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 30,
-  },
-  offlineTitle: {
-      fontSize: 24,
-      fontWeight: '800',
-      color: '#000',
-      marginBottom: 10,
-  },
-  offlineDesc: {
-      fontSize: 15,
-      color: '#666',
-      textAlign: 'center',
-      lineHeight: 22,
-      marginBottom: 40,
-  },
-  enableButton: {
-      flexDirection: 'row',
-      backgroundColor: '#D4AF37',
-      paddingHorizontal: 32,
-      paddingVertical: 16,
-      borderRadius: 30,
-      alignItems: 'center',
-      gap: 10,
-      shadowColor: "#000",
+  emptyCtaButton: {
+      borderRadius: 28,
+      overflow: 'hidden',
+      shadowColor: '#D4AF37',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 10,
       elevation: 6,
   },
+  emptyCtaGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 32,
+      paddingVertical: 14,
+  },
+  emptyCtaText: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: '#0D0D0D',
+      letterSpacing: 0.2,
+  },
+  offlineContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 32,
+      backgroundColor: colors.background,
+  },
+  offlineIconCircle: {
+      width: 148,
+      height: 148,
+      borderRadius: 74,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 30,
+      borderWidth: 1,
+      borderColor: 'rgba(212,175,55,0.2)',
+  },
+  offlineIconInner: {
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  offlineTitle: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: colors.text.primary,
+      marginBottom: 10,
+      letterSpacing: -0.5,
+  },
+  offlineDesc: {
+      fontSize: 14,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      lineHeight: 21,
+      marginBottom: 24,
+      paddingHorizontal: 8,
+  },
+  offlineFeatures: {
+      width: '100%',
+      marginBottom: 36,
+      gap: 10,
+  },
+  offlineFeatureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 8,
+  },
+  offlineFeatureText: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      fontWeight: '500',
+  },
+  enableButton: {
+      borderRadius: 32,
+      overflow: 'hidden',
+      shadowColor: '#D4AF37',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      elevation: 8,
+  },
+  enableButtonGradient: {
+      flexDirection: 'row',
+      paddingHorizontal: 36,
+      paddingVertical: 16,
+      alignItems: 'center',
+      gap: 10,
+  },
   enableButtonText: {
-    color: '#fff',
+    color: '#0D0D0D',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   retryButton: {
     marginTop: 20,

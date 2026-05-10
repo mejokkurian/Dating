@@ -18,12 +18,15 @@ import CustomAlert from '../../components/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import theme from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../context/ThemeContext';
 
 import { useAuth } from '../../context/AuthContext';
 import { createUserDocument } from '../../services/api/user';
 
 const AgeVerificationScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = makeStyles(colors);
   const [date, setDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() - 18)));
   const [loading, setLoading] = useState(false);
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
@@ -104,7 +107,7 @@ const AgeVerificationScreen = ({ navigation }) => {
 
   return (
     <LinearGradient
-      colors={['#FFFFFF', '#F8F9FA']} // Light Premium Background
+      colors={colors.gradients.background}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -120,7 +123,7 @@ const AgeVerificationScreen = ({ navigation }) => {
                 style={styles.backButton} 
                 onPress={handleBack}
               >
-                <Ionicons name="arrow-back" size={24} color="#000000" />
+                <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
               </TouchableOpacity>
 
               <View style={styles.header}>
@@ -141,8 +144,8 @@ const AgeVerificationScreen = ({ navigation }) => {
                     mode="date"
                     display="spinner"
                     onChange={onChange}
-                    textColor="#000000"
-                    themeVariant="light"
+                    textColor={colors.text.primary}
+                    themeVariant={isDark ? 'dark' : 'light'}
                     maximumDate={new Date()}
                     style={styles.datePicker}
                   />
@@ -190,7 +193,7 @@ const AgeVerificationScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   gradient: {
     flex: 1,
   },
@@ -213,22 +216,22 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: 24,
-    shadowColor: '#D4AF37',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 20,
   },
   title: {
     fontSize: 32,
-    fontWeight: '300', // Light font for elegance
-    color: '#000000',
+    fontWeight: '300',
+    color: colors.text.primary,
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 1,
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     textAlign: 'center',
     fontWeight: '300',
   },
@@ -255,46 +258,46 @@ const styles = StyleSheet.create({
   },
   ageLabel: {
     fontSize: 18,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     fontWeight: '300',
   },
   ageValue: {
     fontSize: 36,
     fontWeight: '600',
-    color: '#D4AF37',
+    color: colors.accent,
   },
   ageInvalid: {
-    color: '#FF453A',
+    color: colors.error,
   },
   footer: {
     marginBottom: 20,
   },
   disclaimer: {
     fontSize: 14,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: 32,
     fontWeight: '500',
     opacity: 0.9,
   },
   continueButton: {
-    backgroundColor: '#D4AF37',
+    backgroundColor: colors.accent,
     paddingVertical: 18,
-    borderRadius: 30, // Pill shape
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
   buttonDisabled: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: colors.surface2,
     opacity: 0.5,
   },
   continueButtonText: {
-    color: '#000000',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 1,

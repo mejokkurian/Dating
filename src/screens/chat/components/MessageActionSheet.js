@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { normalizeContent } from '../../../utils/messageContent';
-import styles from '../styles';
+import createChatStyles from '../styles';
+import { useTheme } from '../../../context/ThemeContext';
 
 const MessageActionSheet = ({
   visible,
@@ -18,6 +19,8 @@ const MessageActionSheet = ({
   onReaction,
   isActionLoading = false,
 }) => {
+  const { colors } = useTheme();
+  const styles = createChatStyles(colors);
   if (!visible || !selectedMessage) return null;
 
   // Don't show actions for deleted messages or view once images

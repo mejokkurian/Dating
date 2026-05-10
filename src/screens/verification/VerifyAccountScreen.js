@@ -13,9 +13,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
-import { 
-    createLivenessSession, 
-    getLivenessSessionResults 
+import { useTheme } from "../../context/ThemeContext";
+import {
+    createLivenessSession,
+    getLivenessSessionResults
 } from "../../services/api/verification";
 import { startLivenessCheck } from "../../services/native/LivenessModule";
 
@@ -27,8 +28,11 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const VerifyAccountScreen = ({ navigation }) => {
   const { onboardingComplete, setOnboardingComplete } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = makeStyles(colors);
+
   const [verifying, setVerifying] = useState(false);
-  
+
   // Bottom Sheet States
   const [showErrorSheet, setShowErrorSheet] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -54,7 +58,7 @@ const VerifyAccountScreen = ({ navigation }) => {
         // If Native Check rejects, we jump to catch block.
         // If resolves, it means "Liveness UI completed successfully", but we still need backend to verify signature.
         const verification = await getLivenessSessionResults(sessionId);
-        
+
         if (verification && verification.success) {
             setShowSuccessSheet(true);
         } else {
@@ -66,7 +70,7 @@ const VerifyAccountScreen = ({ navigation }) => {
 
     } catch (error) {
         console.error("Liveness Error:", error);
-        
+
         // Differentiate user cancellation vs actual error
         if (error.message && error.message.includes("cancelled")) {
             // Do simpler alert or nothing
@@ -87,7 +91,7 @@ const VerifyAccountScreen = ({ navigation }) => {
 
   const handleCompletion = () => {
     setShowSuccessSheet(false);
-    
+
     if (!onboardingComplete) {
       setOnboardingComplete(true);
     } else {
@@ -114,12 +118,15 @@ const VerifyAccountScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F0F0F0" />
-      
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={colors.surface2}
+      />
+
       {/* Top Navigation */}
       <View style={styles.topNav}>
-        <TouchableOpacity 
-            style={styles.skipButton} 
+        <TouchableOpacity
+            style={styles.skipButton}
             onPress={handleSkipPress}
         >
             <Text style={styles.skipText}>Skip</Text>
@@ -132,11 +139,11 @@ const VerifyAccountScreen = ({ navigation }) => {
         <Text style={styles.subtitle}>Complete a quick video check to verify you're a real person.</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        
+
         {/* Checklist Section */}
         <View style={styles.checklist}>
             {checklistItems.map((item, index) => (
@@ -151,8 +158,8 @@ const VerifyAccountScreen = ({ navigation }) => {
 
         {/* Action Button */}
         <View style={styles.actionContainer}>
-            <TouchableOpacity 
-                style={styles.verifyButton} 
+            <TouchableOpacity
+                style={styles.verifyButton}
                 onPress={handleLivenessVerification}
                 disabled={verifying}
             >
@@ -165,7 +172,7 @@ const VerifyAccountScreen = ({ navigation }) => {
                     </View>
                 )}
             </TouchableOpacity>
-            
+
             <Text style={styles.securityNote}>
                 Your video is analyzed securely by AWS and is not stored permanently.
             </Text>
@@ -174,7 +181,7 @@ const VerifyAccountScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* Error Bottom Sheet */}
-      <VerificationFailureBottomSheet 
+      <VerificationFailureBottomSheet
         visible={showErrorSheet}
         onClose={() => setShowErrorSheet(false)}
         error={errorMessage}
@@ -182,14 +189,14 @@ const VerifyAccountScreen = ({ navigation }) => {
       />
 
       {/* Success Bottom Sheet */}
-      <VerificationSuccessBottomSheet 
+      <VerificationSuccessBottomSheet
         visible={showSuccessSheet}
         onClose={handleCompletion}
         onContinue={handleCompletion}
       />
 
        {/* Skip Bottom Sheet */}
-       <VerificationSkipBottomSheet 
+       <VerificationSkipBottomSheet
         visible={showSkipSheet}
         onClose={() => setShowSkipSheet(false)}
         onIgnore={handleSkipConfirm}
@@ -199,10 +206,10 @@ const VerifyAccountScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: colors.surface2,
   },
   topNav: {
     flexDirection: "row",
@@ -220,12 +227,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#000000',
+    color: colors.text.primary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: colors.text.secondary,
     lineHeight: 22,
   },
   skipButton: {
@@ -234,7 +241,7 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#666",
+    color: colors.text.secondary,
   },
   content: {
     padding: 24,
@@ -244,7 +251,7 @@ const styles = StyleSheet.create({
   checklist: {
     gap: 20,
     marginBottom: 40,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.card,
     padding: 20,
     borderRadius: 16,
     shadowColor: "#000",
@@ -262,13 +269,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   checklistText: {
     fontSize: 16,
-    color: "#333",
+    color: colors.text.primary,
     fontWeight: "500",
     flex: 1,
   },
@@ -300,7 +307,7 @@ const styles = StyleSheet.create({
   },
   securityNote: {
       fontSize: 12,
-      color: '#999',
+      color: colors.text.tertiary,
       textAlign: 'center',
       paddingHorizontal: 20,
   }

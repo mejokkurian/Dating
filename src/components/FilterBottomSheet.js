@@ -11,12 +11,16 @@ import {
   PanResponder,
   Switch,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { LinearGradient } from "expo-linear-gradient";
-import theme from "../theme/theme";
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+const GOLD = "#D4AF37";
+const GOLD_LIGHT = "#F0D060";
+const CARD = "#1E1E1E";
+const TEXT_DIM = "#888";
 
 const FilterBottomSheet = ({
   visible,
@@ -24,33 +28,28 @@ const FilterBottomSheet = ({
   onClose,
   onUpdateFilter,
 }) => {
-  // Local state for all filter inputs
   const [distance, setDistance] = useState(50);
   const [ageMin, setAgeMin] = useState(18);
   const [ageMax, setAgeMax] = useState(35);
   const [heightMin, setHeightMin] = useState(140);
   const [verified, setVerified] = useState(false);
   const [premium, setPremium] = useState(false);
-  
-  // Lifestyle Chip Arrays
+
   const [education, setEducation] = useState([]);
   const [drinking, setDrinking] = useState([]);
   const [smoking, setSmoking] = useState([]);
   const [kids, setKids] = useState([]);
   const [religion, setReligion] = useState([]);
 
-  // Animation values
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const panY = useRef(new Animated.Value(0)).current;
 
-  // Options Data
   const EDUCATION_OPTIONS = ["High School", "Undergrad", "Postgrad", "PhD"];
   const DRINKING_OPTIONS = ["Socially", "Never", "Often"];
   const SMOKING_OPTIONS = ["Socially", "Never", "Regularly"];
   const KIDS_OPTIONS = ["Have kids", "Want kids", "Don't want", "Not sure"];
   const RELIGION_OPTIONS = ["Christian", "Muslim", "Jewish", "Hindu", "Atheist", "Spiritual", "Other"];
 
-  // Initialize local state from props when visible
   useEffect(() => {
     if (visible) {
       setDistance(filterState.distance || 50);
@@ -65,7 +64,6 @@ const FilterBottomSheet = ({
       setKids(filterState.kids || []);
       setReligion(filterState.religion || []);
 
-      // Enter Animation
       panY.setValue(0);
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -94,19 +92,7 @@ const FilterBottomSheet = ({
   };
 
   const handleApply = () => {
-    onUpdateFilter({
-      distance,
-      ageMin,
-      ageMax,
-      heightMin,
-      verified,
-      premium,
-      education,
-      drinking,
-      smoking,
-      kids,
-      religion,
-    });
+    onUpdateFilter({ distance, ageMin, ageMax, heightMin, verified, premium, education, drinking, smoking, kids, religion });
     handleClose();
   };
 
@@ -124,7 +110,6 @@ const FilterBottomSheet = ({
     setReligion([]);
   };
 
-  // Helper for toggle chips
   const toggleChip = (item, currentList, setter) => {
     if (currentList.includes(item)) {
       setter(currentList.filter((i) => i !== item));
@@ -134,239 +119,304 @@ const FilterBottomSheet = ({
   };
 
   const panResponder = useRef(
-        PanResponder.create({
-          onStartShouldSetPanResponder: () => true,
-          onMoveShouldSetPanResponder: (_, gestureState) => {
-            const isVerticalDrag =
-              Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-            const isDraggingDown = gestureState.dy > 0;
-            return isVerticalDrag && isDraggingDown;
-          },
-          onPanResponderMove: (_, gestureState) => {
-            if (gestureState.dy > 0) {
-              panY.setValue(gestureState.dy);
-            }
-          },
-          onPanResponderRelease: (_, gestureState) => {
-            if (gestureState.dy > 150) {
-              handleClose();
-            } else {
-              Animated.spring(panY, {
-                toValue: 0,
-                useNativeDriver: true,
-                friction: 7,
-              }).start();
-            }
-          },
-        })
-      ).current;
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const isVerticalDrag = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        const isDraggingDown = gestureState.dy > 0;
+        return isVerticalDrag && isDraggingDown;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) panY.setValue(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150) {
+          handleClose();
+        } else {
+          Animated.spring(panY, { toValue: 0, useNativeDriver: true, friction: 7 }).start();
+        }
+      },
+    })
+  ).current;
 
   const combinedTranslateY = Animated.add(slideAnim, panY);
 
   const renderSectionHeader = (title, icon) => (
     <View style={styles.sectionHeader}>
-        <View style={styles.sectionIconContainer}>
-            <Ionicons name={icon} size={16} color="#D4AF37" />
-        </View>
-        <Text style={styles.sectionTitle}>{title}</Text>
+      <LinearGradient
+        colors={["rgba(212,175,55,0.25)", "rgba(212,175,55,0.08)"]}
+        style={styles.sectionIconContainer}
+      >
+        <Ionicons name={icon} size={15} color={GOLD} />
+      </LinearGradient>
+      <Text style={styles.sectionTitle}>{title}</Text>
     </View>
   );
 
   const renderChips = (options, selected, setter) => (
-      <View style={styles.chipsContainer}>
-        {options.map((option) => {
-            const isActive = selected.includes(option);
-            return (
-                <TouchableOpacity
-                    key={option}
-                    style={[styles.chip, isActive && styles.chipActive]}
-                    onPress={() => toggleChip(option, selected, setter)}
-                >
-                    <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{option}</Text>
-                </TouchableOpacity>
-            )
-        })}
-      </View>
+    <View style={styles.chipsContainer}>
+      {options.map((option) => {
+        const isActive = selected.includes(option);
+        return (
+          <TouchableOpacity
+            key={option}
+            style={[styles.chip, isActive && styles.chipActive]}
+            onPress={() => toggleChip(option, selected, setter)}
+            activeOpacity={0.75}
+          >
+            {isActive ? (
+              <LinearGradient
+                colors={[GOLD_LIGHT, GOLD]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                borderRadius={20}
+              />
+            ) : null}
+            <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{option}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-        <View style={styles.overlay}>
-             <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
-             
-             <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: combinedTranslateY }] }]}>
-                {/* Drag Handle */}
-                <View {...panResponder.panHandlers} style={styles.handleContainer}>
-                    <View style={styles.handle} />
+      <View style={styles.overlay}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
+
+        <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: combinedTranslateY }] }]}>
+          {/* Gold top glow line */}
+          <LinearGradient
+            colors={["rgba(212,175,55,0.5)", "transparent"]}
+            style={styles.topGlowLine}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+          />
+
+          {/* Drag Handle */}
+          <View {...panResponder.panHandlers} style={styles.handleContainer}>
+            <LinearGradient
+              colors={[GOLD, GOLD_LIGHT]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.handle}
+            />
+          </View>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.headerLabel}>DISCOVER</Text>
+              <Text style={styles.headerTitle}>Filters</Text>
+            </View>
+            <TouchableOpacity onPress={handleClose} style={styles.closeButton} activeOpacity={0.8}>
+              <LinearGradient
+                colors={["#2A2A2A", "#222"]}
+                style={styles.closeIconCircle}
+              >
+                <Ionicons name="close" size={18} color="#DDD" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+            {/* Distance */}
+            <View style={styles.card}>
+              {renderSectionHeader("Distance Preference", "location-sharp")}
+              <View style={styles.sliderValueRow}>
+                <Text style={styles.sliderValue}>Up to</Text>
+                <Text style={styles.sliderValueHighlight}>{Math.round(distance)} km</Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={100}
+                step={1}
+                value={distance}
+                onValueChange={setDistance}
+                minimumTrackTintColor={GOLD}
+                maximumTrackTintColor="#2E2E2E"
+                thumbTintColor={GOLD}
+              />
+            </View>
+
+            {/* Age Range */}
+            <View style={styles.card}>
+              {renderSectionHeader("Age Range", "calendar")}
+              <View style={styles.ageValuesRow}>
+                <View style={styles.ageValueBox}>
+                  <Text style={styles.ageValueLabel}>Min</Text>
+                  <Text style={styles.ageValueNumber}>{Math.round(ageMin)}</Text>
                 </View>
-                
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Filters</Text>
-                     <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                         <View style={styles.closeIconCircle}>
-                            <Ionicons name="close" size={20} color="#000" />
-                         </View>
-                    </TouchableOpacity>
+                <View style={styles.ageDash} />
+                <View style={styles.ageValueBox}>
+                  <Text style={styles.ageValueLabel}>Max</Text>
+                  <Text style={styles.ageValueNumber}>{Math.round(ageMax)}</Text>
                 </View>
+              </View>
+              <View style={styles.dualSliderContainer}>
+                <Text style={styles.subLabel}>Min</Text>
+                <Slider
+                  style={styles.halfSlider}
+                  minimumValue={18}
+                  maximumValue={50}
+                  step={1}
+                  value={ageMin}
+                  onValueChange={(val) => { if (val > ageMax) setAgeMax(val); setAgeMin(val); }}
+                  minimumTrackTintColor={GOLD}
+                  maximumTrackTintColor="#2E2E2E"
+                  thumbTintColor={GOLD}
+                />
+                <Text style={styles.subLabel}>Max</Text>
+                <Slider
+                  style={styles.halfSlider}
+                  minimumValue={18}
+                  maximumValue={80}
+                  step={1}
+                  value={ageMax}
+                  onValueChange={(val) => { if (val < ageMin) setAgeMin(val); setAgeMax(val); }}
+                  minimumTrackTintColor={GOLD}
+                  maximumTrackTintColor="#2E2E2E"
+                  thumbTintColor={GOLD}
+                />
+              </View>
+            </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                    
-                    {/* --- BASICS --- */}
-                    <View style={styles.section}>
-                        {renderSectionHeader("Distance Preference", "location-sharp")}
-                        <View style={styles.sliderRow}>
-                            <Text style={styles.sliderLabel}>Up to {Math.round(distance)} km</Text>
-                        </View>
-                        <Slider
-                            style={styles.slider}
-                            minimumValue={1}
-                            maximumValue={100}
-                            step={1}
-                            value={distance}
-                            onValueChange={setDistance}
-                            minimumTrackTintColor="#D4AF37"
-                            maximumTrackTintColor="#E5E5EA"
-                            thumbTintColor="#D4AF37"
-                        />
-                    </View>
+            {/* Height */}
+            <View style={styles.card}>
+              {renderSectionHeader("Minimum Height", "resize")}
+              <View style={styles.sliderValueRow}>
+                <Text style={styles.sliderValue}>At least</Text>
+                <Text style={styles.sliderValueHighlight}>{Math.round(heightMin)} cm</Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={140}
+                maximumValue={220}
+                step={1}
+                value={heightMin}
+                onValueChange={setHeightMin}
+                minimumTrackTintColor={GOLD}
+                maximumTrackTintColor="#2E2E2E"
+                thumbTintColor={GOLD}
+              />
+            </View>
 
-                    <View style={styles.section}>
-                        {renderSectionHeader("Age Range", "calendar")}
-                        <View style={styles.sliderRow}>
-                             <Text style={styles.sliderLabel}>Min Age: {Math.round(ageMin)}</Text>
-                             <Text style={styles.sliderLabel}>Max Age: {Math.round(ageMax)}</Text>
-                        </View>
-                        {/* Note: Ideally use a MultiSlider here. For now using two sliders as requested workaround */}
-                         <View style={styles.dualSliderContainer}>
-                            <Text style={styles.subLabel}>Min</Text>
-                            <Slider
-                                style={styles.halfSlider}
-                                minimumValue={18}
-                                maximumValue={50}
-                                step={1}
-                                value={ageMin}
-                                onValueChange={(val) => {
-                                    if(val > ageMax) setAgeMax(val);
-                                    setAgeMin(val);
-                                }}
-                                minimumTrackTintColor="#D4AF37"
-                                maximumTrackTintColor="#E5E5EA"
-                                thumbTintColor="#D4AF37"
-                            />
-                            <Text style={styles.subLabel}>Max</Text>
-                             <Slider
-                                style={styles.halfSlider}
-                                minimumValue={18}
-                                maximumValue={80}
-                                step={1}
-                                value={ageMax}
-                                onValueChange={(val) => {
-                                    if(val < ageMin) setAgeMin(val);
-                                    setAgeMax(val);
-                                }}
-                                minimumTrackTintColor="#D4AF37"
-                                maximumTrackTintColor="#E5E5EA"
-                                thumbTintColor="#D4AF37"
-                            />
-                         </View>
-                    </View>
-
-                    <View style={styles.section}>
-                        {renderSectionHeader("Minimum Height", "resize")}
-                         <View style={styles.sliderRow}>
-                            <Text style={styles.sliderLabel}>{Math.round(heightMin)} cm+</Text>
-                        </View>
-                        <Slider
-                            style={styles.slider}
-                            minimumValue={140}
-                            maximumValue={220}
-                            step={1}
-                            value={heightMin}
-                            onValueChange={setHeightMin}
-                            minimumTrackTintColor="#D4AF37"
-                            maximumTrackTintColor="#E5E5EA"
-                            thumbTintColor="#D4AF37"
-                        />
-                    </View>
-
-                     {/* --- STATUS --- */}
-                     <View style={styles.divider} />
-                     
-                     <View style={styles.toggleRow}>
-                        <View style={styles.toggleTextContainer}>
-                            <View style={styles.toggleIcon}>
-                                <Ionicons name="shield-checkmark" size={18} color="#D4AF37" />
-                            </View>
-                            <Text style={styles.toggleLabel}>Verified Profiles Only</Text>
-                        </View>
-                        <Switch
-                            trackColor={{ false: "#E5E5EA", true: "#D4AF37" }}
-                            thumbColor={"#FFF"}
-                            ios_backgroundColor="#E5E5EA"
-                            onValueChange={setVerified}
-                            value={verified}
-                        />
-                     </View>
-
-                     <View style={styles.toggleRow}>
-                         <View style={styles.toggleTextContainer}>
-                             <View style={styles.toggleIcon}>
-                                 <Ionicons name="star" size={18} color="#D4AF37" />
-                             </View>
-                             <Text style={styles.toggleLabel}>Premium Members Only</Text>
-                        </View>
-                        <Switch
-                            trackColor={{ false: "#E5E5EA", true: "#D4AF37" }}
-                            thumbColor={"#FFF"}
-                            ios_backgroundColor="#E5E5EA"
-                            onValueChange={setPremium}
-                            value={premium}
-                        />
-                     </View>
-                     
-                     <View style={styles.divider} />
-
-                    {/* --- LIFESTYLE --- */}
-                    <View style={styles.section}>
-                        {renderSectionHeader("Education", "school")}
-                        {renderChips(EDUCATION_OPTIONS, education, setEducation)}
-                    </View>
-                    
-                    <View style={styles.section}>
-                        {renderSectionHeader("Vices", "beer-outline")}
-                        <Text style={styles.miniHeader}>Drinking</Text>
-                        {renderChips(DRINKING_OPTIONS, drinking, setDrinking)}
-                         <View style={{height: 12}}/>
-                        <Text style={styles.miniHeader}>Smoking</Text>
-                        {renderChips(SMOKING_OPTIONS, smoking, setSmoking)}
-                    </View>
-
-                    <View style={styles.section}>
-                         {renderSectionHeader("Family Plans", "home")}
-                         {renderChips(KIDS_OPTIONS, kids, setKids)}
-                    </View>
-
-                     <View style={styles.section}>
-                         {renderSectionHeader("Religion", "earth-outline")}
-                         {renderChips(RELIGION_OPTIONS, religion, setReligion)}
-                    </View>
-
-
-                </ScrollView>
-
-                {/* Footer Buttons */}
-                <View style={styles.footer}>
-                     <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-                        <Text style={styles.resetButtonText}>Reset</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
-                        <Text style={styles.applyButtonText}>Apply Filters</Text>
-                    </TouchableOpacity>
+            {/* Toggles */}
+            <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.toggleRow}
+                onPress={() => setVerified(!verified)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.toggleLeft}>
+                  <LinearGradient
+                    colors={verified ? [GOLD_LIGHT, GOLD] : ["rgba(212,175,55,0.2)", "rgba(212,175,55,0.08)"]}
+                    style={styles.toggleIconWrap}
+                  >
+                    <Ionicons name="shield-checkmark" size={17} color={verified ? "#000" : GOLD} />
+                  </LinearGradient>
+                  <View>
+                    <Text style={styles.toggleLabel}>Verified Profiles Only</Text>
+                    <Text style={styles.toggleSub}>Show ID-verified members</Text>
+                  </View>
                 </View>
+                <Switch
+                  trackColor={{ false: "#2E2E2E", true: GOLD }}
+                  thumbColor={verified ? "#000" : "#888"}
+                  ios_backgroundColor="#2E2E2E"
+                  onValueChange={setVerified}
+                  value={verified}
+                />
+              </TouchableOpacity>
 
-             </Animated.View>
-        </View>
+              <View style={styles.cardDivider} />
+
+              <TouchableOpacity
+                style={styles.toggleRow}
+                onPress={() => setPremium(!premium)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.toggleLeft}>
+                  <LinearGradient
+                    colors={premium ? [GOLD_LIGHT, GOLD] : ["rgba(212,175,55,0.2)", "rgba(212,175,55,0.08)"]}
+                    style={styles.toggleIconWrap}
+                  >
+                    <Ionicons name="star" size={17} color={premium ? "#000" : GOLD} />
+                  </LinearGradient>
+                  <View>
+                    <Text style={styles.toggleLabel}>Premium Members Only</Text>
+                    <Text style={styles.toggleSub}>Exclusive subscriber profiles</Text>
+                  </View>
+                </View>
+                <Switch
+                  trackColor={{ false: "#2E2E2E", true: GOLD }}
+                  thumbColor={premium ? "#000" : "#888"}
+                  ios_backgroundColor="#2E2E2E"
+                  onValueChange={setPremium}
+                  value={premium}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Lifestyle */}
+            <View style={styles.sectionGroupLabel}>
+              <Text style={styles.sectionGroupText}>LIFESTYLE</Text>
+              <View style={styles.sectionGroupLine} />
+            </View>
+
+            <View style={styles.card}>
+              {renderSectionHeader("Education", "school")}
+              {renderChips(EDUCATION_OPTIONS, education, setEducation)}
+            </View>
+
+            <View style={styles.card}>
+              {renderSectionHeader("Vices", "beer-outline")}
+              <Text style={styles.miniHeader}>Drinking</Text>
+              {renderChips(DRINKING_OPTIONS, drinking, setDrinking)}
+              <View style={{ height: 16 }} />
+              <Text style={styles.miniHeader}>Smoking</Text>
+              {renderChips(SMOKING_OPTIONS, smoking, setSmoking)}
+            </View>
+
+            <View style={styles.card}>
+              {renderSectionHeader("Family Plans", "home")}
+              {renderChips(KIDS_OPTIONS, kids, setKids)}
+            </View>
+
+            <View style={styles.card}>
+              {renderSectionHeader("Religion", "earth-outline")}
+              {renderChips(RELIGION_OPTIONS, religion, setReligion)}
+            </View>
+
+          </ScrollView>
+
+          {/* Footer */}
+          <LinearGradient
+            colors={["rgba(14,14,14,0)", "#0E0E0E"]}
+            style={styles.footerGradient}
+            pointerEvents="none"
+          />
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.resetButton} onPress={handleReset} activeOpacity={0.8}>
+              <Text style={styles.resetButtonText}>Reset</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyButtonWrap} onPress={handleApply} activeOpacity={0.85}>
+              <LinearGradient
+                colors={[GOLD_LIGHT, GOLD, "#B8922A"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.applyButton}
+              >
+                <Ionicons name="checkmark" size={18} color="#000" style={{ marginRight: 6 }} />
+                <Text style={styles.applyButtonText}>Apply Filters</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 };
@@ -374,222 +424,339 @@ const FilterBottomSheet = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     justifyContent: "flex-end",
   },
   backdrop: {
-      ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFillObject,
   },
   bottomSheet: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
-      height: "90%",
-      width: "100%",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 5,
+    backgroundColor: "#0E0E0E",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    height: "92%",
+    width: "100%",
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "rgba(212,175,55,0.18)",
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
+    overflow: "hidden",
+  },
+  topGlowLine: {
+    position: "absolute",
+    top: 0,
+    left: "10%",
+    right: "10%",
+    height: 1,
+    borderRadius: 1,
   },
   handleContainer: {
-      alignItems: "center",
-      paddingVertical: 12,
+    alignItems: "center",
+    paddingVertical: 14,
   },
   handle: {
-      width: 40,
-      height: 4,
-      backgroundColor: "#E5E5EA",
-      borderRadius: 2,
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.8,
   },
   header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingHorizontal: 24,
-      paddingBottom: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: "#F2F2F7",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  headerLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: GOLD,
+    letterSpacing: 2,
+    marginBottom: 4,
   },
   headerTitle: {
-      fontSize: 24,
-      fontWeight: "800",
-      color: "#000",
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#FFF",
+    letterSpacing: -0.5,
   },
   closeButton: {
-      padding: 4,
+    padding: 4,
   },
   closeIconCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: "#F2F2F7",
-      justifyContent: "center",
-      alignItems: "center",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   scrollContent: {
-      padding: 24,
-      paddingBottom: 100, // Space for footer
+    padding: 16,
+    paddingBottom: 140,
+    gap: 12,
   },
-  section: {
-      marginBottom: 28,
+  // Cards
+  card: {
+    backgroundColor: CARD,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
   },
+  cardDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginVertical: 14,
+  },
+  // Section headers
   sectionHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 16,
-      gap: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 10,
   },
   sectionIconContainer: {
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      backgroundColor: theme.colors.glass.background,
-      justifyContent: 'center',
-      alignItems: 'center',
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.2)",
   },
   sectionTitle: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: "#000",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFF",
+    letterSpacing: -0.2,
   },
-  sliderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 12,
+  // Slider values
+  sliderValueRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    marginBottom: 8,
   },
-  sliderLabel: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: theme.colors.primary,
+  sliderValue: {
+    fontSize: 14,
+    color: TEXT_DIM,
+    fontWeight: "500",
+  },
+  sliderValueHighlight: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: GOLD,
+    letterSpacing: -0.5,
   },
   slider: {
-      width: '100%',
-      height: 40,
+    width: "100%",
+    height: 40,
+    marginTop: -4,
+  },
+  // Age dual slider
+  ageValuesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 12,
+  },
+  ageValueBox: {
+    flex: 1,
+    backgroundColor: "rgba(212,175,55,0.08)",
+    borderRadius: 12,
+    padding: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.15)",
+  },
+  ageValueLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: GOLD,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  ageValueNumber: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFF",
+  },
+  ageDash: {
+    width: 16,
+    height: 2,
+    backgroundColor: "rgba(212,175,55,0.3)",
+    borderRadius: 1,
   },
   dualSliderContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   halfSlider: {
-      flex: 1,
-      height: 40,
+    flex: 1,
+    height: 40,
   },
   subLabel: {
-      fontSize: 12,
-      color: '#666',
-      width: 25,
+    fontSize: 11,
+    color: TEXT_DIM,
+    fontWeight: "600",
+    width: 24,
   },
   // Toggles
-  divider: {
-      height: 1,
-      backgroundColor: '#F2F2F7',
-      marginVertical: 16,
-  },
   toggleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 20,
-      paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 2,
   },
-  toggleTextContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
+  toggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
   },
-  toggleIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: "rgba(212, 175, 55, 0.1)", // Gold with opacity
-      justifyContent: 'center',
-      alignItems: 'center',
+  toggleIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
   toggleLabel: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#000',
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFF",
+    marginBottom: 2,
+  },
+  toggleSub: {
+    fontSize: 12,
+    color: TEXT_DIM,
+    fontWeight: "400",
+  },
+  // Section group
+  sectionGroupLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  sectionGroupText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: GOLD,
+    letterSpacing: 2,
+  },
+  sectionGroupLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(212,175,55,0.15)",
   },
   // Chips
   chipsContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   chip: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 20,
-      backgroundColor: "#F8F8FA",
-      borderWidth: 1,
-      borderColor: "#E5E5EA",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: "#252525",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    overflow: "hidden",
   },
   chipActive: {
-      backgroundColor: theme.colors.primary,
-      borderColor: theme.colors.primary,
+    borderColor: GOLD,
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   chipText: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: "#666",
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#888",
   },
   chipTextActive: {
-      color: "#FFF",
-      fontWeight: '600',
+    color: "#000",
+    fontWeight: "700",
   },
   miniHeader: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: '#999',
-      marginBottom: 8,
-      marginLeft: 4,
-      textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: "700",
+    color: TEXT_DIM,
+    marginBottom: 10,
+    marginLeft: 2,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   // Footer
+  footerGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+    pointerEvents: "none",
+  },
   footer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: '#FFF',
-      borderTopWidth: 1,
-      borderTopColor: '#F2F2F7',
-      padding: 20,
-      paddingBottom: 34,
-      flexDirection: 'row',
-      gap: 16,
-      alignItems: 'center',
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    paddingBottom: 36,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
   },
   resetButton: {
-      flex: 1,
-      paddingVertical: 16,
-      borderRadius: 16,
-      backgroundColor: '#F2F2F7',
-      alignItems: 'center',
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: "#1E1E1E",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
   },
   resetButtonText: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: '#666',
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#888",
+  },
+  applyButtonWrap: {
+    flex: 2,
+    borderRadius: 18,
+    shadowColor: GOLD,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   applyButton: {
-      flex: 2,
-      paddingVertical: 16,
-      borderRadius: 16,
-      backgroundColor: '#000',
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 5,
+    paddingVertical: 16,
+    borderRadius: 18,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
   applyButtonText: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: '#FFF',
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#000",
+    letterSpacing: -0.2,
   },
 });
 

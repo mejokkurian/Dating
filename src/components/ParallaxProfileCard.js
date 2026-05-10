@@ -34,6 +34,8 @@ const ParallaxProfileCard = ({
   disabled = false,
   swipeAnimatedValue,
   cardOpacity, // Destructured prop
+  isLimitReachedShared,
+  onSwipeLimited,
   accessibilityLabel,
   accessibilityHint,
 }) => {
@@ -50,8 +52,10 @@ const ParallaxProfileCard = ({
     const playAudioAura = async () => {
       try {
         const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' }, // Demo URL
-            { isLooping: true, volume: 0, shouldPlay: true }
+          {
+            uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+          }, // Demo URL
+          { isLooping: true, volume: 0, shouldPlay: true },
         );
         soundObject = newSound;
         setSound(newSound);
@@ -81,7 +85,7 @@ const ParallaxProfileCard = ({
       // Direct raw assignment, filtering small noise
       const x = data.x || 0;
       const y = data.y || 0;
-      
+
       // Update shared values
       gyroX.value = withSpring(x, { damping: 50 });
       gyroY.value = withSpring(y, { damping: 50 });
@@ -99,7 +103,7 @@ const ParallaxProfileCard = ({
 
   // --- Parallax Effect Logic ---
   const imageStyle = useAnimatedStyle(() => {
-    const CLAMP = 20; 
+    const CLAMP = 20;
     return {
       transform: [
         { translateX: interpolate(gyroY.value, [-3, 3], [CLAMP, -CLAMP]) },
@@ -123,29 +127,39 @@ const ParallaxProfileCard = ({
   const panGesture = Gesture.Pan()
     .enabled(!disabled)
     .activeOffsetY([-10, 10]) // Activate when vertical movement > 10
-    .failOffsetX([-20, 20])   // Fail if horizontal movement > 20
+    .failOffsetX([-20, 20]) // Fail if horizontal movement > 20
     .onBegin(() => {
       // scale down slightly
     })
     .onUpdate((event) => {
       // Only vertical upward movement
       if (event.translationY < 0) {
-         translateY.value = event.translationY;
+        translateY.value = event.translationY;
       } else {
-         translateY.value = event.translationY * 0.2; // Rubber band
+        translateY.value = event.translationY * 0.2; // Rubber band
       }
       cardScale.value = withTiming(0.98, { duration: 100 });
     })
     .onEnd((event) => {
       cardScale.value = withSpring(1);
       if (event.translationY < SWIPE_THRESHOLD) {
+        // Check limit before animating card away
+        if (isLimitReachedShared && isLimitReachedShared.value) {
+          translateY.value = withSpring(0);
+          if (onSwipeLimited) runOnJS(onSwipeLimited)();
+          return;
+        }
         // Swipe Up!
-        translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 }, (finished) => {
-          if (finished) {
-            runOnJS(onSwipeUp)(data);
-            // NOTE: Removed translateY.value = 0 here to prevent snap-back
-          }
-        });
+        translateY.value = withTiming(
+          -SCREEN_HEIGHT,
+          { duration: 300 },
+          (finished) => {
+            if (finished) {
+              runOnJS(onSwipeUp)(data);
+              // NOTE: Removed translateY.value = 0 here to prevent snap-back
+            }
+          },
+        );
       } else {
         // Reset to center
         translateY.value = withSpring(0);
@@ -165,21 +179,19 @@ const ParallaxProfileCard = ({
 
   // Stamp Opacity (PASS/UNMATCH)
   const rejectOpacity = useAnimatedStyle(() => {
-     return {
-       // Manual interpolation logic explanation:
-       // When translateY goes up (negative), we want opacity 0 -> 1.
-       // -50 (start showing) -> -150 (fully shown)
-       opacity: interpolate(translateY.value, [-150, -50], [1, 0]),
-     };
+    return {
+      // Manual interpolation logic explanation:
+      // When translateY goes up (negative), we want opacity 0 -> 1.
+      // -50 (start showing) -> -150 (fully shown)
+      opacity: interpolate(translateY.value, [-150, -50], [1, 0]),
+    };
   });
 
   const mainPhotoIndex = data.mainPhotoIndex ?? 0;
-  const mainPhoto = data.photos && data.photos.length > 0
+  const mainPhoto =
+    data.photos && data.photos.length > 0
       ? data.photos[mainPhotoIndex] || data.photos[0]
       : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500";
-
- 
-
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -189,8 +201,14 @@ const ParallaxProfileCard = ({
           style={{ flex: 1 }}
           delayLongPress={500}
           accessible={true}
-          accessibilityLabel={accessibilityLabel || `Profile of ${data?.displayName || data?.name || 'user'}`}
-          accessibilityHint={accessibilityHint || "Double tap to view full profile, swipe up to pass"}
+          accessibilityLabel={
+            accessibilityLabel ||
+            `Profile of ${data?.displayName || data?.name || "user"}`
+          }
+          accessibilityHint={
+            accessibilityHint ||
+            "Double tap to view full profile, swipe up to pass"
+          }
           accessibilityRole="button"
           disabled={disabled}
         >
@@ -203,13 +221,21 @@ const ParallaxProfileCard = ({
             )}
             {imageError && (
               <View style={styles.imageErrorContainer}>
-                <Ionicons name="image-outline" size={60} color={theme.colors.text?.secondary || "#999"} />
+                <Ionicons
+                  name="image-outline"
+                  size={60}
+                  color={theme.colors.text?.secondary || "#999"}
+                />
                 <Text style={styles.imageErrorText}>Image unavailable</Text>
               </View>
             )}
             <Animated.Image
               source={{ uri: mainPhoto }}
-              style={[styles.cardImage, imageStyle, (imageLoading || imageError) && styles.hiddenImage]}
+              style={[
+                styles.cardImage,
+                imageStyle,
+                (imageLoading || imageError) && styles.hiddenImage,
+              ]}
               resizeMode="cover"
               onLoadStart={() => {
                 setImageLoading(true);
@@ -224,22 +250,23 @@ const ParallaxProfileCard = ({
               }}
             />
           </View>
-          
+
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.8)"]}
+            colors={["transparent", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.92)"]}
+            locations={[0, 0.45, 1]}
             style={styles.gradient}
           />
-          
+
           <Animated.View style={[styles.rejectStamp, rejectOpacity]}>
             <Ionicons name="close-circle" size={100} color="#FFFFFF" />
             <Text style={styles.rejectText}>PASS</Text>
           </Animated.View>
-          
+
           <Animated.View style={[styles.cardInfo, textLayerStyle]}>
-             <View style={styles.nameRow}>
-              <Text 
-                style={styles.name} 
-                numberOfLines={1} 
+            <View style={styles.nameRow}>
+              <Text
+                style={styles.name}
+                numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
               >
@@ -254,12 +281,12 @@ const ParallaxProfileCard = ({
                 />
               )}
               {data.isPremium && (
-                 <MaterialCommunityIcons 
-                    name="crown" 
-                    size={24} 
-                    color="#FFD700" 
-                    style={styles.iconDropShadow}
-                 />
+                <MaterialCommunityIcons
+                  name="crown"
+                  size={24}
+                  color="#FFD700"
+                  style={styles.iconDropShadow}
+                />
               )}
             </View>
 
@@ -272,21 +299,35 @@ const ParallaxProfileCard = ({
             <View style={styles.detailsRow}>
               {data.location && (
                 <View style={styles.detailItem}>
-                  <Ionicons name="location" size={16} color="rgba(255,255,255,0.9)" />
+                  <Ionicons
+                    name="location"
+                    size={16}
+                    color="rgba(255,255,255,0.9)"
+                  />
                   <Text style={styles.detailTextLocation}>{data.location}</Text>
                 </View>
               )}
               {data.distance && (
                 <View style={styles.detailItem}>
-                  <Ionicons name="navigate" size={14} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.detailTextDistance}>{data.distance} km</Text>
+                  <Ionicons
+                    name="navigate"
+                    size={14}
+                    color="rgba(255,255,255,0.7)"
+                  />
+                  <Text style={styles.detailTextDistance}>
+                    {data.distance} km
+                  </Text>
                 </View>
               )}
             </View>
-            
+
             <View style={styles.swipUpHint}>
-                <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.swipUpText}>Swipe up to Pass</Text>
+              <Ionicons
+                name="chevron-up"
+                size={12}
+                color="rgba(255,255,255,0.7)"
+              />
+              <Text style={styles.swipUpText}>Swipe up to Pass</Text>
             </View>
           </Animated.View>
         </Pressable>
@@ -298,22 +339,22 @@ const ParallaxProfileCard = ({
 const styles = StyleSheet.create({
   container: {
     width: SCREEN_WIDTH - 30,
-    height: SCREEN_HEIGHT * 0.70, // Slightly increased height
-    borderRadius: 24,
+    height: SCREEN_HEIGHT * 0.68,
+    borderRadius: 28,
     backgroundColor: "#1a1a1a",
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowColor: "#D4AF37",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    elevation: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(212,175,55,0.22)",
   },
   imageContainer: {
     flex: 1,
     overflow: "hidden",
-    borderRadius: 24,
+    borderRadius: 28,
     position: "relative",
   },
   cardImage: {
@@ -354,8 +395,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: "50%",
-    borderRadius: 24,
+    height: "65%",
+    borderRadius: 28,
   },
   rejectStamp: {
     position: "absolute",
@@ -369,7 +410,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 24,
     fontWeight: "bold",
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowColor: "rgba(0,0,0,0.5)",
     textShadowRadius: 10,
   },
   cardInfo: {
@@ -391,11 +432,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "800",
     color: "#fff",
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: "rgba(0, 0, 0, 0.7)",
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
-    letterSpacing: 0.5,
-    flexShrink: 1, // Prevent pushing icons off screen
+    textShadowRadius: 12,
+    letterSpacing: 0.8,
+    flexShrink: 1,
   },
   iconDropShadow: {
     shadowColor: "#000",
@@ -421,11 +462,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    },
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.35)",
+  },
   detailTextLocation: {
     fontSize: 14,
     color: "#fff",
@@ -436,17 +479,24 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.8)",
   },
   swipUpHint: {
-      position: 'absolute',
-      bottom: 5,
-      alignSelf: 'center',
-      alignItems: 'center',
-      opacity: 0.8
+    position: "absolute",
+    bottom: 6,
+    alignSelf: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    opacity: 0.75,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 10,
   },
   swipUpText: {
-      color: 'rgba(255,255,255,0.6)',
-      fontSize: 10,
-      marginTop: -2
-  }
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 10,
+    letterSpacing: 0.5,
+    fontWeight: "500",
+  },
 });
 
 export default ParallaxProfileCard;

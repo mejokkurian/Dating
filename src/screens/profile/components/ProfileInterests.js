@@ -1,8 +1,11 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../../context/ThemeContext";
 
 const ProfileInterests = ({ interests, onAdd, onRemove }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.inputWrapper}>
       <Text style={styles.label}>Interests</Text>
@@ -11,26 +14,26 @@ const ProfileInterests = ({ interests, onAdd, onRemove }) => {
           <View key={index} style={styles.neuInterestChip}>
             <Text style={styles.neuInterestText}>{interest}</Text>
             <TouchableOpacity onPress={() => onRemove(index)}>
-              <Ionicons name="close-circle" size={18} color="#666" />
+              <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
         ))}
         <TouchableOpacity onPress={onAdd} style={styles.addInterestButton}>
-          <Ionicons name="add-circle" size={24} color="#000" />
+          <Ionicons name="add-circle" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   inputWrapper: {
     marginBottom: 20,
   },
   label: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#000000",
+    color: colors.text.primary,
     marginBottom: 10,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -48,9 +51,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -59,7 +62,7 @@ const styles = StyleSheet.create({
   },
   neuInterestText: {
     fontSize: 14,
-    color: "#000000",
+    color: colors.text.primary,
     fontWeight: "500",
   },
   addInterestButton: {

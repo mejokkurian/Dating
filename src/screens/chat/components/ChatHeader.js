@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../../context/ThemeContext';
 
-const ChatHeader = ({ 
-  user, 
-  navigation, 
-  isTyping, 
-  isRemoteRecording, 
+const ChatHeader = ({
+  user,
+  navigation,
+  isTyping,
+  isRemoteRecording,
   isOtherUserInChat,
   onAudioCall,
   onVideoCall,
@@ -17,24 +18,27 @@ const ChatHeader = ({
   isSearchMode,
   onSearchToggle
 }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+
   if (isSearchMode) {
     return (
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             onSearchToggle(false);
             onSearchChange('');
           }}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={28} color="#000" />
+          <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
         </TouchableOpacity>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={colors.text.tertiary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search messages..."
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={onSearchChange}
             autoFocus
@@ -43,11 +47,11 @@ const ChatHeader = ({
             accessibilityHint="Type to search for messages in this conversation"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => onSearchChange('')}
               style={styles.clearButton}
             >
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={20} color={colors.text.tertiary} />
             </TouchableOpacity>
           )}
         </View>
@@ -57,46 +61,44 @@ const ChatHeader = ({
 
   return (
     <View style={styles.header}>
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={() => {
           if (navigation.canGoBack()) {
             navigation.goBack();
           } else {
-            // If we cant go back (e.g. came from replace), default to the Messages tab
-            // We use reset/navigate to ensure we land on the main tabs structure
             navigation.navigate('MainTab', { screen: 'Messages' });
           }
-        }} 
+        }}
         style={styles.backButton}
         accessible={true}
         accessibilityLabel="Go back"
         accessibilityHint="Navigate back to previous screen"
         accessibilityRole="button"
       >
-        <Ionicons name="chevron-back" size={28} color="#000" />
+        <Ionicons name="chevron-back" size={28} color={colors.text.primary} />
       </TouchableOpacity>
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={() => navigation.navigate('ViewUserProfile', { userId: user._id, user })}
         accessible={true}
         accessibilityLabel={`View ${user.displayName || user.name}'s profile`}
         accessibilityHint="Tap to view user profile"
         accessibilityRole="button"
       >
-        <Image 
-          source={{ 
-            uri: user.image || (user.photos && user.photos.length > 0 ? (user.photos[user.mainPhotoIndex || 0] || user.photos[0]) : 'https://via.placeholder.com/40' ) 
-          }} 
-          style={styles.avatar} 
+        <Image
+          source={{
+            uri: user.image || (user.photos && user.photos.length > 0 ? (user.photos[user.mainPhotoIndex || 0] || user.photos[0]) : 'https://via.placeholder.com/40' )
+          }}
+          style={styles.avatar}
         />
       </TouchableOpacity>
       <View style={styles.headerInfo}>
         <Text style={styles.headerName}>{user.displayName || user.name || 'User'}</Text>
-        <Text style={[styles.statusText, !isOnline && { color: '#999' }]}>
+        <Text style={[styles.statusText, !isOnline && { color: colors.text.tertiary }]}>
           {!isOnline ? 'Offline' : isRemoteRecording ? 'Recording audio...' : isTyping ? 'Typing...' : isOtherUserInChat ? 'In Chat' : 'Online'}
         </Text>
       </View>
-      
-      <TouchableOpacity 
+
+      <TouchableOpacity
         onPress={() => onSearchToggle(true)}
         style={styles.searchButton}
         accessible={true}
@@ -104,25 +106,25 @@ const ChatHeader = ({
         accessibilityHint="Tap to search for messages in this conversation"
         accessibilityRole="button"
       >
-        <Ionicons name="search" size={24} color="#000" />
+        <Ionicons name="search" size={24} color={colors.text.primary} />
       </TouchableOpacity>
-      
+
       {/* Call Buttons - HIDDEN FOR PRODUCTION */}
       {false && (
         <View style={styles.callButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={onAudioCall}
             style={[styles.callButton, callState.visible && { opacity: 0.5 }]}
             disabled={callState.visible}
           >
-            <Ionicons name="call" size={28} color="#000" />
+            <Ionicons name="call" size={28} color={colors.text.primary} />
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={onVideoCall}
             style={[styles.callButton, callState.visible && { opacity: 0.5 }]}
             disabled={callState.visible}
           >
-            <Ionicons name="videocam" size={28} color="#000" />
+            <Ionicons name="videocam" size={28} color={colors.text.primary} />
           </TouchableOpacity>
         </View>
       )}
@@ -130,14 +132,15 @@ const ChatHeader = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
   },
   backButton: {
     marginRight: 16,
@@ -156,7 +159,7 @@ const styles = StyleSheet.create({
   headerName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text.primary,
   },
   statusText: {
     fontSize: 12,
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.inputBg,
     borderRadius: 20,
     paddingHorizontal: 12,
     marginRight: 8,
@@ -195,7 +198,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: colors.text.primary,
     paddingVertical: 8,
   },
   clearButton: {

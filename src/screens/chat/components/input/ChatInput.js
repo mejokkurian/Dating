@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import styles from '../../styles';
+import createChatStyles from '../../styles';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const ChatInput = ({
   isRecording,
@@ -27,6 +28,8 @@ const ChatInput = ({
   disabled = false,
   isEditing = false,
 }) => {
+  const { colors } = useTheme();
+  const styles = createChatStyles(colors);
   const textInputRef = useRef(null);
 
   // Auto-focus input when editing starts

@@ -1,12 +1,14 @@
 import React from "react";
 import { View, Text, StyleSheet, Image, Dimensions } from "react-native";
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
-import theme from "../theme/theme";
+import { useTheme } from "../context/ThemeContext";
 import { getInterestIcon } from "../constants/interestIcons";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const ProfileContent = ({ profile }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   if (!profile) return null;
 
   // Organize photos: primary first, then others
@@ -73,7 +75,7 @@ const ProfileContent = ({ profile }) => {
               <Ionicons 
                 name="location-outline" 
                 size={16} 
-                color={theme.colors.text.secondary}
+                color={colors.text.secondary}
               />
               <Text style={styles.locationText}>{profile.location}</Text>
             </View>
@@ -97,19 +99,19 @@ const ProfileContent = ({ profile }) => {
             <View style={styles.statsGridContainer}>
               {profile.budget && (
                 <View style={styles.statRow}>
-                  <Ionicons name="heart-outline" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                  <Ionicons name="heart-outline" size={16} color={colors.text.secondary} style={styles.statIcon} />
                   <Text style={styles.bioTextPlain}>{profile.budget}</Text>
                 </View>
               )}
               {profile.relationshipType && (
                 <View style={styles.statRow}>
-                  <Ionicons name="people-circle-outline" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                  <Ionicons name="people-circle-outline" size={16} color={colors.text.secondary} style={styles.statIcon} />
                   <Text style={styles.bioTextPlain}>{profile.relationshipType}</Text>
                 </View>
               )}
               {profile.preferences && (
                 <View style={styles.statRow}>
-                  <Ionicons name="male-female" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                  <Ionicons name="male-female" size={16} color={colors.text.secondary} style={styles.statIcon} />
                   <Text style={styles.bioTextPlain}>Interested in {profile.preferences}</Text>
                 </View>
               )}
@@ -127,61 +129,61 @@ const ProfileContent = ({ profile }) => {
           <View style={styles.statsGridContainer}>
             {profile.height && (
               <View style={styles.statRow}>
-                <MaterialCommunityIcons name="ruler" size={18} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <MaterialCommunityIcons name="ruler" size={18} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.height} cm</Text>
               </View>
             )}
             {profile.weight && (
               <View style={styles.statRow}>
-                <FontAwesome5 name="weight" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <FontAwesome5 name="weight" size={16} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.weight} kg</Text>
               </View>
             )}
             {profile.occupation && (
               <View style={styles.statRow}>
-                <MaterialCommunityIcons name="briefcase-outline" size={18} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <MaterialCommunityIcons name="briefcase-outline" size={18} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.occupation}</Text>
               </View>
             )}
             {profile.education && (
               <View style={styles.statRow}>
-                <MaterialCommunityIcons name="school-outline" size={18} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <MaterialCommunityIcons name="school-outline" size={18} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.education}</Text>
               </View>
             )}
             {profile.schoolUniversity && (
               <View style={styles.statRow}>
-                <FontAwesome5 name="university" size={14} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <FontAwesome5 name="university" size={14} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.schoolUniversity}</Text>
               </View>
             )}
             {profile.zodiac && (
               <View style={styles.statRow}>
-                <Ionicons name="sparkles" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <Ionicons name="sparkles" size={16} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.zodiac}</Text>
               </View>
             )}
             {profile.ethnicity && (
               <View style={styles.statRow}>
-                <Ionicons name="people" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <Ionicons name="people" size={16} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.ethnicity}</Text>
               </View>
             )}
             {profile.children && (
               <View style={styles.statRow}>
-                <Ionicons name="person" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <Ionicons name="person" size={16} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.children}</Text>
               </View>
             )}
             {profile.religion && (
               <View style={styles.statRow}>
-                <Ionicons name="book" size={16} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <Ionicons name="book" size={16} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.religion}</Text>
               </View>
             )}
             {profile.politics && (
               <View style={styles.statRow}>
-                <FontAwesome5 name="landmark" size={14} color={theme.colors.text.secondary} style={styles.statIcon} />
+                <FontAwesome5 name="landmark" size={14} color={colors.text.secondary} style={styles.statIcon} />
                 <Text style={styles.bioTextPlain}>{profile.politics}</Text>
               </View>
             )}
@@ -199,19 +201,19 @@ const ProfileContent = ({ profile }) => {
             <View style={styles.statsGridContainer}>
               {profile.drinking && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="glass-wine" size={18} color={theme.colors.text.secondary} style={styles.statIcon} />
+                  <MaterialCommunityIcons name="glass-wine" size={18} color={colors.text.secondary} style={styles.statIcon} />
                   <Text style={styles.bioTextPlain}>{profile.drinking}</Text>
                 </View>
               )}
               {profile.smoking && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="smoking" size={18} color={theme.colors.text.secondary} style={styles.statIcon} />
+                  <MaterialCommunityIcons name="smoking" size={18} color={colors.text.secondary} style={styles.statIcon} />
                   <Text style={styles.bioTextPlain}>{profile.smoking}</Text>
                 </View>
               )}
               {profile.drugs && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="leaf" size={18} color={theme.colors.text.secondary} style={styles.statIcon} />
+                  <MaterialCommunityIcons name="leaf" size={18} color={colors.text.secondary} style={styles.statIcon} />
                   <Text style={styles.bioTextPlain}>{profile.drugs}</Text>
                 </View>
               )}
@@ -241,7 +243,7 @@ const ProfileContent = ({ profile }) => {
                     <IconComponent
                       name={iconConfig.name}
                       size={16}
-                      color={theme.colors.text.secondary}
+                      color={colors.text.secondary}
                       style={styles.interestIcon}
                     />
                     <Text style={styles.bioTextPlain}>{interest}</Text>
@@ -271,7 +273,7 @@ const ProfileContent = ({ profile }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     paddingBottom: 20,
   },
@@ -288,7 +290,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
+    borderColor: colors.border,
   },
   content: {
     paddingHorizontal: 20,
@@ -305,13 +307,13 @@ const styles = StyleSheet.create({
   nameText: {
     fontSize: 32,
     fontWeight: '800',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     letterSpacing: -0.5,
   },
   ageText: {
     fontSize: 32,
     fontWeight: '400',
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     letterSpacing: -0.5,
   },
   verifiedBadge: {
@@ -324,7 +326,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     letterSpacing: 0.2,
   },
   section: {
@@ -333,13 +335,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
   bioTextPlain: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     lineHeight: 26,
     marginTop: 4,
     letterSpacing: 0.2,

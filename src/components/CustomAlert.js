@@ -3,19 +3,22 @@ import { Modal, View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, 
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 import theme from '../theme/theme';
 
 const { width } = Dimensions.get('window');
 
-const CustomAlert = ({ 
-  visible, 
-  title, 
-  message, 
+const CustomAlert = ({
+  visible,
+  title,
+  message,
   buttons = [],
   onClose,
   onConfirm,
   type = 'default', // 'success', 'error', 'warning', 'default'
 }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -107,7 +110,7 @@ const CustomAlert = ({
     if (title?.includes('Match')) {
       return { name: 'heart', color: '#FFFFFF', gradient: ['#D4AF37', '#F2D06B'], size: 42 };
     }
-    if (title?.includes('Super Like') || title?.includes('⭐')) {
+    if (title?.includes('Adore') || title?.includes('⭐')) {
       return { name: 'star', color: '#FFFFFF', gradient: ['#FFD700', '#FFA500'], size: 42 };
     }
     if (title?.includes('Error')) {
@@ -151,7 +154,7 @@ const CustomAlert = ({
         >
           {/* Gradient Background */}
           <LinearGradient
-            colors={theme.colors.gradients.background}
+            colors={colors.gradients.background}
             style={styles.gradientBackground}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -210,7 +213,7 @@ const CustomAlert = ({
                   >
                     {isPrimary ? (
                       <LinearGradient
-                        colors={theme.colors.gradients.primary}
+                        colors={colors.gradients.primary}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.primaryButtonGradient}
@@ -237,7 +240,7 @@ const CustomAlert = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'center',
@@ -269,7 +272,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 24,
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   iconWrapper: {
     marginBottom: 20,
@@ -306,14 +309,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: theme.typography.fontSize['2xl'],
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     textAlign: 'center',
     marginBottom: 10,
     letterSpacing: -0.5,
   },
   message: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
     opacity: 0.9,
@@ -345,13 +348,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.surfaceDark,
+    backgroundColor: colors.surfaceDark,
     borderRadius: theme.borderRadius.full,
     borderWidth: 1,
     borderColor: 'transparent', // Looks cleaner without border or very subtle one
   },
   secondaryButtonText: {
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold,
   },

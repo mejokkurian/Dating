@@ -1,13 +1,13 @@
 import {
-    
+
   StyleSheet,
   Platform,
 } from 'react-native';
 
-const styles = StyleSheet.create({
+const createChatStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -17,12 +17,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: colors.text.secondary,
   },
   errorBanner: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: colors.errorBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFCDD2',
+    borderBottomColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -37,14 +37,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#C62828',
+    color: colors.error,
     marginLeft: 8,
     flex: 1,
   },
   errorRetryButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#FF4444',
+    backgroundColor: colors.error,
     borderRadius: 6,
   },
   errorRetryText: {
@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   errorMessage: {
     fontSize: 14,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -92,14 +92,14 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text.primary,
     marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: colors.border,
   },
   backButton: {
     marginRight: 16,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   headerName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text.primary,
   },
   statusText: {
     fontSize: 12,
@@ -146,17 +146,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   highlightedMessage: {
-    backgroundColor: 'rgba(255, 215, 0, 0.3)', // Gold with opacity
+    backgroundColor: 'rgba(255, 215, 0, 0.3)',
     borderColor: '#FFD700',
     borderWidth: 1,
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#D4AF37',
+    backgroundColor: colors.myMessage,
   },
   theirMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: colors.theirMessage,
     borderBottomLeftRadius: 4,
   },
   messageText: {
@@ -165,10 +165,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   myMessageText: {
-    color: '#FFFFFF',
+    color: colors.myMessageText,
   },
   theirMessageText: {
-    color: '#000000',
+    color: colors.theirMessageText,
   },
   timeText: {
     fontSize: 10,
@@ -176,15 +176,15 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   myTimeText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(0,0,0,0.4)',
   },
   theirTimeText: {
-    color: '#999999',
+    color: colors.text.tertiary,
   },
   inputWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
+    borderTopColor: colors.border,
     paddingBottom: Platform.OS === 'ios' ? 10 : 0,
   },
   inputContainer: {
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 4,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.background,
   },
   cameraButton: {
     width: 40,
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   textInputContainer: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.inputBg,
     borderRadius: 25,
     paddingLeft: 16,
     paddingRight: 8,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: colors.text.primary,
     maxHeight: 120,
     paddingRight: 8,
   },
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   recordingFullContainer: {
     flex: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.inputBg,
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   slideToCancel: {
     fontSize: 14,
-    color: '#999',
+    color: colors.text.tertiary,
     fontWeight: '500',
   },
   recordingInfo: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   recordingTime: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text.primary,
   },
   sendButtonText: {
     color: '#FFF',
@@ -323,12 +323,12 @@ const styles = StyleSheet.create({
   reactionBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: colors.overlayLight,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: colors.border,
   },
   reactionBubbleActive: {
     backgroundColor: 'rgba(212, 175, 55, 0.15)',
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
   reactionCount: {
     fontSize: 11,
-    color: '#666',
+    color: colors.text.secondary,
     marginLeft: 4,
     fontWeight: '600',
   },
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   timestampInBubble: {
     fontSize: 9,
-    color: '#888888',
+    color: colors.text.tertiary,
   },
   statusContainer: {
     flexDirection: 'row',
@@ -361,13 +361,13 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9F9F9',
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#EEE',
+    borderTopColor: colors.border,
   },
   pendingInputText: {
     marginTop: 8,
-    color: '#666',
+    color: colors.text.secondary,
     textAlign: 'center',
     fontSize: 14,
   },
@@ -474,17 +474,17 @@ const styles = StyleSheet.create({
   },
   // Message Preview
   messagePreview: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
     minHeight: 60,
   },
   messagePreviewMine: {
-    backgroundColor: '#000',
+    backgroundColor: '#333',
   },
   messagePreviewTheirs: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: colors.surface,
   },
   previewAudioContent: {
     flexDirection: 'row',
@@ -493,12 +493,12 @@ const styles = StyleSheet.create({
   },
   previewText: {
     fontSize: 14,
-    color: '#000',
+    color: colors.text.primary,
     lineHeight: 20,
   },
   previewTime: {
     fontSize: 11,
-    color: '#666',
+    color: colors.text.secondary,
     marginTop: 4,
   },
   // Action Menu
@@ -525,11 +525,11 @@ const styles = StyleSheet.create({
   pinnedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.surface,
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
+    borderBottomColor: colors.border,
     justifyContent: 'space-between',
   },
   pinnedContent: {
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   },
   pinnedText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.text.secondary,
   },
   unpinButton: {
     padding: 5,
@@ -557,11 +557,11 @@ const styles = StyleSheet.create({
   pinnedMessageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF9E6',
+    backgroundColor: colors.surface,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFE5B4',
+    borderBottomColor: colors.border,
     marginHorizontal: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: colors.overlayLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 6,
@@ -610,23 +610,23 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)', // Light gold background
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderRadius: 4,
   },
   pinnedIndicatorMine: {
-    alignSelf: 'flex-end', // Align to right for my messages
+    alignSelf: 'flex-end',
   },
   pinnedIndicatorTheirs: {
-    alignSelf: 'flex-start', // Align to left for their messages
+    alignSelf: 'flex-start',
   },
   pinnedLabel: {
     fontSize: 11,
-    color: '#B8860B', // Dark gold color
+    color: '#B8860B',
     fontWeight: '600',
   },
   pinnedBubble: {
     borderWidth: 2,
-    borderColor: '#FFD700', // Gold border for pinned messages
+    borderColor: '#FFD700',
   },
   starIndicator: {
     position: 'absolute',
@@ -638,10 +638,10 @@ const styles = StyleSheet.create({
   replyPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.surface,
     padding: 10,
     borderTopWidth: 1,
-    borderTopColor: '#EEE',
+    borderTopColor: colors.border,
     gap: 10,
   },
   replyBar: {
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   },
   replyText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.text.secondary,
   },
   // Reply Context in Message Bubble (WhatsApp Style)
   replyContext: {
@@ -734,10 +734,10 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   viewOnceIconSmallTheirs: {
-    borderColor: '#666',
+    borderColor: colors.text.tertiary,
   },
   viewOnceTextSmallTheirs: {
-    color: '#666',
+    color: colors.text.tertiary,
   },
   viewOnceLabelSmall: {
     fontSize: 14,
@@ -758,21 +758,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cacheIndicator: {
-    backgroundColor: '#FFF9E6',
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#F5E6D3',
+    borderBottomColor: colors.border,
   },
   cacheIndicatorText: {
-    color: '#666',
+    color: colors.text.secondary,
     fontSize: 12,
     marginLeft: 6,
     fontStyle: 'italic',
   },
 });
 
-export default styles;
+export default createChatStyles;

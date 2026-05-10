@@ -18,7 +18,7 @@ import {
   FontAwesome5,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import theme from "../theme/theme";
+import { useTheme } from "../context/ThemeContext";
 import { getInterestIcon } from "../constants/interestIcons";
 import { useProfileAnimations } from "../hooks/useProfileAnimations";
 
@@ -40,8 +40,8 @@ const ProfileBottomSheet = ({
   tutorialStep, // New Prop
   onTutorialNext // New Prop
 }) => {
-  // ... existing hooks ...
-
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const panY = useRef(new Animated.Value(0)).current;
@@ -190,36 +190,55 @@ const ProfileBottomSheet = ({
           </ScrollView>
 
           {/* Action Buttons */}
-          <View style={styles.actionBar}>
-            <TouchableOpacity style={styles.actionButton} onPress={handlePassPress}>
-              <View style={[styles.actionButtonCircle, styles.passButton]}>
-                <Ionicons name="close" size={32} color="#000" />
-              </View>
-            </TouchableOpacity>
+          <LinearGradient
+            colors={['transparent', colors.card + 'F0', colors.card]}
+            style={styles.actionBarGradientWrap}
+            pointerEvents="box-none"
+          >
+            <View style={styles.actionBar}>
+              {/* Pass */}
+              <TouchableOpacity style={styles.actionButtonWrap} onPress={handlePassPress} activeOpacity={0.75}>
+                <View style={styles.passButtonCircle}>
+                  <Ionicons name="close" size={28} color="#888" />
+                </View>
+                <Text style={styles.actionLabel}>Pass</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.superLikeButton]}
-              onPress={() => {
-                 onSuperLike();
-              }}
-            >
-              <View style={[styles.actionButtonCircle, styles.superLikeCircle]}>
-                <Ionicons name="star" size={28} color="#D4AF37" />
-              </View>
-            </TouchableOpacity>
+              {/* Like (center, largest) */}
+              <TouchableOpacity
+                style={styles.actionButtonWrap}
+                onPress={() => { if (onLike) onLike(profile); }}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#F5D27A', '#D4AF37', '#B8922A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.likeButtonCircle}
+                >
+                  <Ionicons name="heart" size={34} color="#FFF" />
+                </LinearGradient>
+                <Text style={[styles.actionLabel, styles.actionLabelGold]}>Like</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                if (onLike) onLike(profile);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.actionButtonCircle, styles.likeButton]}>
-                <Ionicons name="heart" size={32} color="#FFF" />
-              </View>
-            </TouchableOpacity>
-          </View>
+              {/* Super Like */}
+              <TouchableOpacity
+                style={styles.actionButtonWrap}
+                onPress={() => { onSuperLike(); }}
+                activeOpacity={0.75}
+              >
+                <LinearGradient
+                  colors={['#FFF8E7', '#FFF3CC', '#FFF8E7']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.superLikeButtonCircle}
+                >
+                  <Ionicons name="star" size={26} color="#D4AF37" />
+                </LinearGradient>
+                <Text style={[styles.actionLabel, styles.actionLabelStar]}>Adore</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           
 
         </Animated.View>
@@ -308,7 +327,7 @@ const ProfileBottomSheet = ({
                 step={0} 
                 steps={[{
                     title: "Make Your Move",
-                    message: "Tap the buttons to Pass, Super Like, or Match.",
+                    message: "Tap the buttons to Pass, Adore, or Match.",
                     icons: ["close", "star", "heart"], // Show all 3 actions
                     position: "bottom-sheet"
                 }]}
@@ -321,7 +340,7 @@ const ProfileBottomSheet = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -335,10 +354,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.9,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    ...theme.shadows.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
   },
   handleContainer: {
     alignItems: "center",
@@ -347,14 +370,14 @@ const styles = StyleSheet.create({
   handle: {
     width: 40,
     height: 5,
-    backgroundColor: theme.colors.text.tertiary,
+    backgroundColor: colors.text.tertiary,
     borderRadius: 3,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 200,
+    paddingBottom: 220,
   },
   embeddedPhotoContainer: {
     width: "100%",
@@ -369,7 +392,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
+    borderColor: colors.border,
   },
   content: {
     paddingHorizontal: 20,
@@ -381,19 +404,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
   bioText: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     lineHeight: 26,
     letterSpacing: 0.2,
   },
   bioTextPlain: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     lineHeight: 26,
     marginTop: 4,
     letterSpacing: 0.2,
@@ -437,61 +460,82 @@ const styles = StyleSheet.create({
   lifestyleIcon: {
     width: 20,
   },
-  actionBar: {
-    position: "absolute",
+  actionBarGradientWrap: {
+    position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    paddingTop: 32,
+    zIndex: 100,
+  },
+  actionBar: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
-    gap: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#F2F2F7",
-    zIndex: 100,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    alignItems: "flex-end",
+    gap: 24,
+    paddingBottom: 32,
+    paddingHorizontal: 32,
+    paddingTop: 8,
+  },
+  actionButtonWrap: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  passButtonCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  likeButtonCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
     elevation: 10,
   },
-  actionButton: {
-    width: 64,
-    height: 64,
-  },
-  superLikeButton: {
-    width: 56,
-    height: 56,
-  },
-  actionButtonCircle: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+  superLikeButtonCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D4AF37',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
   },
-  passButton: {
-    backgroundColor: "#F5F5F5",
-    borderWidth: 2,
-    borderColor: "#E5E5EA",
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.text.tertiary,
+    letterSpacing: 0.3,
   },
-  superLikeCircle: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#D4AF37",
-    borderRadius: 28,
+  actionLabelGold: {
+    color: '#D4AF37',
+    fontWeight: '700',
+    fontSize: 12,
   },
-  likeButton: {
-    backgroundColor: '#D4AF37',
-    shadowColor: '#D4AF37',
+  actionLabelStar: {
+    color: '#B8922A',
+    fontWeight: '600',
   },
   buttonFeedback: {
     position: "absolute",

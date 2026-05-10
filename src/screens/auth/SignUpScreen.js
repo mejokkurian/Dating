@@ -33,6 +33,7 @@ import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { sanitizeText } from '../../utils/inputSanitization';
 import * as authAnalytics from '../../services/authAnalytics';
 import { AUTH_ERROR_MESSAGES, getAuthErrorMessage } from '../../utils/authErrorMessages';
+import { useTheme } from '../../context/ThemeContext';
 
 // Client IDs from .env
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
@@ -47,6 +48,8 @@ const SignUpScreen = ({ navigation }) => {
   const { login } = useAuth();
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { isOffline } = useNetworkStatus();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   // Validation errors
   const [emailError, setEmailError] = useState('');
@@ -376,7 +379,7 @@ const SignUpScreen = ({ navigation }) => {
                 style={styles.backButton}
                 onPress={() => navigation.goBack()}
               >
-                <Ionicons name="arrow-back" size={24} color="#000" />
+                <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
               </TouchableOpacity>
               <Text style={styles.title}>Create Account</Text>
               <Text style={styles.subtitle}>
@@ -445,7 +448,7 @@ const SignUpScreen = ({ navigation }) => {
                   <TextInput
                     style={styles.input}
                     placeholder="Email"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={colors.placeholder}
                     value={email}
                     onChangeText={(text) => {
                       setEmail(text);
@@ -469,7 +472,7 @@ const SignUpScreen = ({ navigation }) => {
                     <TextInput
                       style={[styles.input, styles.passwordInput]}
                       placeholder="Password"
-                      placeholderTextColor="#8E8E93"
+                      placeholderTextColor={colors.placeholder}
                       value={password}
                       onChangeText={(text) => {
                         setPassword(text);
@@ -498,7 +501,7 @@ const SignUpScreen = ({ navigation }) => {
                         <Ionicons
                           name={showPassword ? "eye-off" : "eye"}
                           size={24}
-                          color={showPassword ? "#FF6B9D" : "#D4AF37"}
+                          color={showPassword ? "#FF6B9D" : colors.accent}
                         />
                       </Animated.View>
                     </TouchableOpacity>
@@ -523,7 +526,7 @@ const SignUpScreen = ({ navigation }) => {
                 ) : (
                   <View style={styles.buttonContent}>
                     <Text style={styles.authButtonText}>Sign Up</Text>
-                    <FontAwesome name="heart" size={16} color="#FFFFFF" />
+                    <FontAwesome name="heart" size={16} color={colors.text.inverse} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -560,7 +563,7 @@ const SignUpScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   gradient: {
     flex: 1,
   },
@@ -590,18 +593,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: theme.typography.fontSize['5xl'],
     fontWeight: theme.typography.fontWeight.extraBold,
-    color: '#000000',
+    color: colors.text.primary,
     marginBottom: theme.spacing.xs,
     textAlign: 'center',
     marginTop: 40,
   },
   subtitle: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     opacity: 0.8,
     textAlign: 'center',
   },
-  
+
   // Social Section
   socialSection: {
     flexDirection: 'row',
@@ -610,11 +613,11 @@ const styles = StyleSheet.create({
   },
   socialButton: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 16,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -630,9 +633,9 @@ const styles = StyleSheet.create({
   socialButtonText: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold,
-    color: '#000000',
+    color: colors.text.primary,
   },
-  
+
   // Divider
   divider: {
     flexDirection: 'row',
@@ -642,16 +645,16 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: colors.border,
   },
   dividerText: {
-    color: theme.colors.text.tertiary,
+    color: colors.text.tertiary,
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
     marginHorizontal: theme.spacing.md,
     opacity: 0.8,
   },
-  
+
   // Email Form
   emailForm: {
     gap: theme.spacing.md,
@@ -660,29 +663,29 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   whiteInputCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
   },
   input: {
     padding: theme.spacing.lg,
     fontSize: theme.typography.fontSize.base,
-    color: '#000000',
+    color: colors.text.primary,
     fontWeight: theme.typography.fontWeight.medium,
   },
   authButton: {
-    backgroundColor: '#D4AF37',
+    backgroundColor: colors.accent,
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: theme.spacing.md,
-    shadowColor: '#D4AF37',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
   authButtonText: {
-    color: '#000000',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -696,7 +699,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   toggleText: {
-    color: '#D4AF37',
+    color: colors.accent,
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
   },
@@ -704,18 +707,18 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontWeight: '700',
   },
-  
+
   // Footer
   footer: {
     marginTop: theme.spacing['3xl'],
     textAlign: 'center',
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.tertiary,
+    color: colors.text.tertiary,
     opacity: 0.9,
     paddingHorizontal: theme.spacing.lg,
   },
   linkText: {
-    color: '#D4AF37',
+    color: colors.accent,
     textDecorationLine: 'underline',
   },
 
@@ -723,9 +726,9 @@ const styles = StyleSheet.create({
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    backgroundColor: colors.errorBg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.3)',
+    borderColor: colors.error + '4D',
     borderRadius: 12,
     padding: 12,
     gap: 8,
@@ -733,19 +736,19 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    color: '#FF3B30',
+    color: colors.error,
     fontSize: 14,
     fontWeight: '500',
   },
   fieldError: {
-    color: '#FF3B30',
+    color: colors.error,
     fontSize: 12,
     marginTop: 6,
     marginLeft: 4,
   },
   inputCardError: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.5)',
+    borderColor: colors.error + '80',
   },
   passwordInputContainer: {
     flexDirection: 'row',
@@ -778,12 +781,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: '#D4AF37',
+    backgroundColor: colors.accent,
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
   retryButtonText: {
-    color: '#000000',
+    color: colors.text.inverse,
     fontSize: 14,
     fontWeight: '600',
   },

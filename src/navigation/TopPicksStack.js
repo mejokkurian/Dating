@@ -10,6 +10,8 @@ const TopPicksStack = () => {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
       }}
       initialRouteName="TopPicksList"
     >

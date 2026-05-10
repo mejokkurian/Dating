@@ -1,8 +1,11 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../../context/ThemeContext";
 
 const VerificationBanner = ({ isVerified, onPress }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   if (isVerified) return null;
 
   return (
@@ -17,15 +20,15 @@ const VerificationBanner = ({ isVerified, onPress }) => {
             Verify that the uploaded images are you
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#666" />
+        <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
       </View>
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   verificationBanner: {
-    backgroundColor: "#FFF9E6",
+    backgroundColor: colors.surface,
     marginHorizontal: 20,
     marginTop: 10,
     marginBottom: 10,
@@ -46,12 +49,12 @@ const styles = StyleSheet.create({
   verificationBannerTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#000000",
+    color: colors.text.primary,
     marginBottom: 4,
   },
   verificationBannerMessage: {
     fontSize: 12,
-    color: "#666666",
+    color: colors.text.secondary,
     lineHeight: 16,
   },
 });

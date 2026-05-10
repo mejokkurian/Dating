@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../services/api/config';
-import theme from '../theme/theme';
+import { useTheme } from '../context/ThemeContext';
 import { INTEREST_ICONS, getInterestIcon } from '../constants/interestIcons';
 import CustomAlert from '../components/CustomAlert';
 import SuperLikeModal from '../components/SuperLikeModal';
@@ -25,6 +25,8 @@ import HeartOverlay from '../components/HeartOverlay';
 import { useProfileAnimations } from '../hooks/useProfileAnimations';
 
 const TopPickProfileScreen = ({ route, navigation }) => {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { user } = route.params; // Simplified params
   const [loading, setLoading] = useState(false);
   const [actionType, setActionType] = useState(null); // 'LIKE', 'SUPERLIKE', 'PASS'
@@ -226,7 +228,7 @@ const TopPickProfileScreen = ({ route, navigation }) => {
       console.error('Super Like error:', error);
       setLoading(false);
       setShowSuperLikeModal(false);
-      showAlert('Error', 'Failed to send Super Like.', 'error');
+      showAlert('Error', 'Failed to send Adore.', 'error');
     }
   };
 
@@ -336,7 +338,7 @@ const TopPickProfileScreen = ({ route, navigation }) => {
                 <MaterialCommunityIcons 
                   name={user.gender === 'Female' ? 'gender-female' : 'gender-male'} 
                   size={24} 
-                  color={theme.colors.text.secondary} 
+                  color={colors.text.secondary} 
                   style={{ marginLeft: 8 }}
                 />
               )}
@@ -352,7 +354,7 @@ const TopPickProfileScreen = ({ route, navigation }) => {
             
             {user.location && (
               <View style={styles.locationRow}>
-                <Ionicons name="location-sharp" size={16} color={theme.colors.text.secondary} />
+                <Ionicons name="location-sharp" size={16} color={colors.text.secondary} />
                 <Text style={styles.locationText}>{user.location}</Text>
               </View>
             )}
@@ -375,19 +377,19 @@ const TopPickProfileScreen = ({ route, navigation }) => {
               <View style={styles.statsGridContainer}>
                 {user.budget && (
                   <View style={styles.statRow}>
-                    <Ionicons name="heart-outline" size={18} color={theme.colors.text.secondary} />
+                    <Ionicons name="heart-outline" size={18} color={colors.text.secondary} />
                     <Text style={styles.bioTextPlain}>{user.budget}</Text>
                   </View>
                 )}
                 {user.relationshipType && (
                   <View style={styles.statRow}>
-                    <Ionicons name="people-circle-outline" size={18} color={theme.colors.text.secondary} />
+                    <Ionicons name="people-circle-outline" size={18} color={colors.text.secondary} />
                     <Text style={styles.bioTextPlain}>{user.relationshipType}</Text>
                   </View>
                 )}
                 {user.preferences && (
                   <View style={styles.statRow}>
-                    <Ionicons name="male-female" size={18} color={theme.colors.text.secondary} />
+                    <Ionicons name="male-female" size={18} color={colors.text.secondary} />
                     <Text style={styles.bioTextPlain}>Interested in {user.preferences}</Text>
                   </View>
                 )}
@@ -404,61 +406,61 @@ const TopPickProfileScreen = ({ route, navigation }) => {
             <View style={styles.statsGridContainer}>
               {user.height && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="ruler" size={18} color={theme.colors.text.secondary} />
+                  <MaterialCommunityIcons name="ruler" size={18} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.height} cm</Text>
                 </View>
               )}
               {user.occupation && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="briefcase-outline" size={18} color={theme.colors.text.secondary} />
+                  <MaterialCommunityIcons name="briefcase-outline" size={18} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.occupation}</Text>
                 </View>
               )}
               {user.education && (
                 <View style={styles.statRow}>
-                  <MaterialCommunityIcons name="school-outline" size={18} color={theme.colors.text.secondary} />
+                  <MaterialCommunityIcons name="school-outline" size={18} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.education}</Text>
                 </View>
               )}
               {user.schoolUniversity && (
                 <View style={styles.statRow}>
-                  <FontAwesome5 name="university" size={14} color={theme.colors.text.secondary} />
+                  <FontAwesome5 name="university" size={14} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.schoolUniversity}</Text>
                 </View>
               )}
               {user.weight && (
                 <View style={styles.statRow}>
-                  <FontAwesome5 name="weight" size={16} color={theme.colors.text.secondary} />
+                  <FontAwesome5 name="weight" size={16} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.weight} kg</Text>
                 </View>
               )}
               {user.zodiac && (
                 <View style={styles.statRow}>
-                  <Ionicons name="sparkles" size={16} color={theme.colors.text.secondary} />
+                  <Ionicons name="sparkles" size={16} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.zodiac}</Text>
                 </View>
               )}
               {user.ethnicity && (
                 <View style={styles.statRow}>
-                  <Ionicons name="people" size={16} color={theme.colors.text.secondary} />
+                  <Ionicons name="people" size={16} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.ethnicity}</Text>
                 </View>
               )}
               {user.children && (
                 <View style={styles.statRow}>
-                  <Ionicons name="person" size={16} color={theme.colors.text.secondary} />
+                  <Ionicons name="person" size={16} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.children}</Text>
                 </View>
               )}
               {user.religion && (
                 <View style={styles.statRow}>
-                  <Ionicons name="book" size={16} color={theme.colors.text.secondary} />
+                  <Ionicons name="book" size={16} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.religion}</Text>
                 </View>
               )}
               {user.politics && (
                 <View style={styles.statRow}>
-                  <FontAwesome5 name="landmark" size={14} color={theme.colors.text.secondary} />
+                  <FontAwesome5 name="landmark" size={14} color={colors.text.secondary} />
                   <Text style={styles.bioTextPlain}>{user.politics}</Text>
                 </View>
               )}
@@ -475,19 +477,19 @@ const TopPickProfileScreen = ({ route, navigation }) => {
               <View style={styles.statsGridContainer}>
                 {user.drinking && (
                   <View style={styles.statRow}>
-                    <MaterialCommunityIcons name="glass-wine" size={18} color={theme.colors.text.secondary} />
+                    <MaterialCommunityIcons name="glass-wine" size={18} color={colors.text.secondary} />
                     <Text style={styles.bioTextPlain}>{user.drinking}</Text>
                   </View>
                 )}
                 {user.smoking && (
                   <View style={styles.statRow}>
-                    <MaterialCommunityIcons name="smoking" size={18} color={theme.colors.text.secondary} />
+                    <MaterialCommunityIcons name="smoking" size={18} color={colors.text.secondary} />
                     <Text style={styles.bioTextPlain}>{user.smoking}</Text>
                   </View>
                 )}
                 {user.drugs && (
                   <View style={styles.statRow}>
-                    <MaterialCommunityIcons name="leaf" size={18} color={theme.colors.text.secondary} />
+                    <MaterialCommunityIcons name="leaf" size={18} color={colors.text.secondary} />
                     <Text style={styles.bioTextPlain}>{user.drugs}</Text>
                   </View>
                 )}
@@ -509,7 +511,7 @@ const TopPickProfileScreen = ({ route, navigation }) => {
                       <IconComponent
                         name={iconConfig.name}
                         size={16}
-                        color={theme.colors.text.secondary}
+                        color={colors.text.secondary}
                         style={styles.interestIcon}
                       />
                       <Text style={styles.bioTextPlain}>{interest}</Text>
@@ -704,10 +706,10 @@ const TopPickProfileScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -715,7 +717,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
@@ -725,7 +727,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
   },
   scrollView: {
     flex: 1,
@@ -758,13 +760,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
   bioTextPlain: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
     lineHeight: 26,
     marginTop: 4,
     letterSpacing: 0.2,
@@ -814,7 +816,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.06)',
   },
   tagText: {
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     fontSize: 15,
     fontWeight: '500',
   },
@@ -846,7 +848,7 @@ const styles = StyleSheet.create({
   },
   lifestyleText: {
     fontSize: 15,
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
     fontWeight: '500',
   },
   basicInfoSection: {
@@ -861,7 +863,7 @@ const styles = StyleSheet.create({
   nameText: {
     fontSize: 28,
     fontWeight: '800',
-    color: theme.colors.text.primary,
+    color: colors.text.primary,
   },
   locationRow: {
     flexDirection: 'row',
@@ -870,7 +872,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.text.secondary,
   },
   expectationContainer: {
     flexDirection: 'row',

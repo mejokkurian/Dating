@@ -11,7 +11,7 @@ import {
   initConnection,
   endConnection,
   getSubscriptions,
-  requestSubscription,
+  requestPurchase,
   getAvailablePurchases,
   purchaseUpdatedListener,
   purchaseErrorListener,
@@ -171,7 +171,18 @@ export const SubscriptionProvider = ({ children }) => {
     }
     try {
       setPurchasing(true);
-      await requestSubscription({ sku: productId });
+      const product = products.find(p => p.productId === productId);
+      const offerToken = product?.subscriptionOfferDetails?.[0]?.offerToken;
+      await requestPurchase({
+        type: 'subs',
+        request: {
+          apple: { sku: productId },
+          google: {
+            skus: [productId],
+            subscriptionOffers: offerToken ? [{ sku: productId, offerToken }] : [],
+          },
+        },
+      });
       // Result handled in purchaseUpdatedListener above
     } catch (err) {
       if (__DEV__) console.error('[Subscription] requestSubscription error:', err);

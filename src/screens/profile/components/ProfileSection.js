@@ -1,16 +1,19 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../../context/ThemeContext";
 
 const ProfileSection = ({ icon, title, description, children }) => {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.neuCard}>
+    <View style={[styles.neuCard, { backgroundColor: colors.surface }]}>
       <View style={styles.sectionHeader}>
-        <Ionicons name={icon} size={20} color="#000" />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Ionicons name={icon} size={20} color={colors.text.secondary} />
+        <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>{title}</Text>
       </View>
       {description && (
-        <Text style={styles.sectionDescription}>{description}</Text>
+        <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>{description}</Text>
       )}
       {children}
     </View>
@@ -19,16 +22,15 @@ const ProfileSection = ({ icon, title, description, children }) => {
 
 const styles = StyleSheet.create({
   neuCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -37,15 +39,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
-    color: "#000000",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   sectionDescription: {
     fontSize: 13,
-    color: "#666666",
     marginBottom: 16,
     lineHeight: 18,
   },

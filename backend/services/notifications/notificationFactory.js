@@ -126,8 +126,8 @@ class NotificationFactory {
    */
   static createLikeRequestNotification(user, matchId, isSuperLike = false) {
     const emoji = isSuperLike ? '⭐' : '💖';
-    const title = isSuperLike ? 'Someone Super Liked You!' : 'Someone Likes You!';
-    const body = `${user.displayName || user.name} ${isSuperLike ? 'super liked' : 'liked'} your profile`;
+    const title = isSuperLike ? 'Someone Adored You!' : 'Someone Likes You!';
+    const body = `${user.displayName || user.name} ${isSuperLike ? 'adored' : 'liked'} your profile`;
 
     return {
       to: null, // Will be set by service

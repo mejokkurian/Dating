@@ -24,7 +24,6 @@ if (Platform.OS === "android") {
 }
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
-import { signInWithPhoneNumber } from '../../services/api/auth';
 import {
   signInWithEmail,
   createAccountWithEmail,
@@ -43,21 +42,19 @@ import CountryPicker from "../../components/CountryPicker";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 import { sanitizeText } from "../../utils/inputSanitization";
 import * as authAnalytics from "../../services/authAnalytics";
-import { AUTH_ERROR_MESSAGES, getAuthErrorMessage } from "../../utils/authErrorMessages";
+import {
+  AUTH_ERROR_MESSAGES,
+  getAuthErrorMessage,
+} from "../../utils/authErrorMessages";
+import { useTheme } from "../../context/ThemeContext";
 
 // Client IDs from .env
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 const LoginScreen = ({ navigation }) => {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState({
-    name: "United States",
-    code: "US",
-    dialCode: "+1",
-    flag: "🇺🇸",
-  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,12 +64,12 @@ const LoginScreen = ({ navigation }) => {
   const { login } = useAuth();
   const { alertConfig, showAlert, hideAlert, handleConfirm } = useCustomAlert();
   const { isOffline } = useNetworkStatus();
+  const { colors, isDark } = useTheme();
 
   // Validation errors
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [formError, setFormError] = useState("");
-  const [phoneError, setPhoneError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // Rate limiting refs
@@ -86,6 +83,8 @@ const LoginScreen = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const eyeScale = useRef(new Animated.Value(1)).current;
+
+  const styles = makeStyles(colors);
 
   // Form animation
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -103,7 +102,7 @@ const LoginScreen = ({ navigation }) => {
       // For code flow, we might get authentication object with idToken after internal exchange
       const { authentication } = response;
       const idToken = authentication?.idToken || response.params?.id_token;
-      
+
       if (idToken) {
         handleGoogleLoginSuccess(idToken);
       } else {
@@ -143,14 +142,16 @@ const LoginScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     // Test connection to backend on mount
     if (__DEV__) {
-      testConnection().then(isConnected => {
+      testConnection().then((isConnected) => {
         if (isConnected) {
-          console.log('✅ Backend is reachable');
+          console.log("✅ Backend is reachable");
         } else {
-          console.warn('⚠️ Backend connection test failed - user may experience login issues');
+          console.warn(
+            "⚠️ Backend connection test failed - user may experience login issues",
+          );
         }
       });
     }
@@ -196,7 +197,7 @@ const LoginScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     setShowPassword(!showPassword);
   };
 
@@ -226,81 +227,6 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const handlePhoneLogin = async () => {
-    // Clear previous error
-    setPhoneError("");
-
-    if (isOffline) {
-      setPhoneError("No internet connection. Please check your network and try again.");
-      return;
-    }
-
-    // Rate limiting - debounce check
-    const now = Date.now();
-    const timeSinceLastAttempt = now - lastAttemptTimeRef.current;
-    if (timeSinceLastAttempt < AUTH_DEBOUNCE_MS) {
-      authAnalytics.trackRateLimitHit('phone_login_debounce');
-      setPhoneError("Please wait a moment before trying again.");
-      return;
-    }
-
-    // Rate limiting - attempts per minute check
-    const oneMinuteAgo = now - AUTH_RATE_WINDOW;
-    attemptTimestampsRef.current = attemptTimestampsRef.current.filter(timestamp => timestamp > oneMinuteAgo);
-    
-    if (attemptTimestampsRef.current.length >= AUTH_RATE_LIMIT) {
-      authAnalytics.trackRateLimitHit('phone_login_per_minute');
-      setPhoneError(`Too many attempts. Please wait a moment before trying again.`);
-      return;
-    }
-
-    // Update rate limit tracking
-    lastAttemptTimeRef.current = now;
-    attemptTimestampsRef.current.push(now);
-
-    // Validate phone number format (E.164 format)
-    const cleanedPhone = phoneNumber.replace(/\D/g, ''); // Remove non-digits
-    if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
-      setPhoneError("Please enter a valid phone number (7-15 digits)");
-      return;
-    }
-
-    if (!phoneNumber.trim()) {
-      setPhoneError("Please enter a valid phone number");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      loadingRef.current = true;
-      const formattedPhone = `${selectedCountry.dialCode}${phoneNumber}`;
-      
-      // Use AWS SNS phone authentication
-      const response = await signInWithPhoneNumber(formattedPhone);
-      
-      // Navigate to OTP screen
-      navigation.navigate("PhoneOTP", { 
-        phoneNumber: formattedPhone
-      });
-      
-      authAnalytics.trackOTPSend(true);
-      if (__DEV__) {
-        console.log('✅ AWS SNS OTP sent to:', formattedPhone);
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || "Failed to send verification code. Please try again.";
-      authAnalytics.trackOTPSend(false, errorMessage);
-      authAnalytics.trackAuthError('phone', errorMessage, error.code);
-      if (__DEV__) {
-        console.error('Phone auth error:', error);
-      }
-      setPhoneError(errorMessage);
-    } finally {
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  };
-
   const handleEmailLogin = async () => {
     // Clear previous errors
     setEmailError("");
@@ -316,17 +242,19 @@ const LoginScreen = ({ navigation }) => {
     const now = Date.now();
     const timeSinceLastAttempt = now - lastAttemptTimeRef.current;
     if (timeSinceLastAttempt < AUTH_DEBOUNCE_MS) {
-      authAnalytics.trackRateLimitHit('login_debounce');
+      authAnalytics.trackRateLimitHit("login_debounce");
       setFormError(AUTH_ERROR_MESSAGES.RATE_LIMIT_DEBOUNCE);
       return;
     }
 
     // Rate limiting - attempts per minute check
     const oneMinuteAgo = now - AUTH_RATE_WINDOW;
-    attemptTimestampsRef.current = attemptTimestampsRef.current.filter(timestamp => timestamp > oneMinuteAgo);
-    
+    attemptTimestampsRef.current = attemptTimestampsRef.current.filter(
+      (timestamp) => timestamp > oneMinuteAgo,
+    );
+
     if (attemptTimestampsRef.current.length >= AUTH_RATE_LIMIT) {
-      authAnalytics.trackRateLimitHit('login_per_minute');
+      authAnalytics.trackRateLimitHit("login_per_minute");
       setFormError(AUTH_ERROR_MESSAGES.RATE_LIMIT_PER_MINUTE);
       return;
     }
@@ -357,23 +285,27 @@ const LoginScreen = ({ navigation }) => {
     try {
       let response;
       if (isSignUp) {
-        response = await createAccountWithEmail(sanitizedEmail, sanitizedPassword);
-        authAnalytics.trackSignupAttempt('email', true);
+        response = await createAccountWithEmail(
+          sanitizedEmail,
+          sanitizedPassword,
+        );
+        authAnalytics.trackSignupAttempt("email", true);
       } else {
         response = await signInWithEmail(sanitizedEmail, sanitizedPassword);
-        authAnalytics.trackLoginAttempt('email', true);
+        authAnalytics.trackLoginAttempt("email", true);
       }
 
       // Update auth context
       await login(response);
     } catch (error) {
-      const errorMessage = error.message || "An error occurred. Please try again.";
+      const errorMessage =
+        error.message || "An error occurred. Please try again.";
       if (isSignUp) {
-        authAnalytics.trackSignupAttempt('email', false, errorMessage);
+        authAnalytics.trackSignupAttempt("email", false, errorMessage);
       } else {
-        authAnalytics.trackLoginAttempt('email', false, errorMessage);
+        authAnalytics.trackLoginAttempt("email", false, errorMessage);
       }
-      authAnalytics.trackAuthError('email', errorMessage, error.code);
+      authAnalytics.trackAuthError("email", errorMessage, error.code);
       if (__DEV__) {
         console.error("Email login error:", error);
       }
@@ -393,15 +325,15 @@ const LoginScreen = ({ navigation }) => {
 
   const handleGoogleLogin = async () => {
     if (__DEV__ && (!GOOGLE_IOS_CLIENT_ID || !GOOGLE_ANDROID_CLIENT_ID)) {
-        console.warn('Google Client IDs are missing!');
+      console.warn("Google Client IDs are missing!");
     }
     try {
-        await promptAsync();
-    } catch(err) {
-        if (__DEV__) {
-          console.error("Google prompt error", err);
-        }
-        showAlert("Error", "Failed to start Google sign in", "error");
+      await promptAsync();
+    } catch (err) {
+      if (__DEV__) {
+        console.error("Google prompt error", err);
+      }
+      showAlert("Error", "Failed to start Google sign in", "error");
     }
   };
 
@@ -409,22 +341,22 @@ const LoginScreen = ({ navigation }) => {
     try {
       setLoading(true);
       loadingRef.current = true;
-      const data = await signInWithGoogle({ token: idToken, type: 'login' });
-      authAnalytics.trackLoginAttempt('google', true);
+      const data = await signInWithGoogle({ token: idToken, type: "login" });
+      authAnalytics.trackLoginAttempt("google", true);
       await login(data);
     } catch (error) {
       const errorMessage = error.message || "Google sign-in failed";
-      authAnalytics.trackLoginAttempt('google', false, errorMessage);
-      authAnalytics.trackAuthError('google', errorMessage, error.code);
+      authAnalytics.trackLoginAttempt("google", false, errorMessage);
+      authAnalytics.trackAuthError("google", errorMessage, error.code);
       if (error.message && error.message.includes("User not found")) {
-         showAlert(
-            "Account Not Found", 
-            "We couldn't find an account with this Google ID. Redirecting you to sign up...", 
-            "info",
-            () => navigation.navigate("SignUp")
-         );
+        showAlert(
+          "Account Not Found",
+          "We couldn't find an account with this Google ID. Redirecting you to sign up...",
+          "info",
+          () => navigation.navigate("SignUp"),
+        );
       } else {
-         showAlert("Error", errorMessage, "error");
+        showAlert("Error", errorMessage, "error");
       }
     } finally {
       setLoading(false);
@@ -448,28 +380,28 @@ const LoginScreen = ({ navigation }) => {
         token: credential.identityToken, // auth service maps this to identityToken
         fullName: credential.fullName,
         authorizationCode: credential.authorizationCode,
-        type: 'login'
+        type: "login",
       });
-      
-      authAnalytics.trackLoginAttempt('apple', true);
+
+      authAnalytics.trackLoginAttempt("apple", true);
       await login(data);
     } catch (error) {
-      if (error.code === 'ERR_CANCELED') {
+      if (error.code === "ERR_CANCELED") {
         // user canceled
         return;
       }
       const errorMessage = error.message || "Apple sign-in failed";
-      authAnalytics.trackLoginAttempt('apple', false, errorMessage);
-      authAnalytics.trackAuthError('apple', errorMessage, error.code);
+      authAnalytics.trackLoginAttempt("apple", false, errorMessage);
+      authAnalytics.trackAuthError("apple", errorMessage, error.code);
       if (error.message && error.message.includes("User not found")) {
-         showAlert(
-            "Account Not Found", 
-            "We couldn't find an account with this Apple ID. Redirecting you to sign up...", 
-            "info",
-            () => navigation.navigate("SignUp")
-         );
+        showAlert(
+          "Account Not Found",
+          "We couldn't find an account with this Apple ID. Redirecting you to sign up...",
+          "info",
+          () => navigation.navigate("SignUp"),
+        );
       } else {
-         showAlert("Error", errorMessage, "error");
+        showAlert("Error", errorMessage, "error");
       }
     } finally {
       setLoading(false);
@@ -499,7 +431,20 @@ const LoginScreen = ({ navigation }) => {
           >
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Discover Real Connections</Text>
+              {/* Brand Logo */}
+              {/* <View style={styles.logoContainer}>
+                <LinearGradient
+                  colors={["#F5C842", "#D4AF37", "#B8860B"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.logoGradient}
+                >
+                  <FontAwesome name="diamond" size={26} color="#0D0D0D" />
+                </LinearGradient>
+                <Text style={styles.brandName}>EMPER</Text>
+              </View> */}
+
+              <Text style={styles.title}>Discover Real{"\n"}Connections</Text>
               <Text style={styles.subtitle}>
                 {showEmailLogin
                   ? isSignUp
@@ -509,8 +454,14 @@ const LoginScreen = ({ navigation }) => {
               </Text>
               {isOffline && (
                 <View style={styles.offlineBanner}>
-                  <Ionicons name="cloud-offline-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.offlineBannerText}>No Internet Connection</Text>
+                  <Ionicons
+                    name="cloud-offline-outline"
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.offlineBannerText}>
+                    No Internet Connection
+                  </Text>
                 </View>
               )}
             </View>
@@ -529,25 +480,54 @@ const LoginScreen = ({ navigation }) => {
                   ],
                 }}
               >
-                {/* Social Login Buttons */}
+                {/* Social Login Buttons — column layout */}
                 <View style={styles.socialSection}>
                   {Platform.OS === "ios" && (
-                    <AppleAuthentication.AppleAuthenticationButton
-                        buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                        cornerRadius={16}
-                        style={{ flex: 1, height: 50 }}
+                    <View style={styles.appleButtonWrapper}>
+                      <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={
+                          AppleAuthentication.AppleAuthenticationButtonType
+                            .SIGN_IN
+                        }
+                        buttonStyle={
+                          AppleAuthentication.AppleAuthenticationButtonStyle
+                            .BLACK
+                        }
+                        cornerRadius={14}
+                        style={{ width: "100%", height: 54 }}
                         onPress={handleAppleLogin}
-                    />
+                      />
+                    </View>
                   )}
+
                   <TouchableOpacity
                     style={styles.socialButton}
                     onPress={handleGoogleLogin}
                     disabled={!request || loading}
+                    activeOpacity={0.8}
                   >
                     <View style={styles.socialButtonContent}>
                       <FontAwesome name="google" size={18} color="#DB4437" />
-                      <Text style={styles.socialButtonText}>Google</Text>
+                      <Text style={styles.socialButtonText}>
+                        Continue with Google
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.socialButton}
+                    onPress={() => navigation.navigate("PhoneNumber")}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.socialButtonContent}>
+                      <Ionicons
+                        name="call-outline"
+                        size={18}
+                        color={colors.text.primary}
+                      />
+                      <Text style={styles.socialButtonText}>
+                        Continue with Phone
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -559,87 +539,32 @@ const LoginScreen = ({ navigation }) => {
                   <View style={styles.dividerLine} />
                 </View>
 
-                {/* Phone Number Section */}
-                <View style={styles.phoneSection}>
-                  <View>
-                    <GlassCard
-                      style={[
-                        styles.inputCard,
-                        phoneError && styles.inputCardError,
-                      ]}
-                      opacity={0.9}
-                    >
-                      <View style={styles.phoneInputContainer}>
-                        <CountryPicker
-                          selectedCountry={selectedCountry}
-                          onSelect={setSelectedCountry}
-                        />
-                        <View style={styles.phoneDivider} />
-                        <TextInput
-                          style={styles.phoneInput}
-                          placeholder="Phone Number"
-                          placeholderTextColor="#8E8E93"
-                          value={phoneNumber}
-                          onChangeText={(text) => {
-                            setPhoneNumber(text);
-                            setPhoneError("");
-                          }}
-                          keyboardType="phone-pad"
-                          autoCapitalize="none"
-                        />
-                      </View>
-                    </GlassCard>
-                    {phoneError ? (
-                      <View style={styles.phoneErrorContainer}>
-                        <Text style={styles.fieldError}>{phoneError}</Text>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setPhoneError("");
-                            handlePhoneLogin();
-                          }}
-                          style={styles.retryButtonSmall}
-                        >
-                          <Text style={styles.retryButtonTextSmall}>Retry</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-                  </View>
-                  <TouchableOpacity
-                    style={styles.authButton}
-                    onPress={handlePhoneLogin}
-                    disabled={loading || isOffline}
-                    accessibilityLabel="Send verification code"
-                    accessibilityHint="Sends a 6-digit verification code to your phone number"
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: loading || isOffline }}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <View style={styles.buttonContent}>
-                        <Text style={styles.authButtonText}>Send Code</Text>
-                        <FontAwesome name="heart" size={16} color="#FFFFFF" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Email Link */}
+                {/* Email Ghost Button */}
                 <TouchableOpacity
-                  style={styles.textLinkButton}
+                  style={styles.emailOutlineButton}
                   onPress={() => toggleEmailLogin(true)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.textLink}>Continue with Email</Text>
+                  <Ionicons
+                    name="mail-outline"
+                    size={18}
+                    color={colors.accent}
+                  />
+                  <Text style={styles.emailOutlineText}>
+                    Continue with Email
+                  </Text>
                 </TouchableOpacity>
 
                 {/* Create Account Link */}
                 <TouchableOpacity
-                  style={styles.textLinkButton}
+                  style={styles.signUpRow}
                   onPress={() => navigation.navigate("SignUp")}
                 >
                   <Text style={styles.createAccountText}>
-                    Don't have an account?{" "}
-                    <Text style={styles.createAccountBold}>Sign Up</Text>
+                    New here?{" "}
+                    <Text style={styles.createAccountBold}>
+                      Create an account
+                    </Text>
                   </Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -723,7 +648,7 @@ const LoginScreen = ({ navigation }) => {
                         <TextInput
                           style={[styles.input, styles.passwordInput]}
                           placeholder="Password"
-                          placeholderTextColor="#8E8E93"
+                          placeholderTextColor={colors.placeholder}
                           value={password}
                           onChangeText={(text) => {
                             setPassword(text);
@@ -733,14 +658,20 @@ const LoginScreen = ({ navigation }) => {
                           secureTextEntry={!showPassword}
                           autoCapitalize="none"
                           accessibilityLabel="Password input"
-                          accessibilityHint={showPassword ? "Password is visible" : "Password is hidden"}
+                          accessibilityHint={
+                            showPassword
+                              ? "Password is visible"
+                              : "Password is hidden"
+                          }
                           accessibilityRole="textbox"
                         />
                         <TouchableOpacity
                           style={styles.eyeButton}
                           onPress={togglePasswordVisibility}
                           activeOpacity={0.6}
-                          accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                          accessibilityLabel={
+                            showPassword ? "Hide password" : "Show password"
+                          }
                           accessibilityHint="Toggles password visibility"
                           accessibilityRole="button"
                         >
@@ -752,7 +683,7 @@ const LoginScreen = ({ navigation }) => {
                             <Ionicons
                               name={showPassword ? "eye-off" : "eye"}
                               size={24}
-                              color={showPassword ? "#FF6B9D" : "#D4AF37"}
+                              color={showPassword ? "#FF6B9D" : colors.accent}
                             />
                           </Animated.View>
                         </TouchableOpacity>
@@ -767,8 +698,14 @@ const LoginScreen = ({ navigation }) => {
                     style={styles.authButton}
                     onPress={handleEmailLogin}
                     disabled={loading || isOffline}
-                    accessibilityLabel={isSignUp ? "Sign up button" : "Sign in button"}
-                    accessibilityHint={isSignUp ? "Creates a new account with your email and password" : "Signs in with your email and password"}
+                    accessibilityLabel={
+                      isSignUp ? "Sign up button" : "Sign in button"
+                    }
+                    accessibilityHint={
+                      isSignUp
+                        ? "Creates a new account with your email and password"
+                        : "Signs in with your email and password"
+                    }
                     accessibilityRole="button"
                     accessibilityState={{ disabled: loading || isOffline }}
                   >
@@ -835,313 +772,353 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: theme.spacing.lg,
-    justifyContent: "center",
-    minHeight: "100%",
-  },
-  content: {
-    width: "100%",
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: theme.spacing["3xl"],
-  },
-  title: {
-    fontSize: theme.typography.fontSize["4xl"],
-    fontWeight: theme.typography.fontWeight.extraBold,
-    color: "#000000",
-    marginBottom: theme.spacing.xs,
-    textAlign: "center",
-    lineHeight: 42,
-    paddingHorizontal: 20,
-  },
-  subtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    opacity: 0.8,
-    textAlign: "center",
-  },
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    gradient: { flex: 1 },
+    container: { flex: 1 },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 28,
+      paddingVertical: 40,
+      justifyContent: "center",
+      minHeight: "100%",
+    },
+    content: { width: "100%" },
 
-  // Social Section
-  socialSection: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing["2xl"], // Increased spacing
-    marginTop: theme.spacing.lg,
-  },
-  appleButton: {
-    borderRadius: 30,
-    overflow: "hidden",
-    ...theme.shadows.lg,
-  },
-  socialButton: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.1)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  socialButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  socialButtonText: {
-    fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semiBold,
-    color: "#000000",
-  },
+    // Header & Logo
+    header: {
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    logoContainer: {
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    logoGradient: {
+      width: 64,
+      height: 64,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#D4AF37",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.55,
+      shadowRadius: 14,
+      elevation: 12,
+      marginBottom: 10,
+    },
+    brandName: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: colors.accent,
+      letterSpacing: 6,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: "800",
+      color: colors.text.primary,
+      marginBottom: 8,
+      textAlign: "center",
+      lineHeight: 40,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: colors.text.secondary,
+      textAlign: "center",
+      letterSpacing: 0.3,
+    },
 
-  // Divider
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: theme.spacing["2xl"], // Increased spacing
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
-  },
-  dividerText: {
-    color: theme.colors.text.tertiary,
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    marginHorizontal: theme.spacing.md,
-    opacity: 0.8,
-  },
+    // Social Section
+    socialSection: {
+      flexDirection: "column",
+      gap: 12,
+      marginBottom: 20,
+      marginTop: 8,
+    },
+    appleButtonWrapper: {
+      width: "100%",
+      borderRadius: 14,
+      overflow: "hidden",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    socialButton: {
+      width: "100%",
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      paddingVertical: 17,
+      borderWidth: 1,
+      borderColor: "rgba(212, 175, 55, 0.25)",
+      shadowColor: "#D4AF37",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    socialButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+    socialButtonText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text.primary,
+      letterSpacing: 0.2,
+    },
 
-  // Phone Section
-  phoneSection: {
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing["3xl"], // Increased spacing
-  },
-  inputCard: {
-    padding: 0,
-  },
-  whiteInputCard: {
-    backgroundColor: "#FFFFFF",
-  },
-  input: {
-    padding: theme.spacing.lg,
-    fontSize: theme.typography.fontSize.base,
-    color: "#000000",
-    fontWeight: theme.typography.fontWeight.medium,
-  },
-  phoneButton: {
-    width: "100%",
-  },
-  phoneInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  phoneDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    marginHorizontal: 8,
-  },
-  phoneInput: {
-    flex: 1,
-    padding: theme.spacing.lg,
-    fontSize: theme.typography.fontSize.base,
-    color: "#000000",
-    fontWeight: theme.typography.fontWeight.medium,
-  },
+    // Divider
+    divider: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginVertical: 16,
+    },
+    dividerLine: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: "rgba(212, 175, 55, 0.3)",
+    },
+    dividerText: {
+      color: colors.text.tertiary,
+      fontSize: 11,
+      fontWeight: "600",
+      marginHorizontal: 14,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+    },
 
-  // Text Links
-  textLinkButton: {
-    alignItems: "center",
-    paddingVertical: theme.spacing.sm,
-    marginTop: theme.spacing.md, // Added spacing between links
-  },
-  textLink: {
-    color: theme.colors.text.secondary,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  createAccountText: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  createAccountBold: {
-    color: "#D4AF37",
-    fontWeight: "700",
-  },
+    // Email Ghost Button
+    emailOutlineButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+      borderRadius: 14,
+      paddingVertical: 15,
+      backgroundColor: "transparent",
+    },
+    emailOutlineText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.accent,
+      letterSpacing: 0.2,
+    },
 
-  // Email Form
-  emailForm: {
-    gap: theme.spacing.md,
-  },
-  authButton: {
-    backgroundColor: "#D4AF37",
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: theme.spacing.md,
-    shadowColor: "#D4AF37",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  authButtonText: {
-    color: "#000000",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  emailButton: {
-    marginTop: theme.spacing.md,
-  },
-  toggleButton: {
-    alignItems: "center",
-    paddingVertical: theme.spacing.sm,
-  },
-  toggleText: {
-    color: "#D4AF37",
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-  },
-  toggleTextAction: {
-    textDecorationLine: "underline",
-    fontWeight: "700",
-  },
-  backButton: {
-    alignItems: "center",
-    paddingVertical: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  backText: {
-    color: theme.colors.text.primary,
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-  },
+    // Sign Up Row
+    signUpRow: {
+      alignItems: "center",
+      paddingVertical: 14,
+      marginTop: 4,
+    },
+    createAccountText: {
+      color: colors.text.secondary,
+      fontSize: 14,
+    },
+    createAccountBold: {
+      color: colors.accent,
+      fontWeight: "700",
+    },
 
-  // Footer
-  footer: {
-    marginTop: theme.spacing["3xl"],
-    textAlign: "center",
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.tertiary,
-    opacity: 0.9,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  linkText: {
-    color: "#D4AF37",
-    textDecorationLine: "underline",
-  },
+    // Text Links (kept for email form back button etc.)
+    textLinkButton: {
+      alignItems: "center",
+      paddingVertical: theme.spacing.sm,
+      marginTop: theme.spacing.md,
+    },
+    textLink: {
+      color: colors.text.secondary,
+      fontSize: 15,
+      fontWeight: "600",
+    },
 
-  // Error styles
-  errorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 59, 48, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 59, 48, 0.3)",
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    flex: 1,
-    color: "#FF3B30",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  fieldError: {
-    color: "#FF3B30",
-    fontSize: 12,
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  inputCardError: {
-    borderWidth: 1,
-    borderColor: "rgba(255, 59, 48, 0.5)",
-  },
-  passwordInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  passwordInput: {
-    flex: 1,
-    paddingRight: 50,
-  },
-  eyeButton: {
-    position: "absolute",
-    right: 16,
-    padding: 8,
-  },
-  offlineBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF5252',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    gap: 6,
-  },
-  offlineBannerText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  phoneErrorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  retryButton: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#D4AF37',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  retryButtonText: {
-    color: '#000000',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  retryButtonSmall: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    backgroundColor: '#D4AF37',
-    borderRadius: 6,
-    marginLeft: 8,
-  },
-  retryButtonTextSmall: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});
+    // Email Form
+    emailForm: { gap: theme.spacing.md },
+    inputCard: { padding: 0 },
+    whiteInputCard: { backgroundColor: colors.card },
+    input: {
+      padding: theme.spacing.lg,
+      fontSize: theme.typography.fontSize.base,
+      color: colors.text.primary,
+      fontWeight: theme.typography.fontWeight.medium,
+    },
+    authButton: {
+      backgroundColor: colors.accent,
+      paddingVertical: 17,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: theme.spacing.md,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    authButtonText: {
+      color: "#0D0D0D",
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+    },
+    toggleButton: {
+      alignItems: "center",
+      paddingVertical: theme.spacing.sm,
+    },
+    toggleText: {
+      color: colors.accent,
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: theme.typography.fontWeight.medium,
+    },
+    toggleTextAction: {
+      textDecorationLine: "underline",
+      fontWeight: "700",
+    },
+    backButton: {
+      alignItems: "center",
+      paddingVertical: theme.spacing.md,
+      marginTop: theme.spacing.md,
+    },
+    backText: {
+      color: colors.text.secondary,
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: theme.typography.fontWeight.medium,
+    },
+
+    // Footer
+    footer: {
+      marginTop: 32,
+      textAlign: "center",
+      fontSize: 12,
+      color: colors.text.tertiary,
+      paddingHorizontal: theme.spacing.lg,
+      lineHeight: 18,
+    },
+    linkText: {
+      color: colors.accent,
+      textDecorationLine: "underline",
+    },
+
+    // Error styles
+    errorContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.errorBg,
+      borderWidth: 1,
+      borderColor: colors.error + "4D",
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+      marginBottom: 16,
+    },
+    errorText: {
+      flex: 1,
+      color: colors.error,
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    fieldError: {
+      color: colors.error,
+      fontSize: 12,
+      marginTop: 6,
+      marginLeft: 4,
+    },
+    inputCardError: {
+      borderWidth: 1,
+      borderColor: colors.error + "80",
+    },
+    passwordInputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    passwordInput: {
+      flex: 1,
+      paddingRight: 50,
+    },
+    eyeButton: {
+      position: "absolute",
+      right: 16,
+      padding: 8,
+    },
+    offlineBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#FF5252",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginTop: 8,
+      alignSelf: "flex-start",
+      gap: 6,
+    },
+    offlineBannerText: {
+      color: "#FFFFFF",
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    phoneErrorContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 6,
+    },
+    retryButton: {
+      marginTop: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      backgroundColor: colors.accent,
+      borderRadius: 8,
+      alignSelf: "flex-start",
+    },
+    retryButtonText: {
+      color: colors.text.inverse,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    retryButtonSmall: {
+      paddingVertical: 4,
+      paddingHorizontal: 12,
+      backgroundColor: colors.accent,
+      borderRadius: 6,
+      marginLeft: 8,
+    },
+    retryButtonTextSmall: {
+      color: colors.text.inverse,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    // Unused legacy
+    phoneSection: { gap: theme.spacing.md, marginBottom: theme.spacing["3xl"] },
+    phoneButton: { width: "100%" },
+    phoneInputContainer: { flexDirection: "row", alignItems: "center" },
+    phoneDivider: {
+      width: 1,
+      height: 24,
+      backgroundColor: colors.border,
+      marginHorizontal: 8,
+    },
+    phoneInput: {
+      flex: 1,
+      padding: theme.spacing.lg,
+      fontSize: theme.typography.fontSize.base,
+      color: colors.text.primary,
+    },
+    buttonContent: { flexDirection: "row", alignItems: "center", gap: 8 },
+    emailButton: { marginTop: theme.spacing.md },
+    appleButton: { borderRadius: 30, overflow: "hidden" },
+    phoneSignupButton: {
+      width: "100%",
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      paddingVertical: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+  });
 
 export default LoginScreen;

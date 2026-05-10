@@ -12,8 +12,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import { useSubscription } from '../context/SubscriptionContext';
-import { SUBSCRIPTION_TIERS, PRODUCT_IDS } from '../constants/subscription';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── Copy per trigger ─────────────────────────────────────────────────────────
 
@@ -46,8 +47,10 @@ const TRIGGER_CONTENT = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const PaywallModal = ({ navigation }) => {
-  const { paywallVisible, paywallTrigger, hidePaywall, purchase, purchasing } = useSubscription();
+const PaywallModal = () => {
+  const { paywallVisible, paywallTrigger, hidePaywall, purchasing } = useSubscription();
+  const { colors } = useTheme();
+  const navigation = useNavigation();
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -67,19 +70,9 @@ const PaywallModal = ({ navigation }) => {
     }
   }, [paywallVisible]);
 
-  const handleGetGold = () => {
+  const navigateToPremium = () => {
     hidePaywall();
-    // Navigate to the Premium screen so the user can pick monthly vs yearly
-    if (navigation) {
-      navigation.navigate('Premium', { isTab: true });
-    }
-  };
-
-  const handleViewAllPlans = () => {
-    hidePaywall();
-    if (navigation) {
-      navigation.navigate('Premium', { isTab: true });
-    }
+    navigation.navigate('Premium', { isTab: true });
   };
 
   return (
@@ -93,10 +86,13 @@ const PaywallModal = ({ navigation }) => {
         <Pressable style={StyleSheet.absoluteFill} onPress={hidePaywall} />
 
         <Animated.View
-          style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.card, transform: [{ translateY: slideAnim }] },
+          ]}
         >
           {/* Handle bar */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {/* Icon badge */}
           <View style={styles.iconBadge}>
@@ -108,15 +104,15 @@ const PaywallModal = ({ navigation }) => {
             </LinearGradient>
           </View>
 
-          <Text style={styles.title}>{content.title}</Text>
-          <Text style={styles.subtitle}>{content.subtitle}</Text>
+          <Text style={[styles.title, { color: colors.text.primary }]}>{content.title}</Text>
+          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>{content.subtitle}</Text>
 
           {/* Quick feature pills */}
           <View style={styles.pills}>
-            {['Unlimited Swipes', 'See Likes', 'Top Picks', '5 SuperLikes'].map((f) => (
-              <View key={f} style={styles.pill}>
+            {['Unlimited Swipes', 'See Likes', 'Top Picks', '5 Adores'].map((f) => (
+              <View key={f} style={[styles.pill, { backgroundColor: colors.surface2 }]}>
                 <Ionicons name="checkmark-circle" size={14} color="#B8860B" />
-                <Text style={styles.pillText}>{f}</Text>
+                <Text style={[styles.pillText, { color: colors.accentDark }]}>{f}</Text>
               </View>
             ))}
           </View>
@@ -124,7 +120,7 @@ const PaywallModal = ({ navigation }) => {
           {/* Primary CTA */}
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={handleGetGold}
+            onPress={navigateToPremium}
             disabled={purchasing}
             activeOpacity={0.85}
           >
@@ -146,12 +142,12 @@ const PaywallModal = ({ navigation }) => {
           </TouchableOpacity>
 
           {/* Secondary link */}
-          <TouchableOpacity onPress={handleViewAllPlans} style={styles.secondaryBtn}>
+          <TouchableOpacity onPress={navigateToPremium} style={styles.secondaryBtn}>
             <Text style={styles.secondaryBtnText}>See all plans →</Text>
           </TouchableOpacity>
 
           <View style={styles.legalRow}>
-            <Text style={styles.legalText}>
+            <Text style={[styles.legalText, { color: colors.text.tertiary }]}>
               Recurring billing. Cancel anytime in{' '}
               {Platform.OS === 'ios' ? 'App Store Settings' : 'Google Play'}.
             </Text>
@@ -167,11 +163,10 @@ const PaywallModal = ({ navigation }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
@@ -183,7 +178,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E0E0E0',
     marginBottom: 24,
   },
   iconBadge: {
@@ -199,13 +193,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#111',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 15,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 20,
@@ -221,7 +213,6 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E1',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -230,7 +221,6 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#7A5C00',
   },
   primaryBtn: {
     width: '100%',
@@ -271,7 +261,6 @@ const styles = StyleSheet.create({
   },
   legalText: {
     fontSize: 11,
-    color: '#AAA',
     textAlign: 'center',
     lineHeight: 16,
   },
